@@ -21,7 +21,7 @@ jobs:
           JWT_SECRET_KEY=ci-test-jwt-key-not-for-production
           MYSQL_HOST=db
           MYSQL_PORT=3306
-          MYSQL_USER=hspx_app
+          MYSQL_USER=nursespace_app
           MYSQL_PASSWORD=CiTest2024!
           MYSQL_DATABASE=nurse_training_system
           ADMIN_USERNAME=admin

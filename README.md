@@ -1,4 +1,4 @@
-# 护士培训系统（HSPX）
+# NurseSpace — 智能护士培训系统
 
 基于 Flask + MySQL + Redis 的智能护士培训系统，支持案例学习、AI 评分、错题管理、考试功能和薄弱点分析。
 
@@ -136,14 +136,14 @@ sudo chmod +x /usr/local/bin/docker-compose
 ```bash
 # 上传项目到服务器
 # 方式一：git clone
-git clone <your-repo-url> /opt/hspx
+git clone <your-repo-url> /opt/nursespace
 
 # 方式二：scp 上传
-scp -r HSPX/ user@server:/opt/hspx
+scp -r NurseSpace/ user@server:/opt/nursespace
 
-# 方式三：直接用文件管理器上传 HSPX 目录到 /opt/hspx
+# 方式三：直接用文件管理器上传 NurseSpace 目录到 /opt/nursespace
 
-cd /opt/hspx
+cd /opt/nursespace
 ```
 
 ### 第三步：配置环境变量
@@ -187,7 +187,7 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 | `JWT_SECRET_KEY` | ✅ | — | JWT Token 签名密钥 |
 | `MYSQL_HOST` | — | `db` | MySQL 主机（容器内用服务名） |
 | `MYSQL_PORT` | — | `3306` | MySQL 端口 |
-| `MYSQL_USER` | — | `hspx_app` | MySQL 用户名 |
+| `MYSQL_USER` | — | `nursespace_app` | MySQL 用户名 |
 | `MYSQL_PASSWORD` | ✅ | — | MySQL 密码 |
 | `MYSQL_DATABASE` | — | `nurse_training_system` | 数据库名 |
 | `ADMIN_USERNAME` | — | `admin` | 管理员用户名（仅首次启动创建） |
@@ -210,8 +210,8 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 ### 第四步：启动服务
 
 ```bash
-# 确保在 /opt/hspx 目录下
-cd /opt/hspx
+# 确保在 /opt/nursespace 目录下
+cd /opt/nursespace
 
 # 构建镜像并启动所有服务
 # 首次构建约 3-5 分钟（拉取基础镜像 + 安装依赖）
@@ -223,10 +223,10 @@ docker compose ps
 
 # 预期输出：
 # NAME                STATUS
-# hspx-db-1           healthy
-# hspx-redis-1        healthy
-# hspx-app-1          healthy
-# hspx-nginx-1        healthy
+# nursespace-db-1           healthy
+# nursespace-redis-1        healthy
+# nursespace-app-1          healthy
+# nursespace-nginx-1        healthy
 ```
 
 **验证部署**：
@@ -293,11 +293,11 @@ docker compose exec app flask db upgrade
 **方式四：直接复制到 Docker 卷**
 ```bash
 # 查看案例卷的实际路径
-docker volume inspect hspx_app_cases | grep Mountpoint
-# 输出类似: "/var/lib/docker/volumes/hspx_app_cases/_data"
+docker volume inspect nursespace_app_cases | grep Mountpoint
+# 输出类似: "/var/lib/docker/volumes/nursespace_app_cases/_data"
 
 # 复制案例文件
-sudo cp /path/to/your/cases/*.docx /var/lib/docker/volumes/hspx_app_cases/_data/
+sudo cp /path/to/your/cases/*.docx /var/lib/docker/volumes/nursespace_app_cases/_data/
 ```
 
 ### 第八步：创建护士账号
@@ -428,7 +428,7 @@ Word 文档 (.docx) 需要遵循以下标记格式，系统自动解析入库：
 
 ```bash
 # 查看状态
-cd /opt/hspx && docker compose ps
+cd /opt/nursespace && docker compose ps
 
 # 重启单个服务
 docker compose restart app
@@ -465,7 +465,7 @@ docker compose exec app cat /app/logs/error.log
 
 ```bash
 # 创建备份目录
-mkdir -p /opt/hspx/backups
+mkdir -p /opt/nursespace/backups
 
 # 导出数据库
 docker compose exec db mysqldump \
@@ -474,11 +474,11 @@ docker compose exec db mysqldump \
   --routines \
   --triggers \
   nurse_training_system \
-  | gzip > /opt/hspx/backups/db_$(date +%Y%m%d_%H%M%S).sql.gz
+  | gzip > /opt/nursespace/backups/db_$(date +%Y%m%d_%H%M%S).sql.gz
 
 # 备份上传文件
-sudo tar czf /opt/hspx/backups/uploads_$(date +%Y%m%d).tar.gz \
-  -C /var/lib/docker/volumes/hspx_app_uploads/_data .
+sudo tar czf /opt/nursespace/backups/uploads_$(date +%Y%m%d).tar.gz \
+  -C /var/lib/docker/volumes/nursespace_app_uploads/_data .
 ```
 
 **自动备份（crontab）**：
@@ -489,24 +489,24 @@ crontab -e
 
 # 添加以下行：
 # 每天凌晨 2 点备份数据库
-0 2 * * * cd /opt/hspx && docker compose exec -T db mysqldump -u root -p"YOUR_PASSWORD" --single-transaction nurse_training_system | gzip > /opt/hspx/backups/db_$(date +\%Y\%m\%d).sql.gz
+0 2 * * * cd /opt/nursespace && docker compose exec -T db mysqldump -u root -p"YOUR_PASSWORD" --single-transaction nurse_training_system | gzip > /opt/nursespace/backups/db_$(date +\%Y\%m\%d).sql.gz
 
 # 每天凌晨 3 点清理 30 天前的备份
-0 3 * * * find /opt/hspx/backups -name "db_*.sql.gz" -mtime +30 -delete
+0 3 * * * find /opt/nursespace/backups -name "db_*.sql.gz" -mtime +30 -delete
 ```
 
 **恢复数据库**：
 
 ```bash
 # 解压并恢复
-gunzip -c /opt/hspx/backups/db_20260507_020000.sql.gz | \
+gunzip -c /opt/nursespace/backups/db_20260507_020000.sql.gz | \
   docker compose exec -T db mysql -u root -p"${MYSQL_PASSWORD}" nurse_training_system
 ```
 
 ### 更新部署
 
 ```bash
-cd /opt/hspx
+cd /opt/nursespace
 
 # 拉取新代码
 git pull origin main
@@ -619,7 +619,7 @@ docker compose logs app
 ## 目录结构
 
 ```
-HSPX/
+NurseSpace/
 ├── app.py                    # Flask 应用入口（工厂模式）
 ├── config.py                 # 配置（全部从环境变量读取）
 ├── models.py                 # 数据模型（14 张表）

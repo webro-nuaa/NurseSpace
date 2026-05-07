@@ -5,7 +5,7 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD 未设置}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-nurse_training_system}
-      MYSQL_USER: ${MYSQL_USER:-hspx_app}
+      MYSQL_USER: ${MYSQL_USER:-nursespace_app}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD 未设置}
     volumes:
       - mysql_data:/var/lib/mysql
@@ -23,7 +23,7 @@ services:
       timeout: 3s
       retries: 30
     networks:
-      - hspx-net
+      - nursespace-net
 
   redis:
     image: redis:7-alpine
@@ -37,7 +37,7 @@ services:
       timeout: 3s
       retries: 10
     networks:
-      - hspx-net
+      - nursespace-net
 
   app:
     build:
@@ -71,7 +71,7 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - hspx-net
+      - nursespace-net
 
   nginx:
     image: nginx:1.25-alpine
@@ -92,7 +92,7 @@ services:
       timeout: 5s
       retries: 3
     networks:
-      - hspx-net
+      - nursespace-net
 
 volumes:
   mysql_data:
@@ -109,5 +109,5 @@ volumes:
     driver: local
 
 networks:
-  hspx-net:
+  nursespace-net:
     driver: bridge
