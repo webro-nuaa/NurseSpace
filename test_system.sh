@@ -4,7 +4,9 @@
 # =============================================
 set +e
 
-BASE_URL="http://localhost"
+BASE_URL="${BASE_URL:-http://localhost}"
+FIXTURE_DIR="${FIXTURE_DIR:-/tmp}"
+FIXTURE_FILE="${FIXTURE_DIR}/【内科】护理基础操作规范.docx"
 PASS=0
 FAIL=0
 
@@ -16,6 +18,58 @@ NC='\033[0m'
 pass() { echo -e "${GREEN}[PASS]${NC} $1"; PASS=$((PASS+1)); }
 fail() { echo -e "${RED}[FAIL]${NC} $1 — $2"; FAIL=$((FAIL+1)); }
 info() { echo -e "${YELLOW}[INFO]${NC} $1"; }
+
+# 自动生成测试用 .docx 固件（纯 Python 内置模块，无需 python-docx）
+gen_fixture() {
+    if [ -f "$FIXTURE_FILE" ]; then
+        return 0
+    fi
+    info "生成测试固件: $FIXTURE_FILE"
+    python3 -c "
+import zipfile, os
+
+path = '$FIXTURE_FILE'
+z = zipfile.ZipFile(path, 'w', zipfile.ZIP_DEFLATED)
+
+z.writestr('[Content_Types].xml',
+    '<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>'
+    '<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">'
+    '<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>'
+    '<Default Extension=\"xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/>'
+    '</Types>')
+
+z.writestr('_rels/.rels',
+    '<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>'
+    '<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">'
+    '<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/>'
+    '</Relationships>')
+
+z.writestr('word/document.xml',
+    '<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>'
+    '<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">'
+    '<w:body>'
+    '<w:p><w:r><w:t>【站点】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>测试站点-内科护理</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【站点结尾】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【问题】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>请写出内科护理的三大要点。</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【问题结尾】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【回答】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【项】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>生命体征监测与记录</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【项结尾】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【项】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>药物管理与给药安全</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【项结尾】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【项】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>病人心理护理与健康教育</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【项结尾】</w:t></w:r></w:p>'
+    '<w:p><w:r><w:t>【回答结尾】</w:t></w:r></w:p>'
+    '</w:body></w:document>')
+z.close()
+print('OK')
+" 2>/dev/null
+}
 
 check() {
     local desc="$1" expected="$2" actual="$3"
@@ -223,16 +277,17 @@ check "10.4 案例搜索" '"success":true' "$R"
 CODE=$(http_code "$BASE_URL/admin/cases/xlsx-template" -H "Authorization: Bearer $ADMIN_JWT")
 check "10.5 下载案例模板" "200" "$CODE"
 
-# 上传 docx 案例
-if [ -f "/tmp/【内科】护理基础操作规范.docx" ]; then
+# 上传 docx 案例（自动生成测试固件）
+gen_fixture
+if [ -f "$FIXTURE_FILE" ]; then
     R=$(curl -s -X POST "$BASE_URL/admin/cases" \
         -H "Authorization: Bearer $ADMIN_JWT" \
-        -F "file=@/tmp/【内科】护理基础操作规范.docx")
+        -F "file=@$FIXTURE_FILE")
     check "10.6 上传案例文档" '"success":true' "$R"
     CASE_ID=$(echo "$R" | python3 -c "import sys,json; print(json.load(sys.stdin).get('case',{}).get('id',''))" 2>/dev/null)
     info "创建的案例 ID: $CASE_ID"
 else
-    fail "10.6 上传案例文档" "测试文件 /tmp/【内科】护理基础操作规范.docx 不存在"
+    fail "10.6 上传案例文档" "测试固件 $FIXTURE_FILE 生成失败"
     CASE_ID=""
 fi
 
@@ -282,7 +337,7 @@ fi
 # 上传校验
 R=$(curl -s -X POST "$BASE_URL/admin/cases" \
     -H "Authorization: Bearer $ADMIN_JWT" \
-    -F "file=@/tmp/【内科】护理基础操作规范.docx;filename=test.txt")
+    -F "file=@$FIXTURE_FILE;filename=test.txt")
 check "10.18 非docx后缀拒绝" '只支持docx格式' "$R"
 
 CODE=$(http_code "$BASE_URL/admin/users/xlsx-template" -H "Authorization: Bearer $ADMIN_JWT")

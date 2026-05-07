@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 生成 .env（测试密钥）
+        run: |
+          cat > .env <<'ENVEOF'
+          SECRET_KEY=ci-test-secret-key-not-for-production
+          JWT_SECRET_KEY=ci-test-jwt-key-not-for-production
+          MYSQL_HOST=db
+          MYSQL_PORT=3306
+          MYSQL_USER=hspx_app
+          MYSQL_PASSWORD=CiTest2024!
+          MYSQL_DATABASE=nurse_training_system
+          ADMIN_USERNAME=admin
+          ADMIN_PASSWORD=admin123
+          REDIS_URL=redis://redis:6379/0
+          REDIS_ENABLED=1
+          RATELIMIT_ENABLED=1
+          RATELIMIT_STORAGE_URL=redis://redis:6379/1
+          DB_POOL_SIZE=5
+          DB_MAX_OVERFLOW=5
+          GUNICORN_WORKERS=2
+          GUNICORN_THREADS=4
+          ENVEOF
+          chmod 600 .env
+
+      - name: 构建并启动服务
+        run: |
+          docker compose build --pull
+          docker compose up -d
+          echo "等待服务就绪..."
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost/api/health > /dev/null 2>&1; then
+              echo "✓ 服务就绪"
+              break
+            fi
+            if [ $i -eq 90 ]; then
+              echo "✗ 服务启动超时"
+              docker compose logs --tail=50
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: 运行全功能测试
+        run: |
+          chmod +x test_system.sh
+          bash test_system.sh
+
+      - name: 收集失败日志
+        if: failure()
+        run: |
+          echo "=== App Logs ==="
+          docker compose logs app --tail=100
+          echo "=== Nginx Logs ==="
+          docker compose logs nginx --tail=50
+
+      - name: 清理
+        if: always()
+        run: docker compose down -v
