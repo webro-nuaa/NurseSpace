@@ -13,8 +13,8 @@ services:
     command: >
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
-      --innodb-buffer-pool-size=512M
-      --max-connections=300
+      --innodb-buffer-pool-size=256M
+      --max-connections=150
       --slow-query-log=ON
       --long-query-time=2
     healthcheck:
@@ -51,8 +51,8 @@ services:
       MYSQL_PORT: 3306
       REDIS_URL: redis://redis:6379/0
       RATELIMIT_STORAGE_URL: redis://redis:6379/1
-      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-4}
-      GUNICORN_THREADS: ${GUNICORN_THREADS:-10}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-5}
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
     volumes:
       - app_uploads:/app/uploads

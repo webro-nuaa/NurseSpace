@@ -53,8 +53,8 @@
                                 │ proxy_pass
                          ┌──────▼───────┐
                          │    Flask     │  :8000
-                         │   Gunicorn   │  4 workers × 10 threads
-                         │  (gthread)   │  = 40 并发处理能力
+                         │   Gunicorn   │  3 workers × 5 threads
+                         │  (gthread)   │  = 15 并发处理能力
                          └──┬─────┬─────┘
                             │     │
                    ┌────────▼─┐ ┌─▼────────┐
@@ -67,15 +67,13 @@
 
 **操作系统要求**：Ubuntu 20.04+ / Debian 11+ / CentOS 8+ / 统信 UOS / openEuler
 
-**硬件要求**（200 并发）：
+**硬件要求**（文字型应用，资源需求不高）：
 
-| 组件 | 最低 | 推荐 |
-|------|------|------|
-| CPU | 4 核 | 8 核 |
-| 内存 | 8 GB | 16 GB |
-| 系统盘 | 40 GB SSD | 50 GB SSD |
-| 数据盘 | 100 GB SSD | 200 GB SSD |
-| 带宽 | 5 Mbps | 10 Mbps |
+| 规模 | CPU | 内存 | 系统盘 | 带宽 | 月费参考 |
+|------|-----|------|--------|------|----------|
+| 起步（50人） | 2 核 | 4 GB | 30 GB SSD | 3 Mbps | ~30元 |
+| 标准（200人） | 4 核 | 8 GB | 50 GB SSD | 5 Mbps | ~60元 |
+| 宽裕（500人+） | 8 核 | 16 GB | 100 GB SSD | 10 Mbps | ~150元 |
 
 **安装 Docker**：
 
@@ -196,11 +194,11 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 | `OPENAI_MODEL` | — | `gpt-4o-mini` | OpenAI 模型名 |
 | `ZHIPU_API_KEY` | — | — | 智谱 GLM API Key |
 | `ZHIPU_MODEL` | — | `glm-4-air` | 智谱模型名 |
-| `DB_POOL_SIZE` | — | `20` | 每个 worker 的连接池大小 |
+| `DB_POOL_SIZE` | — | `10` | 每个 worker 的连接池大小 |
 | `DB_POOL_RECYCLE` | — | `1800` | 连接回收时间（秒） |
 | `DB_MAX_OVERFLOW` | — | `10` | 连接池溢出上限 |
-| `GUNICORN_WORKERS` | — | `4` | Gunicorn worker 数量 |
-| `GUNICORN_THREADS` | — | `10` | 每个 worker 的线程数 |
+| `GUNICORN_WORKERS` | — | `3` | Gunicorn worker 数量 |
+| `GUNICORN_THREADS` | — | `5` | 每个 worker 的线程数 |
 | `GUNICORN_TIMEOUT` | — | `120` | 请求超时（秒） |
 | `REDIS_URL` | — | `redis://redis:6379/0` | 缓存 Redis 地址 |
 | `REDIS_ENABLED` | — | `1` | 是否启用 Redis 缓存 |
@@ -542,21 +540,20 @@ docker compose exec app flask db history
 
 ## 性能调优
 
-### 200 人并发配置基准
+### 并发配置基准
 
-| 配置项 | 值 | 位置 |
-|--------|-----|------|
-| GUNICORN_WORKERS | 4 | `.env` |
-| GUNICORN_THREADS | 10 | `.env` |
-| DB_POOL_SIZE | 20 | `.env` |
-| DB_MAX_OVERFLOW | 10 | `.env` |
-| MySQL max_connections | 300 | `docker-compose.yml` |
-| MySQL innodb_buffer_pool_size | 512M | `docker-compose.yml` |
-| Nginx proxy_buffers | 16×32k | `nginx/nginx.conf` |
+文字型应用，大部分时间用户在阅读和打字，实际并发请求比例很低（15-25%）。
 
-**并发公式**：`workers × threads = 4 × 10 = 40 个并发请求处理能力`
+| 配置项 | 起步（50人） | 标准（200人） | 位置 |
+|--------|------------|-------------|------|
+| GUNICORN_WORKERS | 2 | 3 | `.env` |
+| GUNICORN_THREADS | 3 | 5 | `.env` |
+| DB_POOL_SIZE | 5 | 10 | `.env` |
+| DB_MAX_OVERFLOW | 5 | 10 | `.env` |
+| MySQL max_connections | 100 | 150 | `docker-compose.yml` |
+| MySQL innodb_buffer_pool_size | 128M | 256M | `docker-compose.yml` |
 
-200 用户在线时，通常只有 15-25% 在同时发送请求（阅读题目、打字作答占大部分时间），40 并发绰绰有余。
+**并发公式**：`workers × threads` = 同时处理的请求数。标准配置 3×5=15 并发，200 人在线约 30-50 个同时请求，足够。
 
 ### 扩容建议
 
