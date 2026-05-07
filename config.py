@@ -1,0 +1,71 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def _require_env(key):
+    value = os.environ.get(key)
+    if not value:
+        raise RuntimeError(f"环境变量 {key} 未设置，生产环境必须配置")
+    return value
+
+
+class Config:
+    SECRET_KEY = _require_env('SECRET_KEY')
+
+    # MySQL
+    MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
+    MYSQL_PASSWORD = _require_env('MYSQL_PASSWORD')
+    MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+    MYSQL_PORT = int(os.environ.get('MYSQL_PORT', 3306))
+    MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', 'nurse_training_system')
+
+    SQLALCHEMY_DATABASE_URI = (
+        f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}'
+        f'@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4'
+    )
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_POOL_SIZE = int(os.environ.get('DB_POOL_SIZE', 20))
+    SQLALCHEMY_POOL_RECYCLE = int(os.environ.get('DB_POOL_RECYCLE', 1800))
+    SQLALCHEMY_POOL_PRE_PING = True
+    SQLALCHEMY_MAX_OVERFLOW = int(os.environ.get('DB_MAX_OVERFLOW', 10))
+
+    # JWT
+    JWT_SECRET_KEY = _require_env('JWT_SECRET_KEY')
+    JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES', 3600))
+
+    # AI
+    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+
+    ZHIPU_API_KEY = os.environ.get('ZHIPU_API_KEY')
+    ZHIPU_MODEL = os.environ.get('ZHIPU_MODEL', 'glm-4-air')
+
+    # Redis
+    REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+    REDIS_ENABLED = os.environ.get('REDIS_ENABLED', '1') == '1'
+
+    # Rate limit
+    RATELIMIT_ENABLED = os.environ.get('RATELIMIT_ENABLED', '1') == '1'
+    RATELIMIT_STORAGE_URL = os.environ.get('RATELIMIT_STORAGE_URL', 'redis://redis:6379/1')
+
+    # File upload
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
+    MAX_CONTENT_LENGTH = 128 * 1024 * 1024
+    CASES_DIR = os.environ.get('CASES_DIR', os.path.join(BASE_DIR, '案例'))
+
+    # HTTPS (由 Nginx 处理，应用层通常不需要)
+    ENABLE_HTTPS = os.environ.get('ENABLE_HTTPS', '0') == '1'
+    HTTPS_PORT = int(os.environ.get('HTTPS_PORT', '8443'))
+    SSL_CERT_FILE = os.environ.get('SSL_CERT_FILE', os.path.join(BASE_DIR, 'certs', 'server.crt'))
+    SSL_KEY_FILE = os.environ.get('SSL_KEY_FILE', os.path.join(BASE_DIR, 'certs', 'server.key'))
+
+    @staticmethod
+    def ensure_directories():
+        """确保必要的目录存在，在 app 初始化后调用"""
+        os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
+        os.makedirs(os.path.join(Config.BASE_DIR, 'certs'), exist_ok=True)
+        os.makedirs(os.path.join(Config.BASE_DIR, 'logs'), exist_ok=True)
+        os.makedirs(Config.CASES_DIR, exist_ok=True)

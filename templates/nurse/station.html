@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}答题 - 护士培训系统{% endblock %}
+
+{% block nav_items %}
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=dashboard"><i class="fas fa-tachometer-alt me-1"></i>首页概览</a></li>
+<li class="nav-item"><a class="nav-link active" href="/nurse?tab=cases"><i class="fas fa-book-medical me-1"></i>案例学习</a></li>
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=wrongs"><i class="fas fa-exclamation-triangle me-1"></i>错题集</a></li>
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=weakness"><i class="fas fa-chart-line me-1"></i>薄弱点分析</a></li>
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=exams"><i class="fas fa-file-alt me-1"></i>考试中心</a></li>
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=points"><i class="fas fa-coins me-1"></i>积分记录</a></li>
+{% endblock %}
+
+{% block body_class %}no-sidebar{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+  <!-- 传递参数给Jinja2模板 -->
+  {% set station_id = request.args.get('id') %}
+  {% set case_id = request.args.get('case') %}
+  
+  <div class="page-title">
+    <h2><i class="fas fa-edit me-2"></i>答题站点</h2>
+    <p>仔细阅读题目，认真作答</p>
+  </div>
+  
+  <div class="question-container">
+    <div id="station-content" class="mb-4">
+      <div class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</div>
+    </div>
+    <div class="mb-4">
+      <label class="form-label">
+        <i class="fas fa-pencil-alt me-2 text-primary"></i>
+        <span class="fw-bold">请输入您的答案：</span>
+      </label>
+      <textarea class="form-control answer-textarea" id="station-answer" placeholder="请在此输入您的详细答案..."></textarea>
+    </div>
+    <div class="d-flex gap-3">
+      <button class="btn btn-outline-secondary btn-lg" onclick="history.back()">
+        <i class="fas fa-arrow-left me-2"></i>返回
+      </button>
+      <a href="/nurse/answer-view?id={{ station_id }}&case={{ case_id }}" class="btn btn-info btn-lg">
+        <i class="fas fa-eye me-2"></i>查看答案
+      </a>
+      <button class="btn btn-primary btn-lg btn-glow flex-grow-1" id="btn-submit">
+        <i class="fas fa-paper-plane me-2"></i>提交并评分
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3 d-none" id="evaluation-card">
+  <div class="card-header"><h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>评分结果</h5></div>
+  <div class="card-body" id="evaluation-body"></div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/nurse.js') }}"></script>
+<script>
+  const qs = new URLSearchParams(location.search);
+  const stationId = parseInt(qs.get('id'));
+  const caseId = parseInt(qs.get('case'));
+
+  function renderStation(data){
+    const html = `
+      <div class="mb-3">
+        <div class="fw-bold">题目：</div>
+        <div>${(data.question||'').replace(/\n/g,'<br>')}</div>
+      </div>
+      ${data.assessment_task ? `
+      <div class="mb-3">
+        <div class="fw-bold">考核任务：</div>
+        <div class="small">${data.assessment_task.replace(/\n/g,'<br>')}</div>
+      </div>` : ''}
+    `;
+    document.getElementById('station-content').innerHTML = html;
+  }
+
+  function renderEvaluation(result, std){
+    const scoreClass = result.score >= 90 ? 'score-excellent' : result.score >= 60 ? 'score-good' : 'score-poor';
+    const html = `
+      <div class="feedback-score ${scoreClass}">
+        <i class="fas fa-star me-2"></i> 得分：${result.score} / ${result.max_score}
+      </div>
+      <div class="feedback-container">
+        <h6><i class="fas fa-comments me-2"></i>AI反馈：</h6>
+        <p>${result.feedback || ''}</p>
+        ${result.reason ? `<h6 class="mt-2"><i class='fas fa-info-circle me-2'></i>评分理由</h6><p>${result.reason}</p>`:''}
+        ${result.covered_points?.length ? `<h6 class="text-success mt-3"><i class="fas fa-check-circle me-2"></i>答对要点</h6><ul>${result.covered_points.map(p=>`<li class='text-success'><i class='fas fa-check me-2'></i>${p}</li>`).join('')}</ul>`:''}
+        ${result.missed_points?.length ? `<h6 class="text-warning mt-3"><i class="fas fa-exclamation-triangle me-2"></i>遗漏要点</h6><ul>${result.missed_points.map(p=>`<li class='text-warning'><i class='fas fa-minus me-2'></i>${p}</li>`).join('')}</ul>`:''}
+        ${result.suggestions ? `<h6 class="text-info mt-3"><i class="fas fa-lightbulb me-2"></i>改进建议</h6><p class="text-info">${result.suggestions}</p>`:''}
+      </div>
+      <div class="mt-3">
+        <h6><i class="fas fa-clipboard-list me-2"></i>标准答案</h6>
+        <ol>${std.map(a=>`<li>${a.answer_item}</li>`).join('')}</ol>
+      </div>
+    `;
+    document.getElementById('evaluation-body').innerHTML = html;
+    document.getElementById('evaluation-card').classList.remove('d-none');
+  }
+
+  $(document).ready(function(){
+    // 统一与其他页面：检查登录并设置用户信息与token
+    if (typeof checkLogin === 'function') { checkLogin(); }
+
+    // 加载题目
+    $.get(`/api/stations/${stationId}`, function(res){
+      if (res.success){ renderStation(res.data); }
+      else { showAlert(res.message || '加载失败', 'error'); }
+    });
+
+    // 提交
+    $('#btn-submit').on('click', function(){
+      const answer = $('#station-answer').val().trim();
+      if (!answer){ showAlert('请输入答案', 'error'); return; }
+      const btn = $(this); const old = btn.html();
+      btn.html('<i class="fas fa-spinner fa-spin me-1"></i>评分中...').prop('disabled', true);
+      $.ajax({
+        url: `/nurse/stations/${stationId}/submit`,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ answer }),
+        success: function(r){
+          if (r.success){ renderEvaluation(r.evaluation, r.standard_answers || []); }
+          else { showAlert(r.message || '提交失败', 'error'); }
+        },
+        complete: function(){ btn.html(old).prop('disabled', false); }
+      });
+    });
+  });
+</script>
+{% endblock %}
+
+

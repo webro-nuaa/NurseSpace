@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}护士端 - 护士培训系统{% endblock %}
+
+{% block nav_items %}
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=dashboard">
+        <i class="fas fa-tachometer-alt me-1"></i>首页概览
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=cases">
+        <i class="fas fa-book-medical me-1"></i>案例学习
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=wrongs">
+        <i class="fas fa-exclamation-triangle me-1"></i>错题集
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=weakness">
+        <i class="fas fa-chart-line me-1"></i>薄弱点分析
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=exams">
+        <i class="fas fa-file-alt me-1"></i>考试中心
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=points">
+        <i class="fas fa-coins me-1"></i>积分记录
+    </a>
+ </li>
+{% endblock %}
+
+{% block body_class %}no-sidebar{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div id="main-content">
+    <!-- 内容将通过AJAX加载 -->
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/nurse.js') }}"></script>
+<script>
+    $(document).ready(function() {
+        // 检查登录状态
+        checkLogin();
+        
+        // 根据URL参数决定加载哪个tab
+        const qs = new URLSearchParams(location.search);
+        const tab = qs.get('tab');
+        switch(tab){
+            case 'cases': loadCases(); break;
+            case 'wrongs': loadWrongQuestions(); break;
+            case 'weakness': loadWeaknessAnalysis(); break;
+            case 'exams': loadExams(); break;
+            case 'points': loadPointRecords(); break;
+            default: loadDashboard();
+        }
+    });
+    
+    function checkLogin() {
+        const token = localStorage.getItem('access_token');
+        const userInfo = localStorage.getItem('user_info');
+        
+        if (!token || !userInfo) {
+            window.location.href = '/auth/login';
+            return;
+        }
+        
+        const user = JSON.parse(userInfo);
+        if (user.role !== 'nurse') {
+            window.location.href = '/auth/login';
+            return;
+        }
+        
+        // 设置用户信息
+        $('#user-name').text(user.real_name);
+        
+        // 设置AJAX默认header
+        $.ajaxSetup({
+            headers: {
+                'Authorization': 'Bearer ' + token
+            }
+        });
+    }
+    
+    function loadDashboard() {
+        setActiveNav('首页概览');
+        const html = `
+            <section class="hero-section text-white rounded-4 mb-4">
+                <div class="row align-items-center">
+                    <div class="col-lg-7">
+                        <h1 class="hero-title mb-3">智能护士培训平台</h1>
+                        <p class="hero-subtitle mb-4">以真实临床案例为核心，结合大语言模型评估与个性化学习路径，帮助护理人员快速提升临床思维与实操能力。</p>
+                        <div class="hero-ctas d-flex flex-wrap gap-2">
+                            <a class="btn btn-light text-dark btn-lg" href="/nurse?tab=cases"><i class="fas fa-play me-2"></i>立即开始学习</a>
+                            <a class="btn btn-outline-light btn-lg" href="/nurse?tab=weakness"><i class="fas fa-magnifying-glass-chart me-2"></i>查看薄弱点分析</a>
+                        </div>
+                        <div class="trusted-badges mt-3 small opacity-75">
+                            <i class="fas fa-shield-alt me-1"></i>数据私有化 · <i class="fas fa-lock ms-2 me-1"></i>安全合规 · <i class="fas fa-robot ms-2 me-1"></i>AI赋能
+                        </div>
+                    </div>
+                    <div class="col-lg-5 d-none d-lg-block">
+                        <div class="hero-illustration glass-card p-4 text-center">
+                            <i class="fas fa-user-nurse fa-6x"></i>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="mb-4">
+                <h3 class="section-title"><i class="fas fa-star me-2"></i>核心价值</h3>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon bg-gradient-primary"><i class="fas fa-book-medical"></i></div>
+                            <h6>案例驱动</h6>
+                            <p class="text-muted small mb-0">覆盖内、外、妇、儿等多学科真实情景，贴近临床。</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon bg-gradient-success"><i class="fas fa-wand-magic-sparkles"></i></div>
+                            <h6>AI评估反馈</h6>
+                            <p class="text-muted small mb-0">自动评分、指出遗漏要点并提供改进建议。</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon bg-gradient-warning"><i class="fas fa-rotate"></i></div>
+                            <h6>错题闭环</h6>
+                            <p class="text-muted small mb-0">错题集中管理，一键重做，形成学习闭环。</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="feature-card h-100">
+                            <div class="feature-icon bg-gradient-danger"><i class="fas fa-chart-line"></i></div>
+                            <h6>个性化路径</h6>
+                            <p class="text-muted small mb-0">依据薄弱点生成个性化学习计划，效果更可度量。</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h3 class="section-title"><i class="fas fa-route me-2"></i>如何使用</h3>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="step-card h-100">
+                            <div class="step-index">1</div>
+                            <h6>选择案例模块</h6>
+                            <p class="text-muted small mb-0">进入案例学习，选择感兴趣的学科与案例。</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="step-card h-100">
+                            <div class="step-index">2</div>
+                            <h6>作答并获取AI反馈</h6>
+                            <p class="text-muted small mb-0">提交答案后即时获得评分、要点覆盖与改进建议。</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="step-card h-100">
+                            <div class="step-index">3</div>
+                            <h6>查看薄弱点并制定计划</h6>
+                            <p class="text-muted small mb-0">在薄弱点分析中查看个性化建议，持续复盘错题。</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `;
+        
+        $('#main-content').html(html);
+    }
+    
+    function setActiveNav(title) {
+        $('.nav-link').removeClass('active');
+        $(`.nav-link:contains("${title}")`).addClass('active');
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}错题详情 - 护士培训系统{% endblock %}
+
+{% block nav_items %}
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=dashboard">
+        <i class="fas fa-tachometer-alt me-1"></i>首页概览
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=cases">
+        <i class="fas fa-book-medical me-1"></i>案例学习
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=wrongs">
+        <i class="fas fa-exclamation-triangle me-1"></i>错题集
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=weakness">
+        <i class="fas fa-chart-line me-1"></i>薄弱点分析
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=exams">
+        <i class="fas fa-file-alt me-1"></i>考试中心
+    </a>
+ </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=points">
+        <i class="fas fa-coins me-1"></i>积分记录
+    </a>
+ </li>
+{% endblock %}
+
+{% block body_class %}no-sidebar{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+  <div class="page-title d-flex justify-content-between align-items-center">
+    <div>
+      <h2><i class="fas fa-exclamation-triangle me-2"></i>错题详情</h2>
+      <p>查看题目与最近一次作答记录</p>
+    </div>
+    <div>
+      <a class="btn btn-light text-dark border" href="/nurse?tab=wrongs"><i class="fas fa-list me-1"></i>返回错题集</a>
+    </div>
+  </div>
+
+  <div class="question-container">
+    <div id="wd-content" class="mb-4">
+      <div class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</div>
+    </div>
+    <div class="d-flex gap-3">
+      <a class="btn btn-primary btn-glow" id="btn-redo"><i class="fas fa-redo me-1"></i>重新作答</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/nurse.js') }}"></script>
+<script>
+  const qs = new URLSearchParams(location.search);
+  const stationId = parseInt(qs.get('station'));
+
+  function renderWrongDetail(data){
+    const html = `
+      ${data.station.assessment_task ? `<div class='mb-3'><div class='fw-bold'>考核任务：</div><div class='small'>${data.station.assessment_task}</div></div>` : ''}
+      <div class="mb-3">
+        <div class="fw-bold">题目：</div>
+        <div>${(data.station.question||'').replace(/\n/g,'<br>')}</div>
+      </div>
+      <div class="mb-3">
+        <div class="fw-bold">我的最近一次作答：</div>
+        <div class="mb-2">${(data.my_record.user_answer||'').replace(/\n/g,'<br>') || '<span class="text-muted">暂无记录</span>'}</div>
+        <div>得分：<span class="badge ${getScoreBadgeClass(data.my_record.score)}">${(data.my_record.score ?? '—')}</span>
+            ${data.my_record.completed_at ? `<small class='text-muted ms-2'>${formatDateTime(data.my_record.completed_at)}</small>` : ''}
+        </div>
+        ${data.my_record.ai_feedback ? `<div class='mt-2'><div class='fw-bold'>AI反馈：</div><div>${data.my_record.ai_feedback}</div></div>` : ''}
+        ${data.my_record.reason ? `<div class='mt-2'><div class='fw-bold'>评分理由：</div><div>${data.my_record.reason}</div></div>` : ''}
+      </div>
+      <div class="mb-2">
+        <div class="fw-bold">标准答案：</div>
+        <ol>${data.standard_answers.map(a=>`<li>${a.answer_item}</li>`).join('')}</ol>
+      </div>`;
+    document.getElementById('wd-content').innerHTML = html;
+  }
+
+  $(function(){
+    const token = localStorage.getItem('access_token');
+    if (token){ $.ajaxSetup({ headers: { 'Authorization': 'Bearer ' + token }}); }
+
+    $.get(`/nurse/wrong-questions/${stationId}`, function(r){
+      if(r.success){ renderWrongDetail(r.data); $('#btn-redo').attr('href', `/nurse/station?id=${stationId}`); }
+      else { showAlert(r.message||'加载失败','error'); }
+    });
+
+    $('#btn-redo').on('click', function(e){ e.preventDefault(); startStation(stationId); });
+  })
+</script>
+{% endblock %}
+
+

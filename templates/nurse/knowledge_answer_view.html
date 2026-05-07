@@ -1,0 +1,653 @@
+{% extends "base.html" %}
+
+{% block title %}查看答案 - 扩展知识 - 护士培训系统{% endblock %}
+
+{% block nav_items %}
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=dashboard"><i class="fas fa-tachometer-alt me-1"></i>首页概览</a></li>
+<li class="nav-item"><a class="nav-link active" href="/nurse?tab=cases"><i class="fas fa-book-medical me-1"></i>案例学习</a></li>
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=wrongs"><i class="fas fa-exclamation-triangle me-1"></i>错题集</a></li>
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=weakness"><i class="fas fa-chart-line me-1"></i>薄弱点分析</a></li>
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=exams"><i class="fas fa-file-alt me-1"></i>考试中心</a></li>
+<li class="nav-item"><a class="nav-link" href="/nurse?tab=points"><i class="fas fa-coins me-1"></i>积分记录</a></li>
+{% endblock %}
+
+{% block body_class %}no-sidebar{% endblock %}
+{% block sidebar %}{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+  <div class="page-title">
+    <h2><i class="fas fa-clipboard-check me-2"></i>扩展知识 - 标准答案</h2>
+    <p>查看扩展知识题目的标准答案要点</p>
+  </div>
+  
+  <!-- 禁止复制提示 -->
+  <div class="alert alert-warning alert-dismissible fade show" role="alert">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>重要提示：</strong>为了保护学习效果，答案内容禁止复制、截图等操作。请认真阅读并理解答案要点。
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  
+  <div class="answer-container">
+    <div id="knowledge-content" class="mb-4">
+      <div class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</div>
+    </div>
+    
+    <div id="answers-content" class="mb-4">
+      <div class="loading"><i class="fas fa-spinner fa-spin"></i> 加载答案中...</div>
+    </div>
+    
+    <div class="d-flex gap-3">
+      <button class="btn btn-outline-secondary btn-lg" onclick="history.back()">
+        <i class="fas fa-arrow-left me-2"></i>返回
+      </button>
+      <a href="/nurse/knowledge?id={{ knowledge_id }}" class="btn btn-primary btn-lg btn-glow">
+        <i class="fas fa-edit me-2"></i>去答题
+      </a>
+    </div>
+  </div>
+  
+  <!-- 评论区域 -->
+  <div class="comments-section mt-5">
+    <div class="card">
+      <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="fas fa-comments me-2"></i>讨论区</h5>
+        <small class="text-muted">分享你的想法，与其他护士交流学习心得</small>
+      </div>
+      <div class="card-body">
+        <!-- 发表评论 -->
+        <div class="comment-form mb-4">
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="fas fa-pencil-alt me-2 text-primary"></i>
+              <span class="fw-bold">发表评论：</span>
+            </label>
+            <textarea class="form-control" id="comment-content" rows="3" 
+                      placeholder="分享你的学习心得、疑问或建议..."></textarea>
+          </div>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="comment-type-selector">
+              <select class="form-select form-select-sm" id="comment-type" style="width: auto;">
+                <option value="comment">💬 普通评论</option>
+                <option value="question">❓ 问题</option>
+                <option value="answer">💡 回答</option>
+                <option value="suggestion">💭 建议</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="btn-submit-comment">
+              <i class="fas fa-paper-plane me-2"></i>发表评论
+            </button>
+          </div>
+        </div>
+        
+        <!-- 评论列表 -->
+        <div id="comments-container">
+          <div class="loading text-center py-4">
+            <i class="fas fa-spinner fa-spin me-2"></i>加载评论中...
+          </div>
+        </div>
+        
+        <!-- 分页 -->
+        <div id="comments-pagination" class="d-none">
+          <nav aria-label="评论分页">
+            <ul class="pagination justify-content-center" id="pagination-list">
+              <!-- 分页按钮将通过JavaScript动态生成 -->
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* 禁止复制样式 */
+  .no-copy {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* 答案内容禁止复制 */
+  .standard-answers-list,
+  .question-text {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* 禁止右键菜单 */
+  .answer-container {
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/nurse.js') }}"></script>
+<script>
+  const qs = new URLSearchParams(location.search);
+  const knowledgeId = parseInt(qs.get('id'));
+
+  function renderQuestion(data){
+    const html = `
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>扩展知识题目</h5>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <div class="fw-bold text-primary mb-2">题目：</div>
+            <div class="question-text">${(data.question||'').replace(/\n/g,'<br>')}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById('knowledge-content').innerHTML = html;
+  }
+
+  function renderAnswers(answers){
+    const html = `
+      <div class="card">
+        <div class="card-header bg-success text-white">
+          <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>标准答案要点</h5>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            以下是该题目的标准答案要点，建议先独立思考后再查看
+          </div>
+          <ol class="standard-answers-list">
+            ${answers.map((answer, index) => `
+              <li class="mb-3">
+                <div class="answer-item">
+                  <span class="answer-text">${answer.answer_item}</span>
+                </div>
+              </li>
+            `).join('')}
+          </ol>
+        </div>
+      </div>
+    `;
+    document.getElementById('answers-content').innerHTML = html;
+  }
+
+  $(document).ready(function(){
+    // 统一与其他页面：检查登录并设置用户信息与token
+    if (typeof checkLogin === 'function') { 
+      checkLogin(); 
+    } else {
+      // 如果checkLogin函数不存在，手动设置JWT token
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        $.ajaxSetup({
+          headers: {
+            'Authorization': 'Bearer ' + token
+          }
+        });
+        console.log('JWT token set manually'); // 调试信息
+      } else {
+        console.log('No JWT token found'); // 调试信息
+      }
+    }
+
+    // 禁止复制功能
+    disableCopy();
+    
+    // 加载题目内容
+    $.get(`/api/knowledge/${knowledgeId}`, function(res){
+      if (res.success){ 
+        renderQuestion(res.data);
+      } else { 
+        showAlert(res.message || '加载题目失败', 'error'); 
+      }
+    });
+
+    // 加载标准答案
+    $.get(`/api/knowledge/${knowledgeId}/answers`, function(res){
+      if (res.success){
+        renderAnswers(res.data);
+      } else {
+        showAlert(res.message || '获取答案失败', 'error');
+      }
+    }).fail(function(){
+      showAlert('网络错误，请重试', 'error');
+    });
+    
+    // 加载评论
+    loadComments();
+    
+    // 绑定评论相关事件
+    $('#btn-submit-comment').on('click', submitComment);
+  });
+
+  // 评论相关功能
+  let currentCommentPage = 1;
+  const commentsPerPage = 10;
+
+  // 加载评论
+  function loadComments(page = 1) {
+    currentCommentPage = page;
+    
+    $.get(`/api/comments?content_type=knowledge_answer&content_id=${knowledgeId}&page=${page}&per_page=${commentsPerPage}`, function(res) {
+      if (res.success) {
+        renderComments(res.data.comments);
+        renderPagination(res.data.pagination);
+      } else {
+        showAlert(res.message || '加载评论失败', 'error');
+      }
+    }).fail(function() {
+      showAlert('网络错误，请重试', 'error');
+    });
+  }
+
+  // 渲染评论列表
+  function renderComments(comments) {
+    if (comments.length === 0) {
+      $('#comments-container').html(`
+        <div class="text-center py-4 text-muted">
+          <i class="fas fa-comments fa-2x mb-3"></i>
+          <p>暂无评论，快来发表第一条评论吧！</p>
+        </div>
+      `);
+      return;
+    }
+
+    const html = comments.map(comment => `
+      <div class="comment-item mb-3" data-comment-id="${comment.id}">
+        <div class="d-flex">
+          <div class="flex-shrink-0 me-3">
+            <div class="comment-avatar">
+              <i class="fas fa-user-circle fa-2x text-primary"></i>
+            </div>
+          </div>
+          <div class="flex-grow-1">
+            <div class="comment-header d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <span class="fw-bold">${comment.user.real_name}</span>
+                <span class="text-muted ms-2">${comment.user.department || ''}</span>
+                <span class="badge bg-secondary ms-2">${getCommentTypeLabel(comment.comment_type)}</span>
+              </div>
+              <small class="text-muted">${formatTime(comment.created_at)}</small>
+            </div>
+            <div class="comment-content mb-2">
+              ${comment.content.replace(/\n/g, '<br>')}
+            </div>
+            <div class="comment-actions d-flex align-items-center gap-3">
+              <button class="btn btn-sm btn-outline-primary" onclick="toggleLike(${comment.id})">
+                <i class="fas fa-thumbs-up me-1 ${comment.is_liked ? 'text-primary' : ''}"></i>
+                <span class="likes-count">${comment.likes_count}</span>
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" onclick="showReplyForm(${comment.id})">
+                <i class="fas fa-reply me-1"></i>回复
+              </button>
+              ${comment.replies_count > 0 ? `
+                <button class="btn btn-sm btn-outline-info" onclick="toggleReplies(${comment.id})">
+                  <i class="fas fa-comments me-1"></i>${comment.replies_count}条回复
+                </button>
+              ` : ''}
+            </div>
+            
+            <!-- 回复表单 -->
+            <div class="reply-form mt-3 d-none" id="reply-form-${comment.id}">
+              <div class="input-group">
+                <input type="text" class="form-control" placeholder="写下你的回复..." id="reply-content-${comment.id}">
+                <button class="btn btn-outline-primary" onclick="submitReply(${comment.id})">
+                  <i class="fas fa-paper-plane"></i>
+                </button>
+              </div>
+            </div>
+            
+            <!-- 回复列表 -->
+            <div class="replies-container mt-3 d-none" id="replies-${comment.id}">
+              <div class="loading text-center py-2">
+                <i class="fas fa-spinner fa-spin me-2"></i>加载回复中...
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    $('#comments-container').html(html);
+  }
+
+  // 渲染分页
+  function renderPagination(pagination) {
+    if (pagination.pages <= 1) {
+      $('#comments-pagination').addClass('d-none');
+      return;
+    }
+
+    $('#comments-pagination').removeClass('d-none');
+    
+    let paginationHtml = '';
+    
+    // 上一页
+    if (pagination.has_prev) {
+      paginationHtml += `
+        <li class="page-item">
+          <a class="page-link" href="#" onclick="loadComments(${pagination.page - 1})">上一页</a>
+        </li>
+      `;
+    }
+    
+    // 页码
+    for (let i = 1; i <= pagination.pages; i++) {
+      if (i === pagination.page) {
+        paginationHtml += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
+      } else {
+        paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="loadComments(${i})">${i}</a></li>`;
+      }
+    }
+    
+    // 下一页
+    if (pagination.has_next) {
+      paginationHtml += `
+        <li class="page-item">
+          <a class="page-link" href="#" onclick="loadComments(${pagination.page + 1})">下一页</a>
+        </li>
+      `;
+    }
+    
+    $('#pagination-list').html(paginationHtml);
+  }
+
+  // 发表评论
+  function submitComment() {
+    console.log('submitComment function called'); // 调试信息
+    
+    // 检查JWT token
+    const token = localStorage.getItem('access_token');
+    console.log('JWT token exists:', !!token); // 调试信息
+    console.log('JWT token length:', token ? token.length : 0); // 调试信息
+    
+    const content = $('#comment-content').val().trim();
+    const commentType = $('#comment-type').val();
+    
+    console.log('Content:', content); // 调试信息
+    console.log('Comment type:', commentType); // 调试信息
+    console.log('Knowledge ID:', knowledgeId); // 调试信息
+    
+    if (!content) {
+      showAlert('请输入评论内容', 'error');
+      return;
+    }
+    
+    if (content.length < 5) {
+      showAlert('评论内容至少5个字符', 'error');
+      return;
+    }
+    
+    const btn = $('#btn-submit-comment');
+    const originalText = btn.html();
+    btn.html('<i class="fas fa-spinner fa-spin me-2"></i>发表中...').prop('disabled', true);
+    
+    console.log('Sending AJAX request...'); // 调试信息
+    
+    $.ajax({
+      url: '/api/comments',
+      method: 'POST',
+      contentType: 'application/json',
+      headers: {
+        'Authorization': 'Bearer ' + token // 显式设置token
+      },
+      data: JSON.stringify({
+        content_type: 'knowledge_answer',
+        content_id: knowledgeId,
+        content: content,
+        comment_type: commentType
+      }),
+      success: function(res) {
+        console.log('Success response:', res); // 调试信息
+        if (res.success) {
+          showAlert('评论发表成功！', 'success');
+          $('#comment-content').val('');
+          loadComments(1); // 重新加载第一页
+        } else {
+          showAlert(res.message || '发表评论失败', 'error');
+        }
+      },
+      error: function(xhr, status, error) {
+        console.log('Error response:', xhr, status, error); // 调试信息
+        console.log('Response text:', xhr.responseText); // 调试信息
+        showAlert('网络错误，请重试', 'error');
+      },
+      complete: function() {
+        btn.html(originalText).prop('disabled', false);
+      }
+    });
+  }
+
+  // 切换点赞
+  function toggleLike(commentId) {
+    $.ajax({
+      url: `/api/comments/${commentId}/like`,
+      method: 'POST',
+      success: function(res) {
+        if (res.success) {
+          // 更新UI
+          const likeBtn = $(`.comment-item[data-comment-id="${commentId}"] .btn-outline-primary`);
+          const likesCount = likeBtn.find('.likes-count');
+          const icon = likeBtn.find('.fas');
+          
+          likesCount.text(res.data.likes_count);
+          
+          if (res.data.is_liked) {
+            icon.addClass('text-primary');
+          } else {
+            icon.removeClass('text-primary');
+          }
+        } else {
+          showAlert(res.message || '操作失败', 'error');
+        }
+      }
+    });
+  }
+
+  // 显示回复表单
+  function showReplyForm(commentId) {
+    $(`#reply-form-${commentId}`).toggleClass('d-none');
+  }
+
+  // 提交回复
+  function submitReply(commentId) {
+    const content = $(`#reply-content-${commentId}`).val().trim();
+    
+    if (!content) {
+      showAlert('请输入回复内容', 'error');
+      return;
+    }
+    
+    if (content.length < 5) {
+      showAlert('回复内容至少5个字符', 'error');
+      return;
+    }
+    
+    console.log('Submitting reply for comment:', commentId); // 调试信息
+    console.log('Reply content:', content); // 调试信息
+    
+    $.ajax({
+      url: '/api/comments',
+      method: 'POST',
+      contentType: 'application/json',
+      headers: {
+        'Authorization': 'Bearer ' + localStorage.getItem('access_token')
+      },
+      data: JSON.stringify({
+        content_type: 'knowledge_answer',
+        content_id: knowledgeId,
+        content: content,
+        comment_type: 'comment',
+        parent_id: commentId
+      }),
+      success: function(res) {
+        console.log('Reply success response:', res); // 调试信息
+        if (res.success) {
+          showAlert('回复发表成功！', 'success');
+          $(`#reply-content-${commentId}`).val('');
+          $(`#reply-form-${commentId}`).addClass('d-none');
+          
+          // 重新加载回复列表
+          loadReplies(commentId);
+          
+          // 更新父评论的回复数量
+          updateReplyCount(commentId);
+        } else {
+          showAlert(res.message || '发表回复失败', 'error');
+        }
+      },
+      error: function(xhr, status, error) {
+        console.log('Reply error:', xhr, status, error); // 调试信息
+        showAlert('发表回复失败，请重试', 'error');
+      }
+    });
+  }
+
+  // 切换回复显示
+  function toggleReplies(commentId) {
+    const repliesContainer = $(`#replies-${commentId}`);
+    if (repliesContainer.hasClass('d-none')) {
+      repliesContainer.removeClass('d-none');
+      loadReplies(commentId);
+    } else {
+      repliesContainer.addClass('d-none');
+    }
+  }
+
+  // 更新回复数量显示
+  function updateReplyCount(commentId) {
+    // 重新获取回复数量
+    $.get(`/api/comments/${commentId}/replies?page=1&per_page=1`, function(res) {
+      if (res.success) {
+        const replyCount = res.data.pagination.total;
+        const replyButton = $(`.comment-item[data-comment-id="${commentId}"] .btn-outline-info`);
+        
+        if (replyButton.length > 0) {
+          replyButton.html(`<i class="fas fa-comments me-1"></i>${replyCount}条回复`);
+        }
+        
+        // 如果回复数量为0，隐藏回复按钮
+        if (replyCount === 0) {
+          replyButton.hide();
+        } else {
+          replyButton.show();
+        }
+      }
+    });
+  }
+
+  // 加载回复
+  function loadReplies(commentId) {
+    console.log('Loading replies for comment:', commentId); // 调试信息
+    
+    $.get(`/api/comments/${commentId}/replies`, function(res) {
+      console.log('Replies response:', res); // 调试信息
+      if (res.success) {
+        renderReplies(commentId, res.data.replies);
+      } else {
+        showAlert(res.message || '加载回复失败', 'error');
+      }
+    }).fail(function(xhr, status, error) {
+      console.log('Failed to load replies:', xhr, status, error); // 调试信息
+      showAlert('加载回复失败，请重试', 'error');
+    });
+  }
+
+  // 渲染回复
+  function renderReplies(commentId, replies) {
+    if (replies.length === 0) {
+      $(`#replies-${commentId}`).html('<p class="text-muted text-center">暂无回复</p>');
+      return;
+    }
+
+    const html = replies.map(reply => `
+      <div class="reply-item border-start border-2 border-light ps-3 py-2">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <div>
+            <span class="fw-bold">${reply.user.real_name}</span>
+            <span class="text-muted ms-2">${reply.user.department || ''}</span>
+          </div>
+          <small class="text-muted">${formatTime(reply.created_at)}</small>
+        </div>
+        <div class="reply-content mb-2">
+          ${reply.content.replace(/\n/g, '<br>')}
+        </div>
+        <div class="reply-actions">
+          <button class="btn btn-sm btn-outline-primary btn-sm" onclick="toggleReplyLike(${reply.id})">
+            <i class="fas fa-thumbs-up me-1 ${reply.is_liked ? 'text-primary' : ''}"></i>
+            <span class="likes-count">${reply.likes_count}</span>
+          </button>
+        </div>
+      </div>
+    `).join('');
+
+    $(`#replies-${commentId}`).html(html);
+  }
+
+  // 切换回复点赞
+  function toggleReplyLike(replyId) {
+    $.ajax({
+      url: `/api/comments/${replyId}/like`,
+      method: 'POST',
+      success: function(res) {
+        if (res.success) {
+          // 更新UI
+          const likeBtn = $(`.reply-item .btn-outline-primary[onclick*="${replyId}"]`);
+          const likesCount = likeBtn.find('.likes-count');
+          const icon = likeBtn.find('.fas');
+          
+          likesCount.text(res.data.likes_count);
+          
+          if (res.data.is_liked) {
+            icon.addClass('text-primary');
+          } else {
+            icon.removeClass('text-primary');
+          }
+        } else {
+          showAlert(res.message || '操作失败', 'error');
+        }
+      }
+    });
+  }
+
+  // 工具函数
+  function getCommentTypeLabel(type) {
+    const labels = {
+      'comment': '💬 评论',
+      'question': '❓ 问题',
+      'answer': '💡 回答',
+      'suggestion': '💭 建议'
+    };
+    return labels[type] || '💬 评论';
+  }
+
+  function formatTime(timeStr) {
+    const date = new Date(timeStr);
+    const now = new Date();
+    const diff = now - date;
+    
+    if (diff < 60000) { // 1分钟内
+      return '刚刚';
+    } else if (diff < 3600000) { // 1小时内
+      return `${Math.floor(diff / 60000)}分钟前`;
+    } else if (diff < 86400000) { // 1天内
+      return `${Math.floor(diff / 3600000)}小时前`;
+    } else if (diff < 2592000000) { // 30天内
+      return `${Math.floor(diff / 86400000)}天前`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  }
+
+  // 绑定事件
+  // $('#btn-submit-comment').on('click', submitComment); // This line is removed as per the edit hint.
+</script>
+{% endblock %}
