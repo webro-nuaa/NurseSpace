@@ -230,10 +230,10 @@ def users_xlsx_template():
         wb = Workbook()
         ws = wb.active
         ws.title = 'users'
-        headers = ['用户名', '初始密码', '真实姓名', '科室', '邮箱', '手机号', '角色', '状态']
+        headers = ['真实姓名', '科室', '邮箱', '手机号', '角色', '状态']
         ws.append(headers)
-        ws.append(['nurse001', 'Nurse#123', '张三', '内科', 'zhangsan@example.com', '13800001111', 'nurse', 'active'])
-        ws.append(['admin02', 'Admin#123', '李四', '教学部', 'lisi@example.com', '13900002222', 'admin', 'active'])
+        ws.append(['张三', '内科', 'zhangsan@example.com', '13800001111', 'nurse', 'active'])
+        ws.append(['李四', '教学部', 'lisi@example.com', '13900002222', 'nurse', 'active'])
         bio = BytesIO()
         wb.save(bio)
         bio.seek(0)
@@ -262,7 +262,7 @@ def users_batch_import_xlsx():
             return jsonify({'success': False, 'message': '空文件'})
         header = [str(h).strip() if h is not None else '' for h in rows[0]]
         idx = {name: i for i, name in enumerate(header)}
-        required = ['用户名', '初始密码', '真实姓名']
+        required = ['真实姓名']
         for r in required:
             if r not in idx:
                 return jsonify({'success': False, 'message': f'缺少列：{r}'})
@@ -271,18 +271,28 @@ def users_batch_import_xlsx():
             i = idx.get(key)
             return (str(row[i]).strip() if i is not None and row[i] is not None else default)
 
+        def _generate_username():
+            year = datetime.now().strftime('%y')
+            prefix = f'NS{year}'
+            last = User.query.filter(User.username.like(f'{prefix}%')).order_by(User.username.desc()).first()
+            if last:
+                seq = int(last.username[-3:]) + 1
+            else:
+                seq = 1
+            return f'{prefix}{seq:03d}'
+
+        def _generate_password(username):
+            emp_id = username[2:]
+            return f'{emp_id}@ns'
+
         created, skipped, failed = 0, 0, 0
+        new_users = []
         for row in rows[1:]:
             if not row:
                 continue
-            username = get(row, '用户名')
-            password = get(row, '初始密码')
             real_name = get(row, '真实姓名')
-            if not username or not password or not real_name:
+            if not real_name:
                 failed += 1
-                continue
-            if User.query.filter_by(username=username).first():
-                skipped += 1
                 continue
             email = get(row, '邮箱')
             phone = get(row, '手机号')
@@ -301,15 +311,22 @@ def users_batch_import_xlsx():
                 status = 'active'
 
             try:
+                username = _generate_username()
+                password = _generate_password(username)
                 user = User(username=username, real_name=real_name, email=email or None,
                             phone=phone or None, department=department or None, role=role, status=status)
                 user.set_password(password)
                 db.session.add(user)
+                new_users.append({'username': username, 'password': password, 'real_name': real_name})
                 created += 1
             except Exception:
                 failed += 1
         db.session.commit()
-        return jsonify({'success': True, 'message': f'导入完成：新建 {created}，跳过 {skipped}，失败 {failed}'})
+        return jsonify({
+            'success': True,
+            'message': f'导入完成：新建 {created}，跳过 {skipped}，失败 {failed}',
+            'users': new_users
+        })
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
