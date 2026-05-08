@@ -302,6 +302,12 @@ function showUserXlsxImportModal(){
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <div class="alert alert-info small mb-3">
+            <strong><i class="fas fa-info-circle me-1"></i>账号规则</strong><br>
+            工号自动生成：<code>NS</code> + 年份 + 3位序号（如 <code>NS26001</code>）<br>
+            初始密码：工号后6位 + <code>@ns</code>（如 <code>26001@ns</code>）<br>
+            <span class="text-muted">模板只需填写真实姓名、科室等信息，无需填写用户名和密码。</span>
+          </div>
           <div class="mb-3">
             <label class="form-label">选择 .xlsx 文件</label>
             <input type="file" id="user-xlsx-file" class="form-control" accept=".xlsx" />
@@ -331,7 +337,18 @@ function submitUserXlsxImport(){
     contentType:false,
     data: fd,
     success:function(res){
-      if(res.success){ showAlert(res.message||'导入成功','success'); $('#userXlsxImportModal').modal('hide'); loadUsers(); }
+      if(res.success){
+        const users = res.users || [];
+        let userList = users.map(u => `<tr><td>${u.username}</td><td>${u.password}</td><td>${u.real_name}</td></tr>`).join('');
+        const msg = `${res.message}<br><br>
+          <table class="table table-sm table-bordered small" style="background:#fff">
+            <thead><tr><th>工号</th><th>初始密码</th><th>姓名</th></tr></thead>
+            <tbody>${userList}</tbody>
+          </table>`;
+        showAlert(msg,'success',0);
+        $('#userXlsxImportModal').modal('hide');
+        loadUsers();
+      }
       else{ showAlert(res.message||'导入失败','error'); }
     },
     error:function(xhr){ showAlert((xhr.responseJSON&&xhr.responseJSON.message)||'导入失败','error'); }
