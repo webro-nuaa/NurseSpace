@@ -32,25 +32,36 @@ except Exception:
 done
 echo "[entrypoint] MySQL 已就绪"
 
-echo "[entrypoint] 执行数据库迁移..."
+echo "[entrypoint] 初始化数据库..."
 python3 -c "
 from app import create_app
-from flask_migrate import upgrade
-app = create_app()
-with app.app_context():
-    upgrade()
-    print('[entrypoint] 数据库迁移完成')
-" || {
-    echo "[entrypoint] 迁移失败，尝试初始化..."
-    python3 -c "
-from app import create_app
 from models import db
+from flask_migrate import upgrade, stamp
+from sqlalchemy import inspect
+
 app = create_app()
 with app.app_context():
-    db.create_all()
-    print('[entrypoint] 数据库表已创建（create_all 回退）')
+    inspector = inspect(db.engine)
+    existing_tables = inspector.get_table_names()
+    if not existing_tables:
+        db.create_all()
+        try:
+            stamp()
+        except Exception:
+            pass
+        print('[entrypoint] 数据库表已创建（全新安装）')
+    else:
+        try:
+            upgrade()
+            print('[entrypoint] 数据库迁移完成')
+        except Exception as e:
+            print(f'[entrypoint] 迁移失败: {e}，回退到 create_all')
+            db.create_all()
+            try:
+                stamp()
+            except Exception:
+                pass
 "
-}
 
 echo "[entrypoint] 创建初始管理员账号..."
 python3 -c "

@@ -21,8 +21,8 @@ access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"
 
 
 def post_fork(server, worker):
-    import flask
-    app = flask.current_app._get_current_object()
+    from app import create_app
+    from models import db
+    app = create_app()
     with app.app_context():
-        from models import db
         db.engine.dispose()
