@@ -5,8 +5,6 @@ from flask import jsonify, request, redirect, url_for
 def login_or_jwt_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        import logging
-        _log = logging.getLogger(__name__)
         from flask_login import current_user, login_user
         from models import User, db
 
@@ -21,24 +19,13 @@ def login_or_jwt_required(f):
             from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
             verify_jwt_in_request(optional=True)
             user_id = get_jwt_identity()
-            _log.info(f"JWT identity: {user_id}, endpoint: {request.endpoint}")
             if user_id:
                 user = db.session.get(User, int(user_id))
-                _log.info(f"User found: {user}, active: {user.is_active() if user else 'N/A'}")
                 if user and user.is_active():
                     login_user(user, remember=False)
                     return f(*args, **kwargs)
-                else:
-                    _log.warning(f"User not found or inactive: user_id={user_id}")
-            else:
-                _log.warning(f"No user_id from JWT for endpoint: {request.endpoint}")
-        except Exception as e:
-            _log.exception(f"JWT verification failed on {request.endpoint}: {e}")
-
-        _log.warning(f"Falling through to login redirect for {request.endpoint}, "
-                     f"has_jwt={has_jwt}, auth_header_len={len(auth_header)}, "
-                     f"accept_json={request.accept_mimetypes.accept_json}, "
-                     f"accept_html={request.accept_mimetypes.accept_html}")
+        except Exception:
+            pass
 
         if request.accept_mimetypes.accept_json and \
            not request.accept_mimetypes.accept_html:

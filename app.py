@@ -50,14 +50,6 @@ def create_app():
     login_manager.init_app(app)
     jwt.init_app(app)
     csrf.init_app(app)
-
-    # JWT Bearer 认证的请求天然免疫 CSRF，patch CSRF 豁免检查
-    _original_is_exempt = csrf._is_exempt
-    def _patched_is_exempt(self):
-        if request.headers.get('Authorization', '').startswith('Bearer '):
-            return True
-        return _original_is_exempt()
-    csrf._is_exempt = _patched_is_exempt.__get__(csrf, type(csrf))
     CORS(app, supports_credentials=True, origins=Config.CORS_ORIGINS.split(',') if Config.CORS_ORIGINS != '*' else '*')
 
     # Cache
@@ -121,10 +113,10 @@ def create_app():
     from routes.admin import admin_bp
     from routes.api import api_bp
 
-    # 豁免 CSRF 的 JSON API 端点
-    # - auth_bp: 登录表单提交（已由 Flask-WTF 表单自带 CSRF）、JWT 认证的 JSON API
-    # - api_bp: 纯 JWT 认证，不需要 CSRF
+    # 豁免 CSRF 的蓝图 — 全部使用 JWT Bearer 认证，天然免疫 CSRF
     csrf.exempt(auth_bp)
+    csrf.exempt(nurse_bp)
+    csrf.exempt(admin_bp)
     csrf.exempt(api_bp)
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
