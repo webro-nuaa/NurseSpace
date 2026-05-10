@@ -169,13 +169,15 @@ body {
   overflow-y: auto;
 }
 
-/* Desktop: fixed sidebar (Bootstrap offcanvas-lg handles mobile) */
+/* Desktop: always-visible sticky sidebar (override offcanvas hidden state) */
 @media (min-width: 992px) {
   .sidebar {
-    position: sticky;
+    position: sticky !important;
     top: var(--topbar-height);
     height: calc(100vh - var(--topbar-height));
     flex-shrink: 0;
+    visibility: visible !important;
+    transform: none !important;
   }
 }
 
