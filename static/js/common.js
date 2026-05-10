@@ -82,12 +82,6 @@ $(document).ajaxError(function(event, xhr, settings, thrownError) {
     }
 });
 
-// 侧边栏切换（移动端）
-function toggleSidebar() {
-    $('#sidebar').toggleClass('show');
-    $('#sidebar-backdrop').toggleClass('show');
-}
-
 // 退出登录
 function logout() {
     if (confirm('确定要退出登录吗？')) {
@@ -311,6 +305,7 @@ submitPasswordChange_v2 = function() {
 // ========= 语音输入（浏览器 Web Speech API，无需后端） =========
 var _voiceRecognition = null;
 var _voiceTargetId = null;
+var _voiceStartTimer = null;
 
 function _createSpeechRecognition() {
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -335,48 +330,62 @@ function _createSpeechRecognition() {
     rec.onerror = function(event) {
         if (event.error === 'no-speech') return;
         showAlert('语音识别出错：' + event.error, 'warning');
-        _stopAndCleanup();
+        _cleanup(true);
     };
 
     rec.onend = function() {
-        _stopAndCleanup();
+        _cleanup(true);
     };
     return rec;
 }
 
-function _stopAndCleanup() {
+function _cleanup(skipAbort) {
+    // skipAbort: true when called from onend/onerror (recognition already stopped)
     if (_voiceRecognition) {
-        try { _voiceRecognition.abort(); } catch(e) {}
+        if (!skipAbort) {
+            try { _voiceRecognition.abort(); } catch(e) {}
+        }
         _voiceRecognition = null;
     }
     _voiceTargetId = null;
+    if (_voiceStartTimer) {
+        clearTimeout(_voiceStartTimer);
+        _voiceStartTimer = null;
+    }
     resetVoiceButton();
 }
 
 function toggleVoiceInput(textareaId, btnEl) {
     if (_voiceRecognition && _voiceTargetId === textareaId) {
-        // 正在录音 → 停止
-        _stopAndCleanup();
+        // Currently recording for this field → stop
+        _cleanup(false);
         return;
     }
-    // 停止之前的录音（如有），创建全新实例
-    _stopAndCleanup();
-    var rec = _createSpeechRecognition();
-    if (!rec) {
-        showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
-        return;
-    }
-    _voiceRecognition = rec;
-    _voiceTargetId = textareaId;
-    try {
-        _voiceRecognition.start();
-        $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
-        $(btnEl).find('i').addClass('fa-beat');
-        $(btnEl).find('span').text('录音中...点击停止');
-    } catch(e) {
-        showAlert('无法启动语音：' + e.message, 'error');
-        _stopAndCleanup();
-    }
+
+    // Stop any previous recording
+    _cleanup(false);
+
+    // Chrome bug: abort() doesn't reset state synchronously.
+    // Delay start() by one event-loop tick to avoid "already started".
+    _voiceStartTimer = setTimeout(function() {
+        _voiceStartTimer = null;
+        var rec = _createSpeechRecognition();
+        if (!rec) {
+            showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
+            return;
+        }
+        _voiceRecognition = rec;
+        _voiceTargetId = textareaId;
+        try {
+            _voiceRecognition.start();
+            $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
+            $(btnEl).find('i').addClass('fa-beat');
+            $(btnEl).find('span').text('录音中...点击停止');
+        } catch(e) {
+            showAlert('无法启动语音：' + e.message, 'error');
+            _cleanup(true);
+        }
+    }, 100);
 }
 
 function resetVoiceButton() {

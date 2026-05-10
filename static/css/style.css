@@ -162,11 +162,7 @@ body {
 
 /* ----- Sidebar ----- */
 /* Desktop (>=992px): static flex child, always visible.
-   Mobile (<992px):  fixed overlay, hidden off-screen, slides in via .show */
-
-.sidebar-backdrop {
-  display: none;
-}
+   Mobile (<992px):  hidden — mobile nav collapse used instead. */
 
 .sidebar {
   width: var(--sidebar-width);
@@ -174,20 +170,6 @@ body {
   border-right: 1px solid var(--gray-200);
   flex-shrink: 0;
   overflow-y: auto;
-}
-
-.sidebar .sidebar-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--brand-gradient);
-  color: #fff;
-  padding: 0.75rem 1rem;
-}
-
-.sidebar .sidebar-title {
-  font-weight: 600;
-  font-size: 1rem;
 }
 
 .sidebar .sidebar-body {
@@ -716,6 +698,14 @@ body {
   color: #fff;
 }
 
+.nurse-mobile-nav .nav-section-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray-500);
+  padding: 0.5rem 0.75rem 0.15rem;
+}
+
 /* ----- Score Feedback (used by JS evaluation rendering) ----- */
 .score-excellent {
   background: #d1fae5;
@@ -775,28 +765,8 @@ body {
   .form-control,
   .form-select { font-size: 16px; } /* prevent iOS zoom */
 
-  /* Sidebar mobile overlay */
-  .sidebar-backdrop {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    z-index: 1039;
-  }
-  .sidebar-backdrop.show { display: block; }
-
-  .sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    z-index: 1040;
-    width: 280px;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-    box-shadow: 2px 0 12px rgba(0,0,0,0.15);
-  }
-  .sidebar.show { transform: translateX(0); }
+  /* Sidebar hidden on mobile — mobile nav collapse used instead */
+  .sidebar { display: none; }
 
   /* Full-width modals on mobile */
   .modal-dialog {
@@ -835,8 +805,8 @@ body {
 
   .navbar-top .navbar-brand { font-size: 1.1rem; }
 
-  /* Sidebar full-width on phone */
-  .sidebar { width: 85vw; }
+  /* Sidebar hidden on mobile */
+  .sidebar { display: none; }
 
   /* Single-column grid on small phones */
   .row-cols-sm-2 > [class*="col"] {
