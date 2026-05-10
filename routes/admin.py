@@ -444,11 +444,24 @@ def manage_cases():
         data = request.get_json() or {}
         title = (data.get('title') or '').strip()
         category_id = data.get('category_id')
-        if not title or not category_id:
-            return jsonify({'success': False, 'message': '标题和类别不能为空'})
-        category = db.session.get(CaseCategory, category_id)
-        if not category:
-            return jsonify({'success': False, 'message': '类别不存在'})
+        category_name = (data.get('category_name') or '').strip()
+        if not title:
+            return jsonify({'success': False, 'message': '标题不能为空'})
+        if not category_id and not category_name:
+            return jsonify({'success': False, 'message': '请选择类别或输入新类别名称'})
+        if category_id:
+            category = db.session.get(CaseCategory, category_id)
+            if not category:
+                return jsonify({'success': False, 'message': '类别不存在'})
+        else:
+            category = CaseCategory.query.filter_by(name=category_name).first()
+            if category:
+                category_id = category.id
+            else:
+                category = CaseCategory(name=category_name)
+                db.session.add(category)
+                db.session.flush()
+                category_id = category.id
         case = Case(
             category_id=category_id, title=title,
             case_guide=(data.get('case_guide') or '').strip(),

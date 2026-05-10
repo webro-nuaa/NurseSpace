@@ -82,5 +82,19 @@ with app.app_context():
         print(f'[entrypoint] 管理员账号已存在: {admin_username}')
 "
 
+echo "[entrypoint] 初始化默认配置..."
+python3 -c "
+from app import create_app
+from models import db, AiSetting
+app = create_app()
+with app.app_context():
+    if db.session.get(AiSetting, 1) is None:
+        db.session.add(AiSetting(id=1, provider='local'))
+        db.session.commit()
+        print('[entrypoint] 默认 AI 设置已创建')
+    else:
+        print('[entrypoint] AI 设置已存在')
+"
+
 echo "[entrypoint] 启动应用..."
 exec "$@"
