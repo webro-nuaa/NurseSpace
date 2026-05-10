@@ -77,7 +77,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/nurse.js') }}"></script>
+<script src="{{ url_for('static', filename='js/nurse.js', v=config.VERSION) }}"></script>
 <script>
   const qs = new URLSearchParams(location.search);
   const stationId = parseInt(qs.get('id'));

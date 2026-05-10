@@ -12,6 +12,8 @@ def _require_env(key):
 
 
 class Config:
+    VERSION = '1.2.1'
+
     SECRET_KEY = _require_env('SECRET_KEY')
 
     # MySQL
