@@ -1,6 +1,6 @@
 import re
 from docx import Document
-from models import Case, Station, StandardAnswer, ExtendedKnowledge, CaseCategory, db
+from models import Case, Station, StandardAnswer, ExtendedKnowledge, KnowledgeAnswer, CaseCategory, db
 import os
 
 class DocxParser:
@@ -75,10 +75,21 @@ class DocxParser:
             for knowledge_data in case_data.get('extended_knowledge', []):
                 knowledge = ExtendedKnowledge(
                     case_id=case.id,
-                    question=knowledge_data.get('question', ''),
-                    answer=knowledge_data.get('answer', '')
+                    question=knowledge_data.get('question', '')
                 )
                 db.session.add(knowledge)
+                db.session.flush()
+                items = knowledge_data.get('items', [])
+                if not items:
+                    items = [knowledge_data.get('answer', '')]
+                for i, item_text in enumerate(items):
+                    if item_text.strip():
+                        ka = KnowledgeAnswer(
+                            knowledge_id=knowledge.id,
+                            answer_item=item_text,
+                            order_index=i
+                        )
+                        db.session.add(ka)
             
             db.session.commit()
             return case
