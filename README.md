@@ -2,7 +2,7 @@
 
 基于 Flask + MySQL + Redis 的智能护士培训系统，支持案例学习、AI 评分、语音答题、错题管理、考试功能、二维码分享和薄弱点分析。
 
-> **最新版本：v1.2.0** | 139 单元测试全部通过 | 全页面 SPA 架构
+> **最新版本：v1.2.1** | 139 单元测试全部通过 | 全页面 SPA 架构
 
 ## 目录
 
@@ -165,20 +165,31 @@ vim .env
 nano .env
 ```
 
-**必须修改的项**（`.env` 文件中搜索 `change-me` 即可定位）：
+**必须修改的项**（`.env` 文件中搜索 `change-me` 即可定位，共 6 处）：
 
 ```bash
-# 1. 生成 Flask SECRET_KEY
+# 1. 生成 Flask SECRET_KEY（用于 session 签名）
 python3 -c "import secrets; print(secrets.token_hex(32))"
 # 把输出填入 SECRET_KEY=
 
-# 2. 生成 JWT 密钥
+# 2. 生成 JWT 密钥（用于 Token 签名）
 python3 -c "import secrets; print(secrets.token_hex(32))"
 # 把输出填入 JWT_SECRET_KEY=
 
-# 3. 设置强密码
-# MYSQL_PASSWORD=   ← 设置一个复杂密码（至少12位，含大小写字母+数字+符号）
+# 3. 生成 ENCRYPTION_KEY（用于加密 DB 中存储的 AI API Key）
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# 把输出填入 ENCRYPTION_KEY=
+
+# 4. 设置强密码（至少 16 位，含大小写字母+数字+特殊字符）
+# MYSQL_PASSWORD=   ← 设置数据库密码
 # ADMIN_PASSWORD=   ← 设置管理员初始密码，首次登录后请在后台修改
+# REDIS_PASSWORD=   ← 设置 Redis 密码
+
+# 5. 设置站点外部 URL（必须！用于生成考试二维码等）
+# SITE_URL=https://nurse.hospital.com   ← 替换为实际域名
+
+# 6. 限制 CORS 来源（必须！安全要求）
+# CORS_ORIGINS=https://nurse.hospital.com   ← 替换为实际域名，切勿使用 *
 ```
 
 **.env 各配置项说明**：
@@ -209,8 +220,9 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 | `RATELIMIT_ENABLED` | — | `1` | 是否启用速率限制 |
 | `JWT_ACCESS_TOKEN_EXPIRES` | — | `3600` | JWT Token 有效期（秒） |
 | `SITE_URL` | — | — | 站点外部 URL（用于生成考试二维码，生产环境必设） |
-| `CORS_ORIGINS` | — | `*` | CORS 允许的来源，生产环境设为实际域名 |
-| `ENCRYPTION_KEY` | ✅ | — | Fernet 密钥（加密 AI API Key），生成方法见 `.env.example` |
+| `CORS_ORIGINS` | ✅ | — | CORS 允许的来源，生产环境必须设为实际域名 |
+| `SITE_URL` | ✅ | — | 站点外部 URL（生成考试二维码），生产环境必须设置 |
+| `ENCRYPTION_KEY` | ✅ | — | Fernet 密钥（加密 AI API Key），生成方法见上文 |
 | `REDIS_PASSWORD` | ✅ | — | Redis 密码（需与 docker-compose.yml 一致） |
 
 ### 第四步：启动服务
@@ -244,7 +256,7 @@ docker compose ps
 curl http://localhost/api/health
 
 # 预期输出：
-# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"1.2.0"}
+# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"1.2.1"}
 
 # 访问登录页
 curl -I http://localhost/auth/login
@@ -330,6 +342,53 @@ sudo ufw enable
 # 云服务器还需要在控制台配置安全组规则
 # 禁止直接暴露 3306（MySQL）和 6379（Redis）端口
 ```
+
+---
+
+## 生产部署前安全检查清单
+
+在对外提供服务前，逐项确认以下内容：
+
+### 密钥与密码
+
+- [ ] `SECRET_KEY` — 已用 `secrets.token_hex(32)` 生成随机值，无 `change-me` 字样
+- [ ] `JWT_SECRET_KEY` — 已用 `secrets.token_hex(32)` 生成随机值，与 SECRET_KEY 不同
+- [ ] `ENCRYPTION_KEY` — 已用 `Fernet.generate_key()` 生成，与 CI 测试密钥不同
+- [ ] `MYSQL_PASSWORD` — 强密码（≥16 位，含大小写字母+数字+特殊字符）
+- [ ] `REDIS_PASSWORD` — 强密码，与 MYSQL_PASSWORD 不同
+- [ ] `ADMIN_PASSWORD` — 强密码，首次登录后立即在后台修改
+- [ ] `.env` 文件权限为 `600`（`chmod 600 .env`）
+
+### 网络安全
+
+- [ ] `SITE_URL` — 已设置为实际域名（如 `https://nurse.hospital.com`），末尾无 `/`
+- [ ] `CORS_ORIGINS` — 已设置为实际域名，未使用 `*`
+- [ ] `SESSION_COOKIE_SECURE` — 已设置为 `1`（HTTPS 环境下）
+- [ ] 防火墙已开启，仅暴露 80/443/22 端口
+- [ ] 云服务器安全组已配置，禁止直接暴露 3306/6379/8000 端口
+- [ ] 如使用 HTTPS，证书已配置到 Nginx
+
+### 数据库
+
+- [ ] MySQL 数据卷已配置持久化（docker-compose.yml 中 `mysql_data` 卷）
+- [ ] 数据库备份脚本已配置（crontab 定时备份）
+- [ ] 慢查询日志已开启（默认 >2 秒记录）
+
+### 验证
+
+- [ ] `docker compose ps` 所有服务状态为 `healthy`
+- [ ] `curl http://localhost/api/health` 返回 `{"status":"healthy","version":"1.2.1"}`
+- [ ] 浏览器访问登录页正常加载
+- [ ] 管理员账号可以登录
+- [ ] AI 设置页面可以正常访问（不再出现 302 重定向）
+- [ ] 考试二维码链接正确（包含正确的域名）
+
+### 可选优化
+
+- [ ] 上传案例文档，验证 AI 评分功能正常
+- [ ] 创建护士账号，验证学习流程
+- [ ] 配置 HTTPS 证书（Let's Encrypt / 购买证书）
+- [ ] Nginx `server_name` 改为实际域名（`nginx/nginx.conf` 第 12 行）
 
 ---
 

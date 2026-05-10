@@ -446,7 +446,7 @@ def manage_cases():
         category_id = data.get('category_id')
         if not title or not category_id:
             return jsonify({'success': False, 'message': '标题和类别不能为空'})
-        category = CaseCategory.query.get(category_id)
+        category = db.session.get(CaseCategory, category_id)
         if not category:
             return jsonify({'success': False, 'message': '类别不存在'})
         case = Case(
@@ -598,7 +598,7 @@ def update_or_delete_case(case_id: int):
         case.title = title
     case.case_guide = case_guide
     if category_id:
-        category = CaseCategory.query.get(category_id)
+        category = db.session.get(CaseCategory, category_id)
         if not category:
             return jsonify({'success': False, 'message': '类别不存在'})
         case.category_id = category_id
@@ -625,7 +625,7 @@ def batch_delete_cases():
         return jsonify({'success': False, 'message': '请提供要删除的案例ID列表'})
     try:
         for cid in ids:
-            case = Case.query.get(cid)
+            case = db.session.get(Case, cid)
             if case:
                 db.session.delete(case)
         db.session.commit()
@@ -827,8 +827,12 @@ def batch_import_cases_xlsx():
                 ac = f'知识答{suffix}'
                 qv = get(row, qc)
                 av = get(row, ac)
-                if qv or av:
-                    db.session.add(ExtendedKnowledge(case_id=case.id, question=qv, answer=av))
+                if qv:
+                    ek = ExtendedKnowledge(case_id=case.id, question=qv)
+                    db.session.add(ek)
+                    db.session.flush()
+                    if av:
+                        db.session.add(KnowledgeAnswer(knowledge_id=ek.id, answer_item=av, order_index=0))
 
             created += 1
 
@@ -887,9 +891,7 @@ def get_case_detail(case_id):
             'id': ek.id,
             'question': ek.question,
             'answers': [{'id': a.id, 'answer_item': a.answer_item,
-                         'score_weight': float(a.score_weight)} for a in answers] or [
-                {'id': 0, 'answer_item': ek.answer, 'score_weight': float(ek.score) if ek.score else 5}
-            ]
+                         'score_weight': float(a.score_weight)} for a in answers]
         })
 
     return jsonify({

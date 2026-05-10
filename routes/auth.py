@@ -231,7 +231,7 @@ def change_password():
 @login_or_jwt_required
 @admin_required
 def toggle_user_status(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({'success': False, 'message': '用户不存在'})
 
@@ -257,7 +257,7 @@ def toggle_user_status(user_id):
 @admin_required
 def admin_reset_user_password(user_id):
     import secrets
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         return jsonify({'success': False, 'message': '用户不存在'})
     new_password = secrets.token_urlsafe(8) + 'A1'

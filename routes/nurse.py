@@ -7,7 +7,7 @@ from utils.decorators import nurse_required
 from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, ExamRecord, PointRecord, ExtendedKnowledge, KnowledgeAnswer, WeaknessAnalysis, ExtensionVideo, ExtensionLink, db
 from utils.ai_evaluator import AIEvaluator
 from sqlalchemy import desc, func
-from datetime import datetime
+from datetime import datetime, timezone
 
 nurse_bp = Blueprint('nurse', __name__)
 ai_evaluator = AIEvaluator()
@@ -308,7 +308,7 @@ def submit_answer(station_id):
             existing_record.user_answer = user_answer
             existing_record.score = evaluation['score']
             existing_record.ai_feedback = feedback_json
-            existing_record.completed_at = datetime.utcnow()
+            existing_record.completed_at = datetime.now(timezone.utc)
             learning_record = existing_record
         else:
             learning_record = LearningRecord(
@@ -552,7 +552,7 @@ def run_weakness_analysis():
     saved = WeaknessAnalysis.query.filter_by(user_id=current_user.id).first()
     if saved:
         saved.content = payload
-        saved.generated_at = datetime.utcnow()
+        saved.generated_at = datetime.now(timezone.utc)
     else:
         saved = WeaknessAnalysis(user_id=current_user.id, content=payload)
         db.session.add(saved)
@@ -575,7 +575,7 @@ def get_exams():
 
     exams = Exam.query.filter(
         Exam.status == 'published',
-        Exam.end_time > datetime.utcnow()
+        Exam.end_time > datetime.now(timezone.utc)
     ).order_by(desc(Exam.created_at)).all()
 
     exams_data = []

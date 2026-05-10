@@ -93,7 +93,7 @@ def get_station_answers(station_id: int):
 def search_stations():
     """搜索站点（用于考试组卷）"""
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    user = db.session.get(User, current_user_id)
     
     if not user or user.role != 'admin':
         return jsonify({'success': False, 'message': '权限不足'})
@@ -164,7 +164,7 @@ def search_stations():
 def get_overview_statistics():
     """获取系统概览统计"""
     current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    user = db.session.get(User, current_user_id)
     
     if not user:
         return jsonify({'success': False, 'message': '用户不存在'})
@@ -182,8 +182,8 @@ def get_overview_statistics():
         total_exam_records = ExamRecord.query.count()
         
         # 最近7天的学习活动
-        from datetime import datetime, timedelta
-        recent_date = datetime.utcnow() - timedelta(days=7)
+        from datetime import datetime, timedelta, timezone
+        recent_date = datetime.now(timezone.utc) - timedelta(days=7)
         recent_activities = LearningRecord.query.filter(
             LearningRecord.completed_at >= recent_date
         ).count()
@@ -237,7 +237,7 @@ def health_check():
     return jsonify({
         'status': 'healthy' if db_ok else 'degraded',
         'service': 'nurse_training_system',
-        'version': '1.0.0',
+        'version': '1.2.1',
         'database': 'connected' if db_ok else 'disconnected'
     }), status_code
 
@@ -267,7 +267,7 @@ def get_comments():
     comments_data = []
     for comment in pagination.items:
         # 获取用户信息
-        user = User.query.get(comment.user_id)
+        user = db.session.get(User, comment.user_id)
         if not user:
             continue
             
@@ -349,7 +349,7 @@ def create_comment():
     
     # 如果有父评论，验证父评论是否存在
     if parent_id:
-        parent_comment = Comment.query.get(parent_id)
+        parent_comment = db.session.get(Comment, parent_id)
         if not parent_comment or parent_comment.status != 'active':
             return jsonify({'success': False, 'message': '父评论不存在或已被删除'})
     
@@ -449,7 +449,7 @@ def get_comment_replies(comment_id):
     
     replies_data = []
     for reply in pagination.items:
-        user = User.query.get(reply.user_id)
+        user = db.session.get(User, reply.user_id)
         if not user:
             continue
             

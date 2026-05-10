@@ -1,7 +1,12 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
+
 
 # 这里不直接导入db，而是在需要时从flask的current_app中获取
 db = SQLAlchemy()
@@ -19,8 +24,8 @@ class User(UserMixin, db.Model):
     department = db.Column(db.String(100))
     status = db.Column(db.Enum('active', 'disabled'), default='active')
     points = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
     
     # 关系
     learning_records = db.relationship('LearningRecord', backref='user', lazy='dynamic')
@@ -46,7 +51,7 @@ class CaseCategory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     description = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
     
     # 关系
     cases = db.relationship('Case', backref='category', lazy='dynamic')
@@ -61,8 +66,8 @@ class Case(db.Model):
     difficulty = db.Column(db.Enum('basic', 'intermediate', 'advanced'), default='intermediate')
     case_type = db.Column(db.Enum('learning', 'exam'), default='learning')
     file_path = db.Column(db.String(500))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
 
     # 关系
     stations = db.relationship('Station', backref='case', lazy='dynamic', cascade='all, delete-orphan')
@@ -79,7 +84,7 @@ class Station(db.Model):
     assessment_task = db.Column(db.Text)
     question = db.Column(db.Text, nullable=False)
     order_index = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
     
     # 关系
     standard_answers = db.relationship('StandardAnswer', backref='station', lazy='dynamic', cascade='all, delete-orphan')
@@ -96,7 +101,7 @@ class StandardAnswer(db.Model):
     answer_item = db.Column(db.Text, nullable=False)
     score_weight = db.Column(db.Numeric(5, 2), default=1.00)
     order_index = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
 
 class ExtendedKnowledge(db.Model):
     __tablename__ = 'extended_knowledge'
@@ -104,7 +109,7 @@ class ExtendedKnowledge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     case_id = db.Column(db.Integer, db.ForeignKey('cases.id'), nullable=False)
     question = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
 
     # 关系
     answers = db.relationship('KnowledgeAnswer', backref='knowledge', lazy='dynamic', cascade='all, delete-orphan')
@@ -118,7 +123,7 @@ class KnowledgeAnswer(db.Model):
     answer_item = db.Column(db.Text, nullable=False)
     score_weight = db.Column(db.Numeric(5, 2), default=1.00)
     order_index = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
 
 
 class ExtensionVideo(db.Model):
@@ -130,7 +135,7 @@ class ExtensionVideo(db.Model):
     url = db.Column(db.String(500), nullable=False)
     description = db.Column(db.Text)
     order_index = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
 
 
 class ExtensionLink(db.Model):
@@ -142,7 +147,7 @@ class ExtensionLink(db.Model):
     url = db.Column(db.String(500), nullable=False)
     description = db.Column(db.Text)
     order_index = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
 
 
 class LearningRecord(db.Model):
@@ -155,7 +160,7 @@ class LearningRecord(db.Model):
     score = db.Column(db.Numeric(5, 2))
     max_score = db.Column(db.Numeric(5, 2), default=100.00)
     ai_feedback = db.Column(db.Text)
-    completed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, default=_utcnow)
 
 class WrongQuestion(db.Model):
     __tablename__ = 'wrong_questions'
@@ -164,7 +169,7 @@ class WrongQuestion(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     station_id = db.Column(db.Integer, db.ForeignKey('stations.id'), nullable=False)
     score = db.Column(db.Numeric(5, 2))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
     
     __table_args__ = (db.UniqueConstraint('user_id', 'station_id', name='unique_user_station'),)
 
@@ -179,7 +184,7 @@ class Exam(db.Model):
     end_time = db.Column(db.DateTime)
     duration = db.Column(db.Integer, default=60)  # 分钟
     status = db.Column(db.Enum('draft', 'published', 'ended'), default='draft')
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
     
     # 关系
     creator = db.relationship('User', backref='created_exams')
@@ -203,7 +208,7 @@ class ExamRecord(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     total_score = db.Column(db.Numeric(5, 2), default=0)
     max_score = db.Column(db.Numeric(5, 2), default=100)
-    start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    start_time = db.Column(db.DateTime, default=_utcnow)
     submit_time = db.Column(db.DateTime)
     status = db.Column(db.Enum('in_progress', 'submitted'), default='in_progress')
     
@@ -229,7 +234,7 @@ class PointRecord(db.Model):
     reason = db.Column(db.String(200))
     related_id = db.Column(db.Integer)
     related_type = db.Column(db.Enum('learning', 'exam'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
 
 
 class AiSetting(db.Model):
@@ -249,11 +254,11 @@ class AiSetting(db.Model):
     zhipu_model = db.Column(db.String(100))
     zhipu_base_url = db.Column(db.String(300))
 
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
 
     @staticmethod
     def get_singleton() -> "AiSetting":
-        setting = AiSetting.query.get(1)
+        setting = db.session.get(AiSetting, 1)
         if not setting:
             setting = AiSetting(id=1, provider='local')
             db.session.add(setting)
@@ -267,7 +272,7 @@ class WeaknessAnalysis(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, unique=True)
     content = db.Column(db.Text, nullable=False)  # 存储分析JSON文本
-    generated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    generated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
 
     # 关系（可选）
     user = db.relationship('User', backref=db.backref('weakness_analysis', uselist=False))
@@ -301,8 +306,8 @@ class Comment(db.Model):
     status = db.Column(db.Enum('active', 'hidden', 'deleted'), default='active')
     
     # 时间戳
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
     
     # 关系
     user = db.relationship('User', backref=db.backref('comments', lazy='dynamic'))
@@ -322,7 +327,7 @@ class CommentLike(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     comment_id = db.Column(db.Integer, db.ForeignKey('comments.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
     
     # 关系
     user = db.relationship('User', backref=db.backref('comment_likes', lazy='dynamic'))
@@ -353,8 +358,8 @@ class CommentReport(db.Model):
     # 管理员处理意见
     admin_note = db.Column(db.Text)
     
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_utcnow)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
     
     # 关系
     user = db.relationship('User', backref=db.backref('comment_reports', lazy='dynamic'))

@@ -16,10 +16,12 @@ class AIEvaluator:
     """AI评分器，用于评估护士答案"""
     
     def __init__(self):
+        import logging
+        self._logger = logging.getLogger(__name__)
         if Config.OPENAI_API_KEY:
             openai.api_key = Config.OPENAI_API_KEY
         else:
-            print("警告：未设置OPENAI_API_KEY，AI评分功能将无法使用")
+            self._logger.warning("未设置OPENAI_API_KEY，AI评分功能将无法使用")
     
     def evaluate_answer(self, question, user_answer, standard_answers):
         """
@@ -70,7 +72,7 @@ class AIEvaluator:
             try:
                 return self._evaluate_with_glm(question, user_answer, standard_answers, zhipu_key, zhipu_model, zhipu_base_url)
             except Exception as e:
-                print(f"GLM评分出错：{str(e)}，降级使用其他方式")
+                self._logger.warning("GLM评分出错：%s，降级使用其他方式", str(e))
 
         if not openai_key or openai is None:
             # 如果没有配置模型，使用简单的文本匹配评分
@@ -159,7 +161,7 @@ class AIEvaluator:
             }
             
         except Exception as e:
-            print(f"AI评分出错：{str(e)}")
+            self._logger.warning("AI评分出错：%s", str(e))
             # 降级到简单文本匹配
             return self._simple_text_matching(question, user_answer, standard_answers)
     
@@ -490,7 +492,7 @@ class AIEvaluator:
                 return self._simple_weakness_analysis(wrong_questions_data)
                 
         except Exception as e:
-            print(f"AI薄弱点分析出错：{str(e)}")
+            self._logger.warning("AI薄弱点分析出错：%s", str(e))
             return self._simple_weakness_analysis(wrong_questions_data)
     
     def _simple_weakness_analysis(self, wrong_questions_data):

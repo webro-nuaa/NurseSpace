@@ -247,15 +247,15 @@ CREATE TABLE IF NOT EXISTS weakness_analysis (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-CREATE INDEX IF NOT EXISTS idx_cases_category ON cases(category_id);
-CREATE INDEX IF NOT EXISTS idx_stations_case ON stations(case_id);
-CREATE INDEX IF NOT EXISTS idx_learning_records_user ON learning_records(user_id);
-CREATE INDEX IF NOT EXISTS idx_learning_records_station ON learning_records(station_id);
-CREATE INDEX IF NOT EXISTS idx_wrong_questions_user ON wrong_questions(user_id);
-CREATE INDEX IF NOT EXISTS idx_exam_records_user ON exam_records(user_id);
-CREATE INDEX IF NOT EXISTS idx_exam_records_exam ON exam_records(exam_id);
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_cases_category ON cases(category_id);
+CREATE INDEX idx_stations_case ON stations(case_id);
+CREATE INDEX idx_learning_records_user ON learning_records(user_id);
+CREATE INDEX idx_learning_records_station ON learning_records(station_id);
+CREATE INDEX idx_wrong_questions_user ON wrong_questions(user_id);
+CREATE INDEX idx_exam_records_user ON exam_records(user_id);
+CREATE INDEX idx_exam_records_exam ON exam_records(exam_id);
 
 INSERT IGNORE INTO case_categories (name, description) VALUES
 ('儿科模块', '儿科相关医疗案例'),
