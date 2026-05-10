@@ -250,3 +250,25 @@ def toggle_user_status(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'状态更新失败：{str(e)}'})
+
+
+@auth_bp.route('/users/<int:user_id>/reset-password', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def admin_reset_user_password(user_id):
+    import secrets
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': '用户不存在'})
+    new_password = secrets.token_urlsafe(8) + 'A1'
+    try:
+        user.set_password(new_password)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': '密码已重置',
+            'new_password': new_password
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'密码重置失败：{str(e)}'})

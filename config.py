@@ -21,7 +21,8 @@ class Config:
     MYSQL_PORT = int(os.environ.get('MYSQL_PORT', 3306))
     MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE', 'nurse_training_system')
 
-    SQLALCHEMY_DATABASE_URI = (
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        'SQLALCHEMY_DATABASE_URI',
         f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}'
         f'@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4'
     )
@@ -43,18 +44,38 @@ class Config:
     ZHIPU_MODEL = os.environ.get('ZHIPU_MODEL', 'glm-4-air')
 
     # Redis
-    REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+    _redis_password = os.environ.get('REDIS_PASSWORD', '')
+    _redis_auth = f":{_redis_password}@" if _redis_password else ""
+    _redis_base = f"redis://{_redis_auth}redis:6379"
+    REDIS_URL = os.environ.get('REDIS_URL', f'{_redis_base}/0')
     REDIS_ENABLED = os.environ.get('REDIS_ENABLED', '1') == '1'
 
     # Rate limit
     RATELIMIT_ENABLED = os.environ.get('RATELIMIT_ENABLED', '1') == '1'
-    RATELIMIT_STORAGE_URL = os.environ.get('RATELIMIT_STORAGE_URL', 'redis://redis:6379/1')
+    RATELIMIT_STORAGE_URL = os.environ.get('RATELIMIT_STORAGE_URL', f'{_redis_base}/1')
 
     # File upload
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
     MAX_CONTENT_LENGTH = 128 * 1024 * 1024
     CASES_DIR = os.environ.get('CASES_DIR', os.path.join(BASE_DIR, '案例'))
+
+    # Encryption (用于加密 DB 中存储的 API Key)
+    ENCRYPTION_KEY = _require_env('ENCRYPTION_KEY')
+
+    # 站点外部 URL（用于生成二维码等外部链接，不配置则自动探测）
+    SITE_URL = os.environ.get('SITE_URL', '').rstrip('/')
+
+    # CORS
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
+
+    # Session security
+    SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', '1') == '1'
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+
+    # Redis password (if set)
+    REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')
 
     # HTTPS (由 Nginx 处理，应用层通常不需要)
     ENABLE_HTTPS = os.environ.get('ENABLE_HTTPS', '0') == '1'

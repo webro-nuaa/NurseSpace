@@ -1,5 +1,20 @@
 from flask import Flask, jsonify, request, redirect, url_for
 from flask_login import LoginManager
+
+# PyJWT 2.8.x compatibility shim — zhipuai pins PyJWT<2.9 but flask-jwt-extended
+# expects jwt.types.Options (added in PyJWT 2.10+).  Provide a stub.
+import jwt.types as _jwt_types
+if not hasattr(_jwt_types, 'Options'):
+    from typing import TypedDict, Optional, List as _List
+    class _Options(TypedDict, total=False):
+        verify_signature: bool
+        verify_exp: bool
+        verify_iat: bool
+        verify_aud: bool
+        verify_iss: bool
+        require: Optional[_List[str]]
+    _jwt_types.Options = _Options
+
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
@@ -35,7 +50,7 @@ def create_app():
     login_manager.init_app(app)
     jwt.init_app(app)
     csrf.init_app(app)
-    CORS(app, supports_credentials=True)
+    CORS(app, supports_credentials=True, origins=Config.CORS_ORIGINS.split(',') if Config.CORS_ORIGINS != '*' else '*')
 
     # Cache
     if Config.REDIS_ENABLED:
@@ -98,11 +113,11 @@ def create_app():
     from routes.admin import admin_bp
     from routes.api import api_bp
 
-    # 豁免 CSRF 的 JSON API 端点（使用 JWT 认证，不需要 CSRF 保护）
+    # 豁免 CSRF 的 JSON API 端点
+    # - auth_bp: 登录表单提交（已由 Flask-WTF 表单自带 CSRF）、JWT 认证的 JSON API
+    # - api_bp: 纯 JWT 认证，不需要 CSRF
     csrf.exempt(auth_bp)
     csrf.exempt(api_bp)
-    csrf.exempt(admin_bp)
-    csrf.exempt(nurse_bp)
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(nurse_bp, url_prefix='/nurse')
@@ -112,6 +127,14 @@ def create_app():
     from routes.main import main_bp
     app.register_blueprint(main_bp)
 
+    # 上传文件服务（视频等）
+    from flask import send_from_directory
+    import os as _os
+    @app.route('/uploads/<path:filename>')
+    def serve_upload(filename):
+        upload_dir = app.config.get('UPLOAD_DIR', _os.path.join(app.root_path, 'uploads'))
+        return send_from_directory(upload_dir, filename)
+
     return app
 
 
@@ -120,4 +143,4 @@ if __name__ == '__main__':
     with app.app_context():
         from models import db
         db.create_all()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=os.environ.get('FLASK_DEBUG', '0') == '1', host='0.0.0.0', port=5000)

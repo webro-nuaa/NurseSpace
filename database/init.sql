@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS cases (
     category_id INT NOT NULL COMMENT '类别ID',
     title VARCHAR(200) NOT NULL COMMENT '案例标题',
     case_guide TEXT COMMENT '案例指引',
-    site_info VARCHAR(100) COMMENT '站点信息',
+    difficulty ENUM('basic', 'intermediate', 'advanced') DEFAULT 'intermediate' COMMENT '难度',
+    case_type ENUM('learning', 'exam') DEFAULT 'learning' COMMENT '案例类型：学习/考试',
     file_path VARCHAR(500) COMMENT '原始文档路径',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS stations (
     name VARCHAR(200) NOT NULL COMMENT '站点名称',
     assessment_task TEXT COMMENT '考核任务',
     question TEXT NOT NULL COMMENT '问题',
+    order_index INT DEFAULT 0 COMMENT '排序',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
 );
@@ -64,6 +66,28 @@ CREATE TABLE IF NOT EXISTS extended_knowledge (
     case_id INT NOT NULL COMMENT '案例ID',
     question TEXT NOT NULL COMMENT '扩展知识问题',
     answer TEXT NOT NULL COMMENT '扩展知识答案',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS extension_videos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    case_id INT NOT NULL COMMENT '案例ID',
+    title VARCHAR(200) NOT NULL COMMENT '视频标题',
+    url VARCHAR(500) NOT NULL COMMENT '视频URL',
+    description TEXT COMMENT '视频描述',
+    order_index INT DEFAULT 0 COMMENT '排序',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS extension_links (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    case_id INT NOT NULL COMMENT '案例ID',
+    title VARCHAR(200) NOT NULL COMMENT '链接标题',
+    url VARCHAR(500) NOT NULL COMMENT '链接URL',
+    description TEXT COMMENT '链接描述',
+    order_index INT DEFAULT 0 COMMENT '排序',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
 );
@@ -197,9 +221,9 @@ CREATE TABLE IF NOT EXISTS comment_reports (
 CREATE TABLE IF NOT EXISTS ai_settings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     provider VARCHAR(20) NOT NULL DEFAULT 'local' COMMENT 'glm | openai | local',
-    openai_key VARCHAR(200) COMMENT 'OpenAI Key',
+    openai_key VARCHAR(500) COMMENT 'OpenAI Key（加密存储）',
     openai_model VARCHAR(100) COMMENT 'OpenAI 模型',
-    zhipu_key VARCHAR(200) COMMENT '智谱GLM Key',
+    zhipu_key VARCHAR(500) COMMENT '智谱GLM Key（加密存储）',
     zhipu_model VARCHAR(100) COMMENT '智谱GLM 模型',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

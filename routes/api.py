@@ -1,14 +1,28 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import User, Case, CaseCategory, Station, StandardAnswer, ExtendedKnowledge, Comment, CommentLike, CommentReport, db
+from models import User, Case, CaseCategory, Station, StandardAnswer, ExtendedKnowledge, KnowledgeAnswer, Comment, CommentLike, CommentReport, db
 from sqlalchemy import func, text
 
 api_bp = Blueprint('api', __name__)
 
+
+def _cache():
+    from app import cache
+    return cache
+
+
+def _limiter():
+    return current_app.extensions.get('limiter')
+
 @api_bp.route('/categories')
 @jwt_required()
 def get_categories():
-    """获取所有案例类别"""
+    """获取所有案例类别（缓存5分钟）"""
+    cached = _cache()
+    if cached:
+        result = cached.get('api_categories')
+        if result:
+            return result
     categories = CaseCategory.query.all()
     categories_data = []
     
@@ -21,10 +35,14 @@ def get_categories():
             'case_count': case_count
         })
     
-    return jsonify({
+    result = jsonify({
         'success': True,
         'data': categories_data
     })
+    cached = _cache()
+    if cached:
+        cached.set('api_categories', result, timeout=300)
+    return result
 
 @api_bp.route('/stations/<int:station_id>')
 @jwt_required(optional=True)
@@ -81,17 +99,21 @@ def search_stations():
         return jsonify({'success': False, 'message': '权限不足'})
     
     category_id = request.args.get('category_id', type=int)
+    case_type = request.args.get('case_type', '').strip()
     keyword = request.args.get('keyword', '').strip()
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    
+
     query = db.session.query(Station, Case, CaseCategory)\
         .join(Case, Station.case_id == Case.id)\
         .join(CaseCategory, Case.category_id == CaseCategory.id)
-    
+
     if category_id:
         query = query.filter(Case.category_id == category_id)
-    
+
+    if case_type in ('learning', 'exam'):
+        query = query.filter(Case.case_type == case_type)
+
     if keyword:
         query = query.filter(
             db.or_(
@@ -111,8 +133,13 @@ def search_stations():
         stations_data.append({
             'id': station.id,
             'name': station.name,
-            'question': station.question[:200] + '...' if len(station.question) > 200 else station.question,
+            'question': station.question,
+            'assessment_task': station.assessment_task,
+            'case_id': case.id,
             'case_title': case.title,
+            'case_type': case.case_type or 'learning',
+            'difficulty': case.difficulty or 'intermediate',
+            'category_id': category.id,
             'category_name': category.name,
             'has_answers': has_answers
         })
@@ -469,17 +496,14 @@ def get_comment_replies(comment_id):
 def get_knowledge_detail(knowledge_id: int):
     """获取单个扩展知识题目详情"""
     ek = ExtendedKnowledge.query.get_or_404(knowledge_id)
-    # 拆分答案项
-    items = []
-    raw = (ek.answer or '').strip()
-    for seg in [s.strip() for s in raw.replace('\r','').split('\n') if s.strip()]:
-        items.append(seg)
+    answers = KnowledgeAnswer.query.filter_by(knowledge_id=knowledge_id)\
+        .order_by(KnowledgeAnswer.order_index).all()
     return jsonify({
         'success': True,
         'data': {
             'id': ek.id,
             'question': ek.question,
-            'answers': items
+            'answers': [a.answer_item for a in answers]
         }
     })
 
@@ -487,18 +511,14 @@ def get_knowledge_detail(knowledge_id: int):
 @jwt_required(optional=True)
 def get_knowledge_answers(knowledge_id: int):
     """获取扩展知识题目的标准答案"""
-    ek = ExtendedKnowledge.query.get_or_404(knowledge_id)
-    
-    # 拆分答案项，转换为标准格式
-    answers_data = []
-    raw = (ek.answer or '').strip()
-    for i, seg in enumerate([s.strip() for s in raw.replace('\r','').split('\n') if s.strip()]):
-        answers_data.append({
-            'id': i + 1,
-            'answer_item': seg,
-            'order_index': i
-        })
-    
+    answers = KnowledgeAnswer.query.filter_by(knowledge_id=knowledge_id)\
+        .order_by(KnowledgeAnswer.order_index).all()
+    answers_data = [{
+        'id': a.id,
+        'answer_item': a.answer_item,
+        'score_weight': float(a.score_weight),
+        'order_index': a.order_index
+    } for a in answers]
     return jsonify({
         'success': True,
         'data': answers_data

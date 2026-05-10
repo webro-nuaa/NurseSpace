@@ -1,71 +1,62 @@
 {% extends "base.html" %}
 
-{% block title %}管理员端 - 护士培训系统{% endblock %}
+{% block title %}管理员端 - 智慧化护理实践教学案例库平台{% endblock %}
 
-{% block nav_items %}
-<li class="nav-item">
-    <a class="nav-link active" href="#" onclick="loadDashboard()">
-        <i class="fas fa-tachometer-alt me-1"></i>首页
-    </a>
-</li>
-<li class="nav-item">
-    <a class="nav-link" href="#" onclick="loadUsers()">
-        <i class="fas fa-users me-1"></i>用户管理
-    </a>
-</li>
-<li class="nav-item">
-    <a class="nav-link" href="#" onclick="loadCases()">
-        <i class="fas fa-book-medical me-1"></i>案例管理
-    </a>
-</li>
-<li class="nav-item">
-    <a class="nav-link" href="#" onclick="loadExams()">
-        <i class="fas fa-file-alt me-1"></i>考试管理
-    </a>
-</li>
+{% block nav_items %}{% endblock %}
+
+{% block navbar_toggle %}
+<button class="sidebar-toggle d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
+    <i class="fas fa-bars"></i>
+</button>
 {% endblock %}
 
 {% block sidebar %}
-<li>
-    <a href="#" class="nav-link active" onclick="loadDashboard()">
-        <i class="fas fa-home me-2"></i>数据看板
+<li class="nav-section-title">主菜单</li>
+<li class="nav-item">
+    <a class="nav-link active" href="#" data-page="dashboard" onclick="navigateTo('dashboard')">
+        <i class="fas fa-tachometer-alt"></i>数据看板
     </a>
 </li>
-<li>
-    <a href="#" class="nav-link" onclick="loadUsers()">
-        <i class="fas fa-users me-2"></i>用户管理
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="users" onclick="navigateTo('users')">
+        <i class="fas fa-users"></i>用户管理
     </a>
 </li>
-<li>
-    <a href="#" class="nav-link" onclick="loadCases()">
-        <i class="fas fa-book-medical me-2"></i>案例管理
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="cases" onclick="navigateTo('cases')">
+        <i class="fas fa-book-medical"></i>案例管理
     </a>
 </li>
-<li>
-    <a href="#" class="nav-link" onclick="loadExams()">
-        <i class="fas fa-file-alt me-2"></i>考试管理
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="exams" onclick="navigateTo('exams')">
+        <i class="fas fa-file-alt"></i>考试管理
     </a>
 </li>
-<li>
-    <a href="#" class="nav-link" onclick="loadStatistics()">
-        <i class="fas fa-chart-bar me-2"></i>学习统计
+<li class="nav-section-title">分析</li>
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="statistics" onclick="navigateTo('statistics')">
+        <i class="fas fa-chart-bar"></i>学习统计
     </a>
 </li>
-<li>
-    <a href="#" class="nav-link" onclick="loadGroupAnalysis()">
-        <i class="fas fa-users-cog me-2"></i>群体分析
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="group-analysis" onclick="navigateTo('group-analysis')">
+        <i class="fas fa-users-cog"></i>群体分析
     </a>
 </li>
-<li>
-    <a href="#" class="nav-link" onclick="loadAiSettings()">
-        <i class="fas fa-robot me-2"></i>AI设置
+<li class="nav-section-title">系统</li>
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="ai-settings" onclick="navigateTo('ai-settings')">
+        <i class="fas fa-robot"></i>AI 设置
     </a>
 </li>
 {% endblock %}
 
 {% block content %}
 <div id="main-content">
-    <!-- 内容将通过AJAX加载 -->
+    <div class="loading-spinner">
+        <div class="spinner-border me-2" role="status"></div>
+        <span>加载中...</span>
+    </div>
 </div>
 {% endblock %}
 
@@ -73,189 +64,63 @@
 <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 <script>
     $(document).ready(function() {
-        // 检查登录状态
         checkLogin();
-        
-        // 加载首页
         loadDashboard();
     });
-    
+
     function checkLogin() {
         const token = localStorage.getItem('access_token');
         const userInfo = localStorage.getItem('user_info');
-        
+
         if (!token || !userInfo) {
             window.location.href = '/auth/login';
             return;
         }
-        
+
         const user = JSON.parse(userInfo);
         if (user.role !== 'admin') {
             window.location.href = '/auth/login';
             return;
         }
-        
-        // 设置用户信息
+
         $('#user-name').text(user.real_name);
-        
-        // 设置AJAX默认header
+
         $.ajaxSetup({
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
+            headers: { 'Authorization': 'Bearer ' + token }
         });
     }
-    
-    function loadDashboard() {
-        setActiveNav('数据看板');
-        
-        $.get('/admin/dashboard', function(response) {
-            if (response.success) {
-                const data = response.data;
-                const html = `
-                    <div class="row">
-                        <div class="col-12">
-                            <h2><i class="fas fa-tachometer-alt me-2"></i>数据看板</h2>
-                            <p class="text-muted">系统总体数据概览</p>
-                        </div>
-                    </div>
-                    
-                    <div class="row mb-4">
-                        <div class="col-md-2">
-                            <div class="card bg-primary text-white">
-                                <div class="card-body text-center">
-                                    <h5><i class="fas fa-users"></i></h5>
-                                    <h3>${data.statistics.total_users}</h3>
-                                    <small>总用户数</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="card bg-success text-white">
-                                <div class="card-body text-center">
-                                    <h5><i class="fas fa-user-check"></i></h5>
-                                    <h3>${data.statistics.active_users}</h3>
-                                    <small>活跃用户</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="card bg-info text-white">
-                                <div class="card-body text-center">
-                                    <h5><i class="fas fa-book-medical"></i></h5>
-                                    <h3>${data.statistics.total_cases}</h3>
-                                    <small>案例总数</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="card bg-warning text-white">
-                                <div class="card-body text-center">
-                                    <h5><i class="fas fa-question-circle"></i></h5>
-                                    <h3>${data.statistics.total_stations}</h3>
-                                    <small>题目总数</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="card bg-secondary text-white">
-                                <div class="card-body text-center">
-                                    <h5><i class="fas fa-chart-line"></i></h5>
-                                    <h3>${data.statistics.avg_score.toFixed(1)}</h3>
-                                    <small>平均分</small>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-2">
-                            <div class="card bg-danger text-white">
-                                <div class="card-body text-center">
-                                    <h5><i class="fas fa-exclamation-triangle"></i></h5>
-                                    <h3>${data.statistics.wrong_rate}%</h3>
-                                    <small>错误率</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5><i class="fas fa-chart-bar me-2"></i>类别分布</h5>
-                                </div>
-                                <div class="card-body">
-                                    <canvas id="categoryChart"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5><i class="fas fa-history me-2"></i>最近学习活动</h5>
-                                </div>
-                                <div class="card-body">
-                                    <div class="list-group list-group-flush">
-                                        ${data.recent_activities.map(activity => `
-                                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <h6 class="mb-1">${activity.user_name}</h6>
-                                                    <small class="text-muted">${activity.case_title} - ${activity.station_name}</small>
-                                                </div>
-                                                <div class="text-end">
-                                                    <span class="badge ${activity.score >= 80 ? 'bg-success' : activity.score >= 60 ? 'bg-warning' : 'bg-danger'}">${activity.score}分</span>
-                                                    <br>
-                                                    <small class="text-muted">${new Date(activity.completed_at).toLocaleString()}</small>
-                                                </div>
-                                            </div>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
-                $('#main-content').html(html);
-                
-                // 绘制类别分布图表
-                drawCategoryChart(data.category_data);
-            }
-        }).fail(function() {
-            showAlert('加载失败，请稍后重试', 'error');
-        });
+
+    function navigateTo(page) {
+        // Update sidebar active state
+        $('#sidebar .nav-link').removeClass('active');
+        $('#sidebar .nav-link[data-page="' + page + '"]').addClass('active');
+
+        // Close offcanvas on mobile
+        const offcanvas = bootstrap.Offcanvas.getInstance(document.getElementById('sidebar'));
+        if (offcanvas) offcanvas.hide();
+
+        // Route to the correct loader
+        switch(page) {
+            case 'dashboard': loadDashboard(); break;
+            case 'users': loadUsers(); break;
+            case 'cases': loadCases(); break;
+            case 'exams': loadExams(); break;
+            case 'statistics': loadStatistics(); break;
+            case 'group-analysis': loadGroupAnalysis(); break;
+            case 'ai-settings': loadAiSettings(); break;
+        }
     }
-    
-    function drawCategoryChart(categoryData) {
-        const ctx = document.getElementById('categoryChart').getContext('2d');
-        
-        new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: categoryData.map(item => item.category),
-                datasets: [{
-                    label: '案例数量',
-                    data: categoryData.map(item => item.case_count),
-                    backgroundColor: '#36A2EB'
-                }, {
-                    label: '题目数量',
-                    data: categoryData.map(item => item.station_count),
-                    backgroundColor: '#FF6384'
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    }
-    
+
     function setActiveNav(title) {
-        $('.nav-link').removeClass('active');
-        $(`.nav-link:contains("${title}")`).addClass('active');
+        // Legacy support — update sidebar by text match
+        $('#sidebar .nav-link').removeClass('active');
+        $('#sidebar .nav-link').each(function() {
+            if ($(this).text().trim().includes(title)) {
+                $(this).addClass('active');
+            }
+        });
     }
+
+    // loadDashboard() and drawCategoryChart() are now in admin.js
 </script>
 {% endblock %}

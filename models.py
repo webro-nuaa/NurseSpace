@@ -58,14 +58,17 @@ class Case(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('case_categories.id'), nullable=False)
     title = db.Column(db.String(200), nullable=False)
     case_guide = db.Column(db.Text)
-    site_info = db.Column(db.String(100))
+    difficulty = db.Column(db.Enum('basic', 'intermediate', 'advanced'), default='intermediate')
+    case_type = db.Column(db.Enum('learning', 'exam'), default='learning')
     file_path = db.Column(db.String(500))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # 关系
     stations = db.relationship('Station', backref='case', lazy='dynamic', cascade='all, delete-orphan')
     extended_knowledge = db.relationship('ExtendedKnowledge', backref='case', lazy='dynamic', cascade='all, delete-orphan')
+    videos = db.relationship('ExtensionVideo', backref='case', lazy='dynamic', cascade='all, delete-orphan')
+    links = db.relationship('ExtensionLink', backref='case', lazy='dynamic', cascade='all, delete-orphan')
 
 class Station(db.Model):
     __tablename__ = 'stations'
@@ -75,6 +78,7 @@ class Station(db.Model):
     name = db.Column(db.String(200), nullable=False)
     assessment_task = db.Column(db.Text)
     question = db.Column(db.Text, nullable=False)
+    order_index = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # 关系
@@ -96,12 +100,50 @@ class StandardAnswer(db.Model):
 
 class ExtendedKnowledge(db.Model):
     __tablename__ = 'extended_knowledge'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     case_id = db.Column(db.Integer, db.ForeignKey('cases.id'), nullable=False)
     question = db.Column(db.Text, nullable=False)
-    answer = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # 关系
+    answers = db.relationship('KnowledgeAnswer', backref='knowledge', lazy='dynamic', cascade='all, delete-orphan')
+
+
+class KnowledgeAnswer(db.Model):
+    __tablename__ = 'knowledge_answers'
+
+    id = db.Column(db.Integer, primary_key=True)
+    knowledge_id = db.Column(db.Integer, db.ForeignKey('extended_knowledge.id'), nullable=False)
+    answer_item = db.Column(db.Text, nullable=False)
+    score_weight = db.Column(db.Numeric(5, 2), default=1.00)
+    order_index = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ExtensionVideo(db.Model):
+    __tablename__ = 'extension_videos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    case_id = db.Column(db.Integer, db.ForeignKey('cases.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    url = db.Column(db.String(500), nullable=False)
+    description = db.Column(db.Text)
+    order_index = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ExtensionLink(db.Model):
+    __tablename__ = 'extension_links'
+
+    id = db.Column(db.Integer, primary_key=True)
+    case_id = db.Column(db.Integer, db.ForeignKey('cases.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    url = db.Column(db.String(500), nullable=False)
+    description = db.Column(db.Text)
+    order_index = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 class LearningRecord(db.Model):
     __tablename__ = 'learning_records'
@@ -196,14 +238,16 @@ class AiSetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     # provider: glm | openai | local
     provider = db.Column(db.String(20), nullable=False, default='local')
-    
-    # OpenAI
-    openai_key = db.Column(db.String(200))
-    openai_model = db.Column(db.String(100))
 
-    # Zhipu GLM
-    zhipu_key = db.Column(db.String(200))
+    # OpenAI (key 加密存储，长度需容纳 Fernet 密文)
+    openai_key = db.Column(db.String(500))
+    openai_model = db.Column(db.String(100))
+    openai_base_url = db.Column(db.String(300))
+
+    # Zhipu GLM (key 加密存储)
+    zhipu_key = db.Column(db.String(500))
     zhipu_model = db.Column(db.String(100))
+    zhipu_base_url = db.Column(db.String(300))
 
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

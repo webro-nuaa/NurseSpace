@@ -1,10 +1,12 @@
 from flask import Blueprint, request, jsonify, render_template, send_file, current_app
 from flask_login import current_user
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from app import csrf
 from utils.auth import login_or_jwt_required
 from utils.decorators import admin_required
-from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, Exam, ExamQuestion, ExamRecord, PointRecord, ExtendedKnowledge, AiSetting, db
+from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, Exam, ExamQuestion, ExamRecord, PointRecord, ExtendedKnowledge, KnowledgeAnswer, ExtensionVideo, ExtensionLink, AiSetting, db
 from utils.docx_parser import DocxParser
+from utils.crypto import encrypt_value, decrypt_value
 from sqlalchemy import desc, func
 from datetime import datetime
 import os
@@ -50,10 +52,10 @@ def dashboard():
 
     category_stats = db.session.query(
         CaseCategory.name,
-        func.count(Case.id).label('case_count'),
-        func.count(Station.id).label('station_count')
+        func.count(func.distinct(Case.id)).label('case_count'),
+        func.count(func.distinct(Station.id)).label('station_count')
     ).join(Case, CaseCategory.id == Case.category_id)\
-     .join(Station, Case.id == Station.case_id)\
+     .outerjoin(Station, Case.id == Station.case_id)\
      .group_by(CaseCategory.id, CaseCategory.name).all()
 
     category_data = []
@@ -96,12 +98,24 @@ def ai_settings():
     setting = AiSetting.get_singleton()
 
     if request.method == 'GET':
+        def _mask_key(key):
+            if not key:
+                return ''
+            try:
+                plain = decrypt_value(key)
+            except Exception:
+                return '***'
+            if not plain:
+                return ''
+            return '***' + plain[-4:] if len(plain) > 4 else '***'
         return jsonify({'success': True, 'data': {
             'provider': setting.provider,
-            'openai_key': '***' if setting.openai_key else '',
+            'openai_key': _mask_key(setting.openai_key),
             'openai_model': setting.openai_model or '',
-            'zhipu_key': '***' if setting.zhipu_key else '',
-            'zhipu_model': setting.zhipu_model or ''
+            'openai_base_url': setting.openai_base_url or '',
+            'zhipu_key': _mask_key(setting.zhipu_key),
+            'zhipu_model': setting.zhipu_model or '',
+            'zhipu_base_url': setting.zhipu_base_url or ''
         }})
 
     data = request.get_json() or {}
@@ -110,9 +124,15 @@ def ai_settings():
         return jsonify({'success': False, 'message': 'provider 取值必须是 glm | openai | local'})
 
     setting.provider = provider
-    for field in ['openai_key', 'openai_model', 'zhipu_key', 'zhipu_model']:
+    for field in ['openai_key', 'openai_model', 'openai_base_url', 'zhipu_key', 'zhipu_model', 'zhipu_base_url']:
         if field in data:
-            setattr(setting, field, data.get(field) or None)
+            value = data.get(field) or None
+            # 加密 key 字段，其他字段不加密
+            if field in ('openai_key', 'zhipu_key') and value:
+                if value.startswith('***'):
+                    continue
+                value = encrypt_value(value)
+            setattr(setting, field, value)
     try:
         db.session.commit()
         return jsonify({'success': True, 'message': 'AI设置已更新'})
@@ -246,6 +266,7 @@ def users_xlsx_template():
 @admin_bp.route('/users/batch-import-xlsx', methods=['POST'])
 @login_or_jwt_required
 @admin_required
+@csrf.exempt
 def users_batch_import_xlsx():
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '未选择文件'})
@@ -335,6 +356,7 @@ def users_batch_import_xlsx():
 @admin_bp.route('/cases', methods=['GET', 'POST'])
 @login_or_jwt_required
 @admin_required
+@csrf.exempt  # POST is file upload (multipart/form-data)
 def manage_cases():
     if request.method == 'GET':
         page = request.args.get('page', 1, type=int)
@@ -342,11 +364,17 @@ def manage_cases():
         category_id = request.args.get('category_id', type=int)
         search = request.args.get('search', '').strip()
 
+        case_type_filter = request.args.get('case_type', '').strip()
+        include_stations = request.args.get('include_stations', '').strip() == 'true'
+
         query = db.session.query(Case, CaseCategory)\
             .join(CaseCategory, Case.category_id == CaseCategory.id)
 
         if category_id:
             query = query.filter(Case.category_id == category_id)
+
+        if case_type_filter in ('learning', 'exam'):
+            query = query.filter(Case.case_type == case_type_filter)
 
         if search:
             query = query.filter(
@@ -361,20 +389,32 @@ def manage_cases():
 
         cases_data = []
         for case, category in pagination.items:
-            station_count = Station.query.filter_by(case_id=case.id).count()
+            case_stations = Station.query.filter_by(case_id=case.id)\
+                .order_by(Station.order_index).all()
+            station_count = len(case_stations)
             learning_count = db.session.query(LearningRecord)\
                 .join(Station, LearningRecord.station_id == Station.id)\
                 .filter(Station.case_id == case.id).count()
 
-            cases_data.append({
+            case_item = {
                 'id': case.id,
                 'title': case.title,
                 'category_name': category.name,
-                'site_info': case.site_info,
+                'difficulty': case.difficulty or 'intermediate',
+                'case_type': case.case_type or 'learning',
                 'station_count': station_count,
                 'learning_count': learning_count,
                 'created_at': case.created_at.isoformat()
-            })
+            }
+            if include_stations:
+                case_item['stations'] = [{
+                    'id': s.id,
+                    'name': s.name,
+                    'question': s.question,
+                    'assessment_task': s.assessment_task,
+                    'order_index': s.order_index
+                } for s in case_stations]
+            cases_data.append(case_item)
 
         categories = CaseCategory.query.all()
         categories_data = [
@@ -398,7 +438,94 @@ def manage_cases():
             }
         })
 
-    # POST: 上传案例文档
+    # POST: 上传案例文档 或 JSON 手动创建（支持完整案例含子元素）
+    # JSON body 手动创建（可包含 stations/videos/links/extended_knowledge）
+    if request.is_json:
+        data = request.get_json() or {}
+        title = (data.get('title') or '').strip()
+        category_id = data.get('category_id')
+        if not title or not category_id:
+            return jsonify({'success': False, 'message': '标题和类别不能为空'})
+        category = CaseCategory.query.get(category_id)
+        if not category:
+            return jsonify({'success': False, 'message': '类别不存在'})
+        case = Case(
+            category_id=category_id, title=title,
+            case_guide=(data.get('case_guide') or '').strip(),
+            difficulty=data.get('difficulty', 'intermediate'),
+            case_type=data.get('case_type', 'learning'),
+            file_path=''
+        )
+        db.session.add(case)
+        db.session.flush()
+
+        # 创建站点（含标准答案）
+        for si, s_data in enumerate(data.get('stations') or []):
+            station = Station(
+                case_id=case.id,
+                name=(s_data.get('name') or '').strip(),
+                assessment_task=(s_data.get('assessment_task') or '').strip(),
+                question=(s_data.get('question') or '').strip(),
+                order_index=s_data.get('order_index', si)
+            )
+            db.session.add(station)
+            db.session.flush()
+            for ai, a_data in enumerate(s_data.get('standard_answers') or []):
+                ans = StandardAnswer(
+                    station_id=station.id,
+                    answer_item=(a_data.get('answer_item') or '').strip(),
+                    score_weight=float(a_data.get('score_weight', 1.0)),
+                    order_index=ai
+                )
+                db.session.add(ans)
+
+        # 创建扩展视频
+        for vi, v_data in enumerate(data.get('videos') or []):
+            video = ExtensionVideo(
+                case_id=case.id,
+                title=(v_data.get('title') or '').strip(),
+                url=(v_data.get('url') or '').strip(),
+                description=(v_data.get('description') or '').strip(),
+                order_index=v_data.get('order_index', vi)
+            )
+            db.session.add(video)
+
+        # 创建扩展链接
+        for li, l_data in enumerate(data.get('links') or []):
+            link = ExtensionLink(
+                case_id=case.id,
+                title=(l_data.get('title') or '').strip(),
+                url=(l_data.get('url') or '').strip(),
+                description=(l_data.get('description') or '').strip(),
+                order_index=l_data.get('order_index', li)
+            )
+            db.session.add(link)
+
+        # 创建扩展知识
+        for k_data in data.get('extended_knowledge') or []:
+            ek = ExtendedKnowledge(
+                case_id=case.id,
+                question=(k_data.get('question') or '').strip()
+            )
+            db.session.add(ek)
+            db.session.flush()  # 获取 ek.id
+            for idx, a_data in enumerate(k_data.get('answers') or []):
+                db.session.add(KnowledgeAnswer(
+                    knowledge_id=ek.id,
+                    answer_item=(a_data.get('answer_item') or '').strip(),
+                    score_weight=float(a_data.get('score_weight', 1)),
+                    order_index=idx
+                ))
+
+        db.session.commit()
+        station_count = Station.query.filter_by(case_id=case.id).count()
+        return jsonify({
+            'success': True,
+            'message': f'案例创建成功（含{station_count}个站点）',
+            'case': {'id': case.id, 'title': case.title}
+        })
+
+    # 文件上传
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '未选择文件'})
 
@@ -464,19 +591,21 @@ def update_or_delete_case(case_id: int):
 
     data = request.get_json() or {}
     title = (data.get('title') or '').strip()
-    site_info = (data.get('site_info') or '').strip()
     case_guide = (data.get('case_guide') or '').strip()
     category_id = data.get('category_id')
 
     if title:
         case.title = title
-    case.site_info = site_info
     case.case_guide = case_guide
     if category_id:
         category = CaseCategory.query.get(category_id)
         if not category:
             return jsonify({'success': False, 'message': '类别不存在'})
         case.category_id = category_id
+    if 'difficulty' in data and data['difficulty'] in ('basic', 'intermediate', 'advanced'):
+        case.difficulty = data['difficulty']
+    if 'case_type' in data and data['case_type'] in ('learning', 'exam'):
+        case.case_type = data['case_type']
 
     try:
         db.session.commit()
@@ -509,6 +638,7 @@ def batch_delete_cases():
 @admin_bp.route('/cases/batch-upload', methods=['POST'])
 @login_or_jwt_required
 @admin_required
+@csrf.exempt
 def batch_upload_cases():
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '请选择压缩包文件'})
@@ -624,6 +754,7 @@ def download_cases_xlsx_template():
 @admin_bp.route('/cases/batch-import-xlsx', methods=['POST'])
 @login_or_jwt_required
 @admin_required
+@csrf.exempt
 def batch_import_cases_xlsx():
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '未选择文件'})
@@ -674,7 +805,7 @@ def batch_import_cases_xlsx():
                 continue
 
             case = Case(category_id=category.id, title=case_title,
-                        site_info=get(row, '站点'), case_guide=get(row, '案例指引'), file_path='')
+                        case_guide=get(row, '案例指引'), file_path='')
             db.session.add(case)
             db.session.flush()
 
@@ -716,7 +847,7 @@ def get_case_detail(case_id):
     if not case:
         return jsonify({'success': False, 'message': '案例不存在'}), 404
 
-    stations = Station.query.filter_by(case_id=case_id).all()
+    stations = Station.query.filter_by(case_id=case_id).order_by(Station.order_index).all()
     stations_data = []
 
     for station in stations:
@@ -745,11 +876,21 @@ def get_case_detail(case_id):
             'avg_score': float(avg_score) if avg_score else 0
         })
 
+    videos = ExtensionVideo.query.filter_by(case_id=case_id).order_by(ExtensionVideo.order_index).all()
+    links = ExtensionLink.query.filter_by(case_id=case_id).order_by(ExtensionLink.order_index).all()
     extended_knowledge = ExtendedKnowledge.query.filter_by(case_id=case_id).all()
-    knowledge_data = [
-        {'id': ek.id, 'question': ek.question, 'answer': ek.answer}
-        for ek in extended_knowledge
-    ]
+    knowledge_data = []
+    for ek in extended_knowledge:
+        answers = KnowledgeAnswer.query.filter_by(knowledge_id=ek.id)\
+            .order_by(KnowledgeAnswer.order_index).all()
+        knowledge_data.append({
+            'id': ek.id,
+            'question': ek.question,
+            'answers': [{'id': a.id, 'answer_item': a.answer_item,
+                         'score_weight': float(a.score_weight)} for a in answers] or [
+                {'id': 0, 'answer_item': ek.answer, 'score_weight': float(ek.score) if ek.score else 5}
+            ]
+        })
 
     return jsonify({
         'success': True,
@@ -758,13 +899,20 @@ def get_case_detail(case_id):
                 'id': case.id,
                 'title': case.title,
                 'case_guide': case.case_guide,
-                'site_info': case.site_info,
                 'category_name': case.category.name,
+                'difficulty': case.difficulty or 'intermediate',
+                'case_type': case.case_type or 'learning',
                 'file_path': case.file_path,
                 'created_at': case.created_at.isoformat()
             },
             'stations': stations_data,
-            'extended_knowledge': knowledge_data
+            'extended_knowledge': knowledge_data,
+            'videos': [{'id': v.id, 'title': v.title, 'url': v.url,
+                        'description': v.description or '', 'order_index': v.order_index}
+                       for v in videos],
+            'links': [{'id': l.id, 'title': l.title, 'url': l.url,
+                       'description': l.description or '', 'order_index': l.order_index}
+                      for l in links]
         }
     })
 
@@ -849,11 +997,27 @@ def manage_exams():
         return jsonify({'success': False, 'message': f'创建失败：{str(e)}'})
 
 
-@admin_bp.route('/exams/<int:exam_id>/questions', methods=['GET', 'POST'])
+@admin_bp.route('/exams/<int:exam_id>/questions', methods=['GET', 'POST', 'DELETE'])
 @login_or_jwt_required
 @admin_required
 def manage_exam_questions(exam_id):
     exam = Exam.query.get_or_404(exam_id)
+
+    if request.method == 'DELETE':
+        data = request.get_json()
+        station_ids = data.get('station_ids', [])
+        if not station_ids:
+            return jsonify({'success': False, 'message': '请指定要移除的题目'})
+        try:
+            ExamQuestion.query.filter(
+                ExamQuestion.exam_id == exam_id,
+                ExamQuestion.station_id.in_(station_ids)
+            ).delete(synchronize_session='fetch')
+            db.session.commit()
+            return jsonify({'success': True, 'message': '已移除'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'移除失败：{str(e)}'})
 
     if request.method == 'GET':
         questions = db.session.query(ExamQuestion, Station, Case)\
@@ -869,6 +1033,7 @@ def manage_exam_questions(exam_id):
                 'station_id': station.id,
                 'station_name': station.name,
                 'question': station.question,
+                'case_id': case.id,
                 'case_title': case.title,
                 'score': float(eq.score),
                 'order_index': eq.order_index
@@ -915,6 +1080,15 @@ def manage_exam_questions(exam_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+
+@admin_bp.route('/exams/<int:exam_id>/questions/clear', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def clear_exam_questions(exam_id):
+    Exam.query.get_or_404(exam_id)
+    ExamQuestion.query.filter_by(exam_id=exam_id).delete()
+    db.session.commit()
+    return jsonify({'success': True, 'message': '已清空所有题目'})
 
 
 @admin_bp.route('/statistics/learning-data')
@@ -1023,3 +1197,391 @@ def get_group_weakness():
             'total_errors': len(wrong_questions)
         }
     })
+
+
+# ---- Station CRUD under Case ----
+
+@admin_bp.route('/cases/<int:case_id>/stations', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def create_case_station(case_id):
+    case = db.session.get(Case, case_id)
+    if not case:
+        return jsonify({'success': False, 'message': '案例不存在'}), 404
+    data = request.get_json() or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'message': '站点名称不能为空'})
+    max_order = db.session.query(func.max(Station.order_index)).filter_by(case_id=case_id).scalar() or 0
+    station = Station(
+        case_id=case_id, name=name,
+        assessment_task=(data.get('assessment_task') or '').strip(),
+        question=(data.get('question') or '').strip(),
+        order_index=max_order + 1
+    )
+    db.session.add(station)
+    db.session.commit()
+    return jsonify({'success': True, 'station': {'id': station.id, 'name': station.name}})
+
+
+@admin_bp.route('/cases/<int:case_id>/stations/<int:station_id>', methods=['PUT', 'DELETE'])
+@login_or_jwt_required
+@admin_required
+def manage_case_station(case_id, station_id):
+    station = Station.query.filter_by(id=station_id, case_id=case_id).first()
+    if not station:
+        return jsonify({'success': False, 'message': '站点不存在'}), 404
+
+    if request.method == 'DELETE':
+        try:
+            # 删除关联记录（这些关系没有 cascade，需手动清除）
+            from models import LearningRecord, WrongQuestion, ExamQuestion, ExamAnswer
+            WrongQuestion.query.filter_by(station_id=station_id).delete()
+            LearningRecord.query.filter_by(station_id=station_id).delete()
+            ExamQuestion.query.filter_by(station_id=station_id).delete()
+            ExamAnswer.query.filter_by(station_id=station_id).delete()
+            db.session.delete(station)
+            db.session.commit()
+            return jsonify({'success': True, 'message': '站点已删除'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 400
+
+    data = request.get_json() or {}
+    for field in ['name', 'assessment_task', 'question']:
+        if field in data:
+            setattr(station, field, (data.get(field) or '').strip())
+    if 'order_index' in data:
+        station.order_index = int(data['order_index'])
+    db.session.commit()
+    return jsonify({'success': True, 'message': '站点已更新'})
+
+
+@admin_bp.route('/cases/<int:case_id>/stations/<int:station_id>/answers', methods=['PUT'])
+@login_or_jwt_required
+@admin_required
+def update_station_answers(case_id, station_id):
+    station = Station.query.filter_by(id=station_id, case_id=case_id).first()
+    if not station:
+        return jsonify({'success': False, 'message': '站点不存在'}), 404
+    data = request.get_json() or {}
+    items = data.get('answers') or []
+    StandardAnswer.query.filter_by(station_id=station_id).delete()
+    for i, item in enumerate(items):
+        ans = StandardAnswer(
+            station_id=station_id,
+            answer_item=(item.get('answer_item') or '').strip(),
+            score_weight=float(item.get('score_weight', 1.0)),
+            order_index=i
+        )
+        db.session.add(ans)
+    db.session.commit()
+    return jsonify({'success': True, 'message': '答案已更新'})
+
+
+# ---- Video Upload ----
+
+@admin_bp.route('/videos/upload', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+@csrf.exempt
+def upload_video_file():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '未选择文件'})
+    f = request.files['file']
+    if f.filename == '':
+        return jsonify({'success': False, 'message': '未选择文件'})
+    import uuid
+    ext = os.path.splitext(f.filename)[1].lower()
+    if ext not in ('.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'):
+        return jsonify({'success': False, 'message': f'不支持的视频格式: {ext}'})
+    videos_dir = os.path.join(current_app.config.get('UPLOAD_DIR', '/app/uploads'), 'videos')
+    os.makedirs(videos_dir, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}{ext}"
+    f.save(os.path.join(videos_dir, filename))
+    return jsonify({'success': True, 'url': f'/uploads/videos/{filename}'})
+
+
+# ---- Video CRUD under Case ----
+
+@admin_bp.route('/cases/<int:case_id>/videos', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def create_case_video(case_id):
+    case = db.session.get(Case, case_id)
+    if not case:
+        return jsonify({'success': False, 'message': '案例不存在'}), 404
+    data = request.get_json() or {}
+    title = (data.get('title') or '').strip()
+    url = (data.get('url') or '').strip()
+    if not title or not url:
+        return jsonify({'success': False, 'message': '视频标题和URL不能为空'})
+    max_order = db.session.query(func.max(ExtensionVideo.order_index)).filter_by(case_id=case_id).scalar() or 0
+    video = ExtensionVideo(case_id=case_id, title=title, url=url,
+                           description=(data.get('description') or '').strip(),
+                           order_index=max_order + 1)
+    db.session.add(video)
+    db.session.commit()
+    return jsonify({'success': True, 'video': {'id': video.id, 'title': video.title}})
+
+
+@admin_bp.route('/cases/<int:case_id>/videos/<int:video_id>', methods=['DELETE'])
+@login_or_jwt_required
+@admin_required
+def delete_case_video(case_id, video_id):
+    video = ExtensionVideo.query.filter_by(id=video_id, case_id=case_id).first()
+    if not video:
+        return jsonify({'success': False, 'message': '视频不存在'}), 404
+    db.session.delete(video)
+    db.session.commit()
+    return jsonify({'success': True, 'message': '视频已删除'})
+
+
+# ---- Link CRUD under Case ----
+
+@admin_bp.route('/cases/<int:case_id>/links', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def create_case_link(case_id):
+    case = db.session.get(Case, case_id)
+    if not case:
+        return jsonify({'success': False, 'message': '案例不存在'}), 404
+    data = request.get_json() or {}
+    title = (data.get('title') or '').strip()
+    url = (data.get('url') or '').strip()
+    if not title or not url:
+        return jsonify({'success': False, 'message': '链接标题和URL不能为空'})
+    max_order = db.session.query(func.max(ExtensionLink.order_index)).filter_by(case_id=case_id).scalar() or 0
+    link = ExtensionLink(case_id=case_id, title=title, url=url,
+                         description=(data.get('description') or '').strip(),
+                         order_index=max_order + 1)
+    db.session.add(link)
+    db.session.commit()
+    return jsonify({'success': True, 'link': {'id': link.id, 'title': link.title}})
+
+
+@admin_bp.route('/cases/<int:case_id>/links/<int:link_id>', methods=['DELETE'])
+@login_or_jwt_required
+@admin_required
+def delete_case_link(case_id, link_id):
+    link = ExtensionLink.query.filter_by(id=link_id, case_id=case_id).first()
+    if not link:
+        return jsonify({'success': False, 'message': '链接不存在'}), 404
+    db.session.delete(link)
+    db.session.commit()
+    return jsonify({'success': True, 'message': '链接已删除'})
+
+
+# ---- Extended Knowledge (per-item) ----
+
+@admin_bp.route('/cases/<int:case_id>/knowledge', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def add_case_knowledge(case_id):
+    Case.query.get_or_404(case_id)
+    data = request.get_json()
+    if not data or not data.get('question'):
+        return jsonify({'success': False, 'message': '问题不能为空'}), 400
+    answers = data.get('answers') or []
+    if not answers:
+        return jsonify({'success': False, 'message': '至少需要一个答案项'}), 400
+    ek = ExtendedKnowledge(case_id=case_id, question=data['question'])
+    db.session.add(ek)
+    db.session.flush()
+    for idx, a in enumerate(answers):
+        db.session.add(KnowledgeAnswer(
+            knowledge_id=ek.id,
+            answer_item=(a.get('answer_item') or '').strip(),
+            score_weight=float(a.get('score_weight', 1)),
+            order_index=idx
+        ))
+    db.session.commit()
+    return jsonify({'success': True, 'message': '扩展知识已添加'})
+
+
+@admin_bp.route('/cases/<int:case_id>/knowledge/<int:knowledge_id>', methods=['DELETE'])
+@login_or_jwt_required
+@admin_required
+def delete_case_knowledge(case_id, knowledge_id):
+    ek = ExtendedKnowledge.query.filter_by(id=knowledge_id, case_id=case_id).first()
+    if not ek:
+        return jsonify({'success': False, 'message': '扩展知识不存在'}), 404
+    db.session.delete(ek)
+    db.session.commit()
+    return jsonify({'success': True, 'message': '扩展知识已删除'})
+
+
+# ---- User Progress ----
+
+@admin_bp.route('/users/<int:user_id>/progress')
+@login_or_jwt_required
+@admin_required
+def get_user_progress(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({'success': False, 'message': '用户不存在'}), 404
+
+    # 按类别统计学习进度
+    category_progress = db.session.query(
+        CaseCategory.name,
+        func.count(func.distinct(Station.id)).label('total'),
+        func.count(func.distinct(LearningRecord.id)).label('completed')
+    ).join(Case, CaseCategory.id == Case.category_id)\
+     .join(Station, Case.id == Station.case_id)\
+     .outerjoin(LearningRecord, (Station.id == LearningRecord.station_id) & (LearningRecord.user_id == user_id))\
+     .filter(Case.case_type == 'learning')\
+     .group_by(CaseCategory.id, CaseCategory.name).all()
+
+    # 最近学习记录
+    recent = db.session.query(LearningRecord, Station, Case)\
+        .join(Station, LearningRecord.station_id == Station.id)\
+        .join(Case, Station.case_id == Case.id)\
+        .filter(LearningRecord.user_id == user_id)\
+        .order_by(desc(LearningRecord.completed_at)).limit(20).all()
+
+    # 考试记录
+    exam_records = ExamRecord.query.filter_by(user_id=user_id)\
+        .order_by(desc(ExamRecord.submit_time)).all()
+
+    # 积分记录
+    point_recs = PointRecord.query.filter_by(user_id=user_id)\
+        .order_by(desc(PointRecord.created_at)).limit(20).all()
+
+    return jsonify({'success': True, 'data': {
+        'user': {
+            'id': user.id, 'username': user.username, 'real_name': user.real_name,
+            'department': user.department, 'points': user.points, 'status': user.status
+        },
+        'category_progress': [
+            {'category': c, 'total': t, 'completed': co or 0,
+             'progress': round((co or 0) / t * 100, 1) if t > 0 else 0}
+            for c, t, co in category_progress
+        ],
+        'recent_records': [
+            {'id': r.id, 'case_title': c.title, 'station_name': s.name,
+             'score': float(r.score) if r.score else 0,
+             'completed_at': r.completed_at.isoformat()}
+            for r, s, c in recent
+        ],
+        'exam_records': [
+            {'id': e.id, 'exam_id': e.exam_id, 'total_score': float(e.total_score) if e.total_score else 0,
+             'status': e.status, 'submit_time': e.submit_time.isoformat() if e.submit_time else None}
+            for e in exam_records
+        ],
+        'point_records': [
+            {'id': p.id, 'points': p.points, 'reason': p.reason,
+             'created_at': p.created_at.isoformat()}
+            for p in point_recs
+        ]
+    }})
+
+
+# ---- AI Test Connection ----
+
+@admin_bp.route('/ai-settings/test', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def test_ai_connection():
+    import time
+    data = request.get_json() or {}
+    provider = data.get('provider', 'openai')
+    api_key = data.get('api_key', '').strip()
+    model = data.get('model', '').strip()
+    base_url = data.get('base_url', '').strip()
+
+    if not api_key:
+        return jsonify({'success': False, 'message': '请提供 API Key'})
+
+    try:
+        start = time.time()
+        if provider == 'openai':
+            import openai
+            openai.api_key = api_key
+            if base_url:
+                openai.api_base = base_url
+            openai.ChatCompletion.create(
+                model=model or 'gpt-4o-mini',
+                messages=[{'role': 'user', 'content': 'ping'}],
+                max_tokens=5
+            )
+        elif provider == 'glm':
+            from zhipuai import ZhipuAI
+            client_kwargs = {'api_key': api_key}
+            if base_url:
+                client_kwargs['base_url'] = base_url
+            client = ZhipuAI(**client_kwargs)
+            client.chat.completions.create(
+                model=model or 'glm-4-air',
+                messages=[{'role': 'user', 'content': 'ping'}],
+                max_tokens=5
+            )
+        else:
+            return jsonify({'success': False, 'message': '不支持的 provider'})
+        latency = round((time.time() - start) * 1000)
+        return jsonify({'success': True, 'message': f'连接成功，延迟 {latency}ms', 'latency_ms': latency})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'连接失败：{str(e)}'})
+
+
+# ---- Exam QR Code ----
+
+@admin_bp.route('/exams/<int:exam_id>/qr-code')
+@login_or_jwt_required
+@admin_required
+def get_exam_qr_code(exam_id):
+    import qrcode
+    from io import BytesIO
+    from flask_jwt_extended import create_access_token
+
+    exam = Exam.query.get_or_404(exam_id)
+    token = create_access_token(identity=f'exam:{exam_id}')
+
+    # 优先使用配置的 SITE_URL，否则从请求头探测
+    site_url = current_app.config.get('SITE_URL', '')
+    if site_url:
+        base = site_url
+    else:
+        base = request.host_url.rstrip('/')
+        # nginx 反向代理时，通过 X-Forwarded-Proto 还原协议
+        proto = request.headers.get('X-Forwarded-Proto', '')
+        if proto == 'https':
+            base = base.replace('http://', 'https://')
+
+    exam_url = f"{base}/nurse/exam-access?token={token}&exam_id={exam_id}"
+
+    img = qrcode.make(exam_url)
+    buf = BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return send_file(buf, mimetype='image/png')
+
+
+# ---- Exam Update ----
+
+@admin_bp.route('/exams/<int:exam_id>', methods=['PUT'])
+@login_or_jwt_required
+@admin_required
+def update_exam(exam_id):
+    exam = Exam.query.get_or_404(exam_id)
+    data = request.get_json() or {}
+    for field in ['title', 'description']:
+        if field in data:
+            setattr(exam, field, (data.get(field) or '').strip())
+    for field in ['duration']:
+        if field in data:
+            setattr(exam, field, int(data[field]))
+    for field in ['start_time', 'end_time']:
+        if field in data and data[field]:
+            setattr(exam, field, datetime.fromisoformat(data[field]))
+    db.session.commit()
+    return jsonify({'success': True, 'message': '考试已更新'})
+
+
+@admin_bp.route('/exams/<int:exam_id>/publish', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def publish_exam(exam_id):
+    exam = Exam.query.get_or_404(exam_id)
+    exam.status = 'published'
+    db.session.commit()
+    return jsonify({'success': True, 'message': '考试已发布'})

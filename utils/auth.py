@@ -8,7 +8,11 @@ def login_or_jwt_required(f):
         from flask_login import current_user, login_user
         from models import User, db
 
-        if current_user.is_authenticated:
+        # If a JWT Bearer token is present, prefer it over session cookie
+        auth_header = request.headers.get('Authorization', '')
+        has_jwt = auth_header.startswith('Bearer ')
+
+        if not has_jwt and current_user.is_authenticated:
             return f(*args, **kwargs)
 
         try:

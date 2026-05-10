@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}查看答案 - 护士培训系统{% endblock %}
+{% block title %}查看答案 - 智慧化护理实践教学案例库平台{% endblock %}
 
 {% block nav_items %}
 <li class="nav-item"><a class="nav-link" href="/nurse?tab=dashboard"><i class="fas fa-tachometer-alt me-1"></i>首页概览</a></li>
@@ -9,6 +9,25 @@
 <li class="nav-item"><a class="nav-link" href="/nurse?tab=weakness"><i class="fas fa-chart-line me-1"></i>薄弱点分析</a></li>
 <li class="nav-item"><a class="nav-link" href="/nurse?tab=exams"><i class="fas fa-file-alt me-1"></i>考试中心</a></li>
 <li class="nav-item"><a class="nav-link" href="/nurse?tab=points"><i class="fas fa-coins me-1"></i>积分记录</a></li>
+{% endblock %}
+
+{% block navbar_toggle %}
+<button class="sidebar-toggle d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#nurseNavMobile" aria-expanded="false" aria-controls="nurseNavMobile">
+    <i class="fas fa-bars"></i>
+</button>
+{% endblock %}
+
+{% block nav_mobile %}
+<div class="collapse d-lg-none nurse-mobile-nav" id="nurseNavMobile">
+    <div class="p-2">
+        <a class="d-block nav-link-mobile" href="/nurse?tab=dashboard"><i class="fas fa-tachometer-alt me-2"></i>首页概览</a>
+        <a class="d-block nav-link-mobile active" href="/nurse?tab=cases"><i class="fas fa-book-medical me-2"></i>案例学习</a>
+        <a class="d-block nav-link-mobile" href="/nurse?tab=wrongs"><i class="fas fa-exclamation-triangle me-2"></i>错题集</a>
+        <a class="d-block nav-link-mobile" href="/nurse?tab=weakness"><i class="fas fa-chart-line me-2"></i>薄弱点分析</a>
+        <a class="d-block nav-link-mobile" href="/nurse?tab=exams"><i class="fas fa-file-alt me-2"></i>考试中心</a>
+        <a class="d-block nav-link-mobile" href="/nurse?tab=points"><i class="fas fa-coins me-2"></i>积分记录</a>
+    </div>
+</div>
 {% endblock %}
 
 {% block body_class %}no-sidebar{% endblock %}

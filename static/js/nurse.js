@@ -95,7 +95,7 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                                     </div>
                                     <p class="card-text">
                                         <small class="text-muted">
-                                            <i class="fas fa-map-marker-alt me-1"></i>${case_.site_info || '无科室信息'}
+                                            <i class="fas fa-layer-group me-1"></i>${case_.total_stations} 个站点
                                         </small>
                                     </p>
                                     <div class="progress mb-3" style="height: 10px;">
@@ -181,7 +181,7 @@ function viewCase(caseId) {
                         <h2>${data.case.title}</h2>
                         <p class="text-muted">
                             <i class="fas fa-tag me-1"></i>${data.case.category_name}
-                            <i class="fas fa-map-marker-alt ms-3 me-1"></i>${data.case.site_info || ''}
+                            <span class="badge bg-warning text-dark ms-2">${({basic:'基础',intermediate:'中级',advanced:'高级'})[data.case.difficulty] || data.case.difficulty}</span>
                         </p>
                     </div>
                 </div>
@@ -237,13 +237,33 @@ function viewCase(caseId) {
                     </div>
                     
                     <div class="col-md-4">
+                        ${(data.videos && data.videos.length) ? `
+                        <div class="card mb-3">
+                            <div class="card-header"><h6 class="mb-0"><i class="fas fa-video me-2"></i>视频资源</h6></div>
+                            <div class="card-body p-2">
+                                ${data.videos.map(v => `
+                                    <div class="mb-2"><a href="${v.url}" target="_blank" class="small">${v.title}</a>
+                                    ${v.description ? `<br><small class="text-muted">${v.description}</small>` : ''}</div>
+                                `).join('')}
+                            </div>
+                        </div>` : ''}
+                        ${(data.links && data.links.length) ? `
+                        <div class="card mb-3">
+                            <div class="card-header"><h6 class="mb-0"><i class="fas fa-link me-2"></i>参考链接</h6></div>
+                            <div class="card-body p-2">
+                                ${data.links.map(l => `
+                                    <div class="mb-2"><a href="${l.url}" target="_blank" class="small">${l.title}</a>
+                                    ${l.description ? `<br><small class="text-muted">${l.description}</small>` : ''}</div>
+                                `).join('')}
+                            </div>
+                        </div>` : ''}
                         <div class="card">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0"><i class="fas fa-lightbulb me-2"></i>扩展知识</h5>
                                 <span class="badge bg-secondary">${(data.extended_knowledge||[]).length}</span>
                             </div>
                             <div class="card-body">
-                                ${data.extended_knowledge.length > 0 ? 
+                                ${data.extended_knowledge.length > 0 ?
                                     data.extended_knowledge.map(k => `
                                         <div class="border rounded p-2 mb-2">
                                             <div class="d-flex justify-content-between align-items-start">
@@ -262,10 +282,9 @@ function viewCase(caseId) {
                                                 </div>
                                             </div>
                                         </div>
-                                    `).join('') : 
+                                    `).join('') :
                                     '<p class="text-muted">暂无扩展知识</p>'
                                 }
-                                <div class="small text-muted mt-2">注：扩展知识题同样支持AI评分</div>
                             </div>
                         </div>
                     </div>
@@ -313,8 +332,11 @@ function showAnswerInterface(station) {
                                 <label class="form-label">
                                     <i class="fas fa-pencil-alt me-2"></i>请输入您的答案：
                                 </label>
-                                <textarea class="form-control answer-textarea" id="user-answer" 
+                                <textarea class="form-control answer-textarea" id="user-answer"
                                     placeholder="请在此输入您的答案..."></textarea>
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-voice-input mt-2" onclick="toggleVoiceInput('user-answer', this)">
+                                    <i class="fas fa-microphone me-1"></i><span>语音输入</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -490,6 +512,9 @@ function startKnowledge(knowledgeId) {
                                     <i class="fas fa-pencil-alt me-2"></i>请输入您的答案：
                                 </label>
                                 <textarea class="form-control answer-textarea" id="knowledge-answer" placeholder="请在此输入您的答案..."></textarea>
+                                <button type="button" class="btn btn-sm btn-outline-secondary btn-voice-input mt-2" onclick="toggleVoiceInput('knowledge-answer', this)">
+                                    <i class="fas fa-microphone me-1"></i><span>语音输入</span>
+                                </button>
                             </div>
                         </div>
                     </div>

@@ -4,7 +4,7 @@ from models import Case, Station, StandardAnswer, ExtendedKnowledge, CaseCategor
 import os
 
 class DocxParser:
-    """Word文档解析器，用于解析护士培训案例"""
+    """Word文档解析器，用于解析智慧化护理实践教学案例"""
     
     def __init__(self):
         self.current_case = None
@@ -45,19 +45,19 @@ class DocxParser:
                 category_id=category.id,
                 title=case_title,
                 case_guide=case_data.get('case_guide', ''),
-                site_info=case_data.get('site_info', ''),
                 file_path=file_path
             )
             db.session.add(case)
             db.session.flush()
             
             # 创建站点和答案
-            for station_data in case_data.get('stations', []):
+            for i, station_data in enumerate(case_data.get('stations', [])):
                 station = Station(
                     case_id=case.id,
                     name=station_data.get('name', ''),
                     assessment_task=station_data.get('assessment_task', ''),
-                    question=station_data.get('question', '')
+                    question=station_data.get('question', ''),
+                    order_index=i
                 )
                 db.session.add(station)
                 db.session.flush()
@@ -91,7 +91,6 @@ class DocxParser:
         """解析文档内容结构 - 支持新的【】标记格式"""
         content = {
             'case_guide': '',
-            'site_info': '',
             'stations': [],
             'extended_knowledge': []
         }
@@ -233,9 +232,12 @@ class DocxParser:
                     current_knowledge = {'question': '', 'answer': ''}
                 text_buffer.append(text)
             
+            elif current_section == 'answer':
+                text_buffer.append(text)
+
             elif current_section == 'answer_item':
                 text_buffer.append(text)
-            
+
             elif current_section == 'extended_knowledge':
                 # 遇到问题时，保存之前的知识点
                 if current_knowledge and current_knowledge.get('question'):

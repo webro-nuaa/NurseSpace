@@ -4,7 +4,7 @@ from flask_login import current_user
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from utils.auth import login_or_jwt_required
 from utils.decorators import nurse_required
-from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, ExamRecord, PointRecord, ExtendedKnowledge, WeaknessAnalysis, db
+from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, ExamRecord, PointRecord, ExtendedKnowledge, KnowledgeAnswer, WeaknessAnalysis, ExtensionVideo, ExtensionLink, db
 from utils.ai_evaluator import AIEvaluator
 from sqlalchemy import desc, func
 from datetime import datetime
@@ -118,7 +118,8 @@ def get_cases():
     per_page = request.args.get('per_page', 10, type=int)
 
     query = db.session.query(Case, CaseCategory)\
-        .join(CaseCategory, Case.category_id == CaseCategory.id)
+        .join(CaseCategory, Case.category_id == CaseCategory.id)\
+        .filter(Case.case_type == 'learning')
 
     if category_id:
         query = query.filter(Case.category_id == category_id)
@@ -137,7 +138,6 @@ def get_cases():
             'id': case.id,
             'title': case.title,
             'category': category.name,
-            'site_info': case.site_info,
             'total_stations': total_stations,
             'completed_stations': completed_stations,
             'progress': round(completed_stations / total_stations * 100, 1) if total_stations > 0 else 0,
@@ -175,7 +175,8 @@ def get_case_detail(case_id):
     if not case:
         return jsonify({'success': False, 'message': '案例不存在'}), 404
 
-    stations = Station.query.filter_by(case_id=case_id).all()
+    stations = Station.query.filter_by(case_id=case_id)\
+        .order_by(Station.order_index).all()
     stations_data = []
 
     for station in stations:
@@ -197,13 +198,17 @@ def get_case_detail(case_id):
     extended_knowledge = ExtendedKnowledge.query.filter_by(case_id=case_id).all()
     knowledge_data = []
     for ek in extended_knowledge:
-        raw = (ek.answer or '').strip()
-        items = [s.strip() for s in raw.replace('\r', '').split('\n') if s.strip()]
+        answers = KnowledgeAnswer.query.filter_by(knowledge_id=ek.id)\
+            .order_by(KnowledgeAnswer.order_index).all()
         knowledge_data.append({
             'id': ek.id,
             'question': ek.question,
-            'answers': items
+            'answers': [{'id': a.id, 'answer_item': a.answer_item,
+                         'score_weight': float(a.score_weight)} for a in answers]
         })
+
+    videos = ExtensionVideo.query.filter_by(case_id=case_id).order_by(ExtensionVideo.order_index).all()
+    links = ExtensionLink.query.filter_by(case_id=case_id).order_by(ExtensionLink.order_index).all()
 
     return jsonify({
         'success': True,
@@ -212,11 +217,18 @@ def get_case_detail(case_id):
                 'id': case.id,
                 'title': case.title,
                 'case_guide': case.case_guide,
-                'site_info': case.site_info,
+                'difficulty': case.difficulty or 'intermediate',
+                'case_type': case.case_type or 'learning',
                 'category_name': case.category.name
             },
             'stations': stations_data,
-            'extended_knowledge': knowledge_data
+            'extended_knowledge': knowledge_data,
+            'videos': [{'id': v.id, 'title': v.title, 'url': v.url,
+                        'description': v.description or '', 'order_index': v.order_index}
+                       for v in videos],
+            'links': [{'id': l.id, 'title': l.title, 'url': l.url,
+                       'description': l.description or '', 'order_index': l.order_index}
+                      for l in links]
         }
     })
 
@@ -231,12 +243,12 @@ def submit_knowledge_answer(knowledge_id):
     if not user_answer:
         return jsonify({'success': False, 'message': '答案不能为空'})
 
-    raw = (knowledge.answer or '').strip()
-    items = [s.strip() for s in raw.replace('\r', '').split('\n') if s.strip()]
-    if not items:
-        return jsonify({'success': False, 'message': '该题暂无标准答案'})
+    answers = KnowledgeAnswer.query.filter_by(knowledge_id=knowledge_id)\
+        .order_by(KnowledgeAnswer.order_index).all()
+    standard_data = [{'answer_item': a.answer_item, 'score_weight': float(a.score_weight)} for a in answers]
 
-    standard_data = [{'answer_item': t, 'score_weight': 1.0} for t in items]
+    if not standard_data:
+        return jsonify({'success': False, 'message': '该题暂无标准答案'})
 
     evaluation = ai_evaluator.evaluate_answer(
         knowledge.question,
@@ -247,7 +259,7 @@ def submit_knowledge_answer(knowledge_id):
     return jsonify({
         'success': True,
         'evaluation': evaluation,
-        'standard_answers': [{'answer_item': t, 'order_index': idx} for idx, t in enumerate(items)]
+        'standard_answers': [{'answer_item': a.answer_item, 'order_index': a.order_index} for a in answers]
     })
 
 

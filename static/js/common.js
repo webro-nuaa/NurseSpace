@@ -1,66 +1,70 @@
 // 通用JavaScript函数
 
-// 显示提示消息
-function showAlert(message, type = 'info', duration = 5000) {
-    const alertClass = {
-        'success': 'alert-success',
-        'error': 'alert-danger',
-        'warning': 'alert-warning',
-        'info': 'alert-info'
-    }[type] || 'alert-info';
-    
-    const icon = {
+// CSRF Token 设置（SPA 模式下全局携带）
+$.ajaxSetup({
+    beforeSend: function(xhr, settings) {
+        if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type)) {
+            const token = $('meta[name="csrf-token"]').attr('content');
+            if (token) {
+                xhr.setRequestHeader('X-CSRFToken', token);
+            }
+        }
+    }
+});
+
+// 显示提示消息（右上角 toast，自动消失，无声音）
+function showAlert(message, type = 'info', duration = 3000) {
+    const bgColors = {
+        'success': '#d1fae5',
+        'error': '#fee2e2',
+        'warning': '#fef3c7',
+        'info': '#dbeafe'
+    };
+    const textColors = {
+        'success': '#065f46',
+        'error': '#991b1b',
+        'warning': '#92400e',
+        'info': '#1e40af'
+    };
+    const borderColors = {
+        'success': '#a7f3d0',
+        'error': '#fecaca',
+        'warning': '#fde68a',
+        'info': '#bfdbfe'
+    };
+    const icons = {
         'success': 'fa-check-circle',
         'error': 'fa-exclamation-circle',
         'warning': 'fa-exclamation-triangle',
         'info': 'fa-info-circle'
-    }[type] || 'fa-info-circle';
-    
+    };
+
+    const bg = bgColors[type] || bgColors.info;
+    const color = textColors[type] || textColors.info;
+    const border = borderColors[type] || borderColors.info;
+    const icon = icons[type] || icons.info;
+
     const alertId = 'alert-' + Date.now();
-    const alert = `
-        <div id="${alertId}" class="alert ${alertClass} alert-dismissible fade show scale-in" role="alert" style="animation-duration: 0.4s;">
-            <i class="fas ${icon} me-2"></i>${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    const toast = $(`
+        <div id="${alertId}" style="
+            background:${bg}; color:${color}; border:1px solid ${border};
+            border-radius:10px; padding:0.65rem 1rem; margin-bottom:0.5rem;
+            font-weight:500; font-size:0.9rem; max-width:400px;
+            box-shadow:0 4px 16px rgba(0,0,0,0.12);
+            display:flex; align-items:center; gap:0.5rem;
+        ">
+            <i class="fas ${icon}"></i>
+            <span style="flex:1">${message}</span>
+            <button type="button" class="btn-close btn-close-sm" style="flex-shrink:0" onclick="$(this).closest('#${alertId}').remove()"></button>
         </div>
-    `;
-    
-    $('#alert-container').prepend(alert);
-    
-    // 添加点击音效（如果需要）
-    if (type === 'success') {
-        playNotificationSound();
-    }
-    
-    // 自动关闭
+    `);
+
+    $('#alert-container').prepend(toast);
+
     if (duration > 0) {
         setTimeout(() => {
-            $(`#${alertId}`).addClass('fade-out').one('animationend', function() {
-                $(this).remove();
-            });
+            toast.fadeOut(300, function() { $(this).remove(); });
         }, duration);
-    }
-}
-
-// 播放通知音效（可选）
-function playNotificationSound() {
-    // 可以添加简单的音效，这里使用Web Audio API创建提示音
-    try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.3);
-    } catch (e) {
-        // 忽略音效错误
     }
 }
 
@@ -391,4 +395,194 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
+}
+
+// ========= 页面版个人信息 & 密码修改（覆盖旧模态版本）=========
+// 注意：以下函数定义会覆盖文件前面的同名模态版本
+
+showProfile = function() {
+    $.get('/auth/profile', function(response) {
+        if (!response.success) { showAlert(response.message||'加载失败','error'); return; }
+        const user = response.user;
+        const isAdmin = user.role === 'admin';
+        const html = `
+            <div class="row"><div class="col-12">
+                <h2><i class="fas fa-user-circle me-2"></i>个人信息</h2>
+            </div></div>
+            <div class="row"><div class="col-lg-6">
+                <div class="card"><div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">用户名</label>
+                        <input type="text" class="form-control" value="${user.username}" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">真实姓名</label>
+                        <input type="text" class="form-control" id="profile-real-name" value="${user.real_name||''}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">邮箱</label>
+                        <input type="email" class="form-control" id="profile-email" value="${user.email||''}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">手机号</label>
+                        <input type="tel" class="form-control" id="profile-phone" value="${user.phone||''}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">科室</label>
+                        <input type="text" class="form-control" id="profile-department" value="${user.department||''}" ${isAdmin?'':'readonly'}>
+                        ${isAdmin?'':'<div class="form-text">科室信息由管理员维护</div>'}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">角色 / 积分</label>
+                        <input type="text" class="form-control" value="${isAdmin?'管理员':'护士'} · 积分: ${user.points||0}" readonly>
+                    </div>
+                    <button class="btn btn-primary" onclick="updateProfile_v2()"><i class="fas fa-save me-1"></i>保存</button>
+                </div></div>
+            </div></div>
+        `;
+        $('#main-content').html(html);
+    });
+};
+
+updateProfile_v2 = function() {
+    const data = {
+        real_name: $('#profile-real-name').val(),
+        email: $('#profile-email').val(),
+        phone: $('#profile-phone').val(),
+        department: $('#profile-department').val()
+    };
+    $.ajax({
+        url: '/auth/profile',
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            if (response.success) {
+                showAlert('个人信息更新成功', 'success');
+                $('#user-name').text(data.real_name);
+            } else { showAlert(response.message, 'error'); }
+        }
+    });
+};
+
+changePassword = function() {
+    const html = `
+        <div class="row"><div class="col-12">
+            <h2><i class="fas fa-key me-2"></i>修改密码</h2>
+        </div></div>
+        <div class="row"><div class="col-lg-6">
+            <div class="card"><div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">当前密码</label>
+                    <input type="password" class="form-control" id="old-password" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">新密码</label>
+                    <input type="password" class="form-control" id="new-password" required minlength="8">
+                    <div class="form-text">长度至少8位，需包含字母和数字</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">确认新密码</label>
+                    <input type="password" class="form-control" id="confirm-password" required>
+                </div>
+                <button class="btn btn-primary" onclick="submitPasswordChange_v2()"><i class="fas fa-check me-1"></i>确认修改</button>
+            </div></div>
+        </div></div>
+    `;
+    $('#main-content').html(html);
+};
+
+submitPasswordChange_v2 = function() {
+    const oldPassword = $('#old-password').val();
+    const newPassword = $('#new-password').val();
+    const confirmPassword = $('#confirm-password').val();
+    if (!oldPassword || !newPassword || !confirmPassword) {
+        showAlert('请填写所有字段', 'error'); return;
+    }
+    if (newPassword !== confirmPassword) {
+        showAlert('两次输入的新密码不一致', 'error'); return;
+    }
+    if (newPassword.length < 8) {
+        showAlert('新密码长度至少8位', 'error'); return;
+    }
+    $.ajax({
+        url: '/auth/change-password',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+        success: function(response) {
+            if (response.success) { showAlert('密码修改成功', 'success'); }
+            else { showAlert(response.message, 'error'); }
+        }
+    });
+};
+
+// ========= 语音输入（浏览器 Web Speech API，无需后端） =========
+var _voiceRecognition = null;
+var _voiceTargetId = null;
+
+function initVoiceRecognition() {
+    if (_voiceRecognition) return;
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
+        return;
+    }
+    _voiceRecognition = new SpeechRecognition();
+    _voiceRecognition.lang = 'zh-CN';
+    _voiceRecognition.interimResults = true;
+    _voiceRecognition.continuous = true;
+
+    _voiceRecognition.onresult = function(event) {
+        var transcript = '';
+        for (var i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+        }
+        var el = $('#' + _voiceTargetId);
+        if (el.length) {
+            // 保留已有文字，追加语音内容
+            var existing = el.val().trim();
+            el.val((existing ? existing + ' ' : '') + transcript);
+        }
+    };
+
+    _voiceRecognition.onerror = function(event) {
+        if (event.error === 'no-speech') return;
+        showAlert('语音识别出错：' + event.error, 'warning');
+        resetVoiceButton();
+    };
+
+    _voiceRecognition.onend = function() {
+        resetVoiceButton();
+    };
+}
+
+function toggleVoiceInput(textareaId, btnEl) {
+    if (!_voiceRecognition || _voiceTargetId !== textareaId) {
+        // 初始化并开始新的录音
+        initVoiceRecognition();
+        if (!_voiceRecognition) return;
+        _voiceTargetId = textareaId;
+        try {
+            _voiceRecognition.start();
+            $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
+            $(btnEl).find('i').addClass('fa-beat');
+            $(btnEl).find('span').text('录音中...点击停止');
+        } catch(e) {
+            showAlert('无法启动语音：' + e.message, 'error');
+        }
+    } else {
+        // 停止录音
+        _voiceRecognition.stop();
+        _voiceTargetId = null;
+        resetVoiceButton();
+    }
+}
+
+function resetVoiceButton() {
+    $('.btn-voice-input').each(function() {
+        $(this).removeClass('btn-danger').addClass('btn-outline-secondary');
+        $(this).find('i').removeClass('fa-beat');
+        $(this).find('span').text('语音输入');
+    });
 }

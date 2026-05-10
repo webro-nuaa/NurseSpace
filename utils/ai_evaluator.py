@@ -2,6 +2,7 @@ import json
 import re
 from config import Config
 from models import AiSetting
+from utils.crypto import decrypt_value
 try:
     import openai
 except Exception:  # openai 非必需，可缺省
@@ -42,26 +43,32 @@ class AIEvaluator:
         provider = None
         zhipu_key = None
         zhipu_model = None
+        zhipu_base_url = None
         openai_key = None
-        
+        openai_base_url = None
+
         try:
             setting = AiSetting.get_singleton()
-          
+
             provider = (setting.provider or '').lower()
-            zhipu_key = setting.zhipu_key or getattr(Config, 'ZHIPU_API_KEY', None)
+            zhipu_key = decrypt_value(setting.zhipu_key) or getattr(Config, 'ZHIPU_API_KEY', None)
             zhipu_model = setting.zhipu_model or getattr(Config, 'ZHIPU_MODEL', 'glm-4-air')
-            openai_key = setting.openai_key or getattr(Config, 'OPENAI_API_KEY', None)
+            zhipu_base_url = setting.zhipu_base_url or None
+            openai_key = decrypt_value(setting.openai_key) or getattr(Config, 'OPENAI_API_KEY', None)
+            openai_model = setting.openai_model or getattr(Config, 'OPENAI_MODEL', 'gpt-4o-mini')
+            openai_base_url = setting.openai_base_url or None
 
         except Exception:
             provider = None
             zhipu_key = getattr(Config, 'ZHIPU_API_KEY', None)
             zhipu_model = getattr(Config, 'ZHIPU_MODEL', 'glm-4-air')
             openai_key = getattr(Config, 'OPENAI_API_KEY', None)
+            openai_model = getattr(Config, 'OPENAI_MODEL', 'gpt-4o-mini')
 
         # 优先根据 provider 选择
         if (provider == 'glm' or (provider is None and zhipu_key)) and ZhipuAI is not None and zhipu_key:
             try:
-                return self._evaluate_with_glm(question, user_answer, standard_answers, zhipu_key, zhipu_model)
+                return self._evaluate_with_glm(question, user_answer, standard_answers, zhipu_key, zhipu_model, zhipu_base_url)
             except Exception as e:
                 print(f"GLM评分出错：{str(e)}，降级使用其他方式")
 
@@ -110,10 +117,13 @@ class AIEvaluator:
 """
             
             openai.api_key = openai_key
+            if openai_base_url:
+                openai.api_base = openai_base_url
+            model_name = openai_model
             response = openai.ChatCompletion.create(
                 model=model_name,
                 messages=[
-                    {"role": "system", "content": "你是一名专业的医疗教育评估专家，专门负责评估护士培训答案的质量。"},
+                    {"role": "system", "content": "你是一名专业的医疗教育评估专家，专门负责评估护理实践教学答案。"},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=1000,
@@ -210,10 +220,13 @@ class AIEvaluator:
         }
 
     # ============== GLM 接入 ==============
-    def _evaluate_with_glm(self, question, user_answer, standard_answers, api_key, model_name):
+    def _evaluate_with_glm(self, question, user_answer, standard_answers, api_key, model_name, base_url=None):
         """使用智谱 GLM 进行评分"""
-        
-        client = ZhipuAI(api_key=api_key)
+
+        client_kwargs = {'api_key': api_key}
+        if base_url:
+            client_kwargs['base_url'] = base_url
+        client = ZhipuAI(**client_kwargs)
         standard_text = "\n".join([
             f"{i+1}. {ans['answer_item']} (权重: {ans['score_weight']})"
             for i, ans in enumerate(standard_answers)
@@ -345,9 +358,9 @@ class AIEvaluator:
         try:
             setting = AiSetting.get_singleton()
             provider = (setting.provider or '').lower()
-            zhipu_key = setting.zhipu_key or getattr(Config, 'ZHIPU_API_KEY', None)
+            zhipu_key = decrypt_value(setting.zhipu_key) or getattr(Config, 'ZHIPU_API_KEY', None)
             zhipu_model = setting.zhipu_model or getattr(Config, 'ZHIPU_MODEL', 'glm-4-air')
-            openai_key = setting.openai_key or getattr(Config, 'OPENAI_API_KEY', None)
+            openai_key = decrypt_value(setting.openai_key) or getattr(Config, 'OPENAI_API_KEY', None)
         except Exception:
             provider = None
             zhipu_key = getattr(Config, 'ZHIPU_API_KEY', None)
@@ -458,7 +471,9 @@ class AIEvaluator:
 
             # 否则使用 OpenAI
             openai.api_key = openai_key
-            model_name = getattr(Config, 'OPENAI_MODEL', 'gpt-4o-mini')
+            if openai_base_url:
+                openai.api_base = openai_base_url
+            model_name = openai_model
             response = openai.ChatCompletion.create(
                 model=model_name,
                 messages=[
