@@ -306,63 +306,70 @@ submitPasswordChange_v2 = function() {
 var _voiceRecognition = null;
 var _voiceTargetId = null;
 
-function initVoiceRecognition() {
-    if (_voiceRecognition) return;
+function _createSpeechRecognition() {
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
-        return;
-    }
-    _voiceRecognition = new SpeechRecognition();
-    _voiceRecognition.lang = 'zh-CN';
-    _voiceRecognition.interimResults = true;
-    _voiceRecognition.continuous = true;
+    if (!SpeechRecognition) return null;
+    var rec = new SpeechRecognition();
+    rec.lang = 'zh-CN';
+    rec.interimResults = true;
+    rec.continuous = true;
 
-    _voiceRecognition.onresult = function(event) {
+    rec.onresult = function(event) {
         var transcript = '';
         for (var i = event.resultIndex; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
         }
         var el = $('#' + _voiceTargetId);
         if (el.length) {
-            // 保留已有文字，追加语音内容
             var existing = el.val().trim();
             el.val((existing ? existing + ' ' : '') + transcript);
         }
     };
 
-    _voiceRecognition.onerror = function(event) {
+    rec.onerror = function(event) {
         if (event.error === 'no-speech') return;
         showAlert('语音识别出错：' + event.error, 'warning');
-        resetVoiceButton();
+        _stopAndCleanup();
     };
 
-    _voiceRecognition.onend = function() {
-        _voiceTargetId = null;
-        resetVoiceButton();
+    rec.onend = function() {
+        _stopAndCleanup();
     };
+    return rec;
+}
+
+function _stopAndCleanup() {
+    if (_voiceRecognition) {
+        try { _voiceRecognition.abort(); } catch(e) {}
+        _voiceRecognition = null;
+    }
+    _voiceTargetId = null;
+    resetVoiceButton();
 }
 
 function toggleVoiceInput(textareaId, btnEl) {
-    if (!_voiceRecognition || _voiceTargetId !== textareaId) {
-        // 初始化并开始新的录音
-        initVoiceRecognition();
-        if (!_voiceRecognition) return;
-        _voiceTargetId = textareaId;
-        try {
-            try { _voiceRecognition.abort(); } catch(e) {}
-            _voiceRecognition.start();
-            $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
-            $(btnEl).find('i').addClass('fa-beat');
-            $(btnEl).find('span').text('录音中...点击停止');
-        } catch(e) {
-            showAlert('无法启动语音：' + e.message, 'error');
-        }
-    } else {
-        // 停止录音
-        _voiceRecognition.abort();
-        _voiceTargetId = null;
-        resetVoiceButton();
+    if (_voiceRecognition && _voiceTargetId === textareaId) {
+        // 正在录音 → 停止
+        _stopAndCleanup();
+        return;
+    }
+    // 停止之前的录音（如有），创建全新实例
+    _stopAndCleanup();
+    var rec = _createSpeechRecognition();
+    if (!rec) {
+        showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
+        return;
+    }
+    _voiceRecognition = rec;
+    _voiceTargetId = textareaId;
+    try {
+        _voiceRecognition.start();
+        $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
+        $(btnEl).find('i').addClass('fa-beat');
+        $(btnEl).find('span').text('录音中...点击停止');
+    } catch(e) {
+        showAlert('无法启动语音：' + e.message, 'error');
+        _stopAndCleanup();
     }
 }
 
