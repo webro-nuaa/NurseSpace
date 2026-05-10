@@ -54,6 +54,9 @@
         <span class="fw-bold">请输入您的答案：</span>
       </label>
       <textarea class="form-control answer-textarea" id="station-answer" placeholder="请在此输入您的详细答案..."></textarea>
+      <button type="button" class="btn btn-sm btn-outline-secondary btn-voice-input mt-2" onclick="toggleVoiceInput('station-answer', this)">
+        <i class="fas fa-microphone me-1"></i><span>语音输入</span>
+      </button>
     </div>
     <div class="d-flex gap-3">
       <button class="btn btn-outline-secondary btn-lg" onclick="history.back()">
