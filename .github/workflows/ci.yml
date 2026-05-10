@@ -69,6 +69,17 @@ jobs:
           docker compose logs app --tail=100
           echo "=== Nginx Logs ==="
           docker compose logs nginx --tail=50
+          echo "=== Diagnostic: failing endpoints ==="
+          ADMIN_LOGIN=$(curl -s -X POST http://localhost/auth/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin123"}')
+          ADMIN_JWT=$(echo "$ADMIN_LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
+          echo "--- GET /admin/exams ---"
+          curl -sv http://localhost/admin/exams -H "Authorization: Bearer $ADMIN_JWT" 2>&1
+          echo "--- GET /nurse/dashboard ---"
+          NURSE_LOGIN=$(curl -s -X POST http://localhost/auth/login -H "Content-Type: application/json" -d '{"username":"tester_nurse","password":"Test#2024Z"}')
+          NURSE_JWT=$(echo "$NURSE_LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
+          curl -sv http://localhost/nurse/dashboard -H "Authorization: Bearer $NURSE_JWT" 2>&1
+          echo "--- PUT /admin/users/2 ---"
+          curl -sv -X PUT http://localhost/admin/users/2 -H "Content-Type: application/json" -H "Authorization: Bearer $ADMIN_JWT" -d '{"department":"外科"}' 2>&1
 
       - name: 清理
         if: always()
