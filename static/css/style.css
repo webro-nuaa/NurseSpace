@@ -161,27 +161,13 @@ body {
 }
 
 /* ----- Sidebar ----- */
-.sidebar {
+#sidebar {
   width: var(--sidebar-width);
   background: #fff;
-  border-right: 1px solid var(--gray-200);
-  padding: 1rem 0;
-  overflow-y: auto;
 }
 
-/* Desktop: always-visible sticky sidebar (override offcanvas hidden state) */
-@media (min-width: 992px) {
-  .sidebar {
-    position: sticky !important;
-    top: var(--topbar-height);
-    height: calc(100vh - var(--topbar-height));
-    flex-shrink: 0;
-    visibility: visible !important;
-    transform: none !important;
-  }
-}
-
-.sidebar .nav-section-title {
+/* Sidebar nav items */
+#sidebar .nav-section-title {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -189,11 +175,11 @@ body {
   padding: 0.75rem 1.25rem 0.25rem;
 }
 
-.sidebar .nav-item {
+#sidebar .nav-item {
   padding: 0 0.75rem;
 }
 
-.sidebar .nav-link {
+#sidebar .nav-link {
   color: var(--gray-700);
   border-radius: 8px;
   padding: 0.6rem 0.85rem;
@@ -207,60 +193,47 @@ body {
   transition: background 0.15s, color 0.15s;
 }
 
-.sidebar .nav-link i {
+#sidebar .nav-link i {
   width: 20px;
   text-align: center;
   font-size: 0.95rem;
   flex-shrink: 0;
 }
 
-.sidebar .nav-link:hover {
+#sidebar .nav-link:hover {
   background: var(--gray-100);
   color: var(--gray-900);
 }
 
-.sidebar .nav-link.active {
+#sidebar .nav-link.active {
   background: var(--brand-gradient);
   color: #fff;
 }
 
-/* ----- Sidebar offcanvas (mobile) ----- */
-.sidebar-offcanvas {
-  width: var(--sidebar-width) !important;
-}
-
-.sidebar-offcanvas .offcanvas-header {
+#sidebar .offcanvas-header {
   background: var(--brand-gradient);
   color: #fff;
   padding: 0.75rem 1rem;
 }
 
-.sidebar-offcanvas .offcanvas-body {
+#sidebar .offcanvas-body {
   padding: 0.5rem 0;
 }
 
-.sidebar-offcanvas .nav-link {
-  color: var(--gray-700);
-  border-radius: 8px;
-  padding: 0.65rem 1rem;
-  margin: 1px 0.75rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  text-decoration: none;
-}
-
-.sidebar-offcanvas .nav-link i {
-  width: 20px;
-  text-align: center;
-}
-
-.sidebar-offcanvas .nav-link:hover { background: var(--gray-100); }
-
-.sidebar-offcanvas .nav-link.active {
-  background: var(--brand-gradient);
-  color: #fff;
+/* Desktop: sidebar always visible, override offcanvas hidden state */
+@media (min-width: 992px) {
+  #sidebar {
+    position: sticky !important;
+    top: var(--topbar-height) !important;
+    height: calc(100vh - var(--topbar-height));
+    flex-shrink: 0;
+    visibility: visible !important;
+    transform: none !important;
+  }
+  /* Hide offcanvas close button on desktop */
+  #sidebar .offcanvas-header {
+    display: none;
+  }
 }
 
 /* ----- Main Content Area ----- */
@@ -271,7 +244,7 @@ body {
 }
 
 /* Full-width variant (no sidebar) */
-.layout-wrapper.no-sidebar .sidebar { display: none !important; }
+.layout-wrapper.no-sidebar #sidebar { display: none !important; }
 .layout-wrapper.no-sidebar .main-content { width: 100%; }
 
 /* ----- Cards ----- */
