@@ -164,9 +164,11 @@ body {
 #sidebar {
   width: var(--sidebar-width);
   background: #fff;
+  border-right: 1px solid var(--gray-200);
+  flex-shrink: 0;
+  overflow-y: auto;
 }
 
-/* Sidebar nav items */
 #sidebar .nav-section-title {
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -220,17 +222,13 @@ body {
   padding: 0.5rem 0;
 }
 
-/* Desktop: sidebar always visible, override offcanvas hidden state */
+/* Desktop: override offcanvas-lg position:static to sticky, always visible */
 @media (min-width: 992px) {
   #sidebar {
     position: sticky !important;
-    top: var(--topbar-height) !important;
+    top: var(--topbar-height);
     height: calc(100vh - var(--topbar-height));
-    flex-shrink: 0;
-    visibility: visible !important;
-    transform: none !important;
   }
-  /* Hide offcanvas close button on desktop */
   #sidebar .offcanvas-header {
     display: none;
   }
