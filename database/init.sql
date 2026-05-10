@@ -65,9 +65,18 @@ CREATE TABLE IF NOT EXISTS extended_knowledge (
     id INT PRIMARY KEY AUTO_INCREMENT,
     case_id INT NOT NULL COMMENT '案例ID',
     question TEXT NOT NULL COMMENT '扩展知识问题',
-    answer TEXT NOT NULL COMMENT '扩展知识答案',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_answers (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    knowledge_id INT NOT NULL COMMENT '扩展知识ID',
+    answer_item TEXT NOT NULL COMMENT '答案项内容',
+    score_weight DECIMAL(5,2) DEFAULT 1.00 COMMENT '评分权重',
+    order_index INT DEFAULT 0 COMMENT '排序',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (knowledge_id) REFERENCES extended_knowledge(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS extension_videos (
@@ -223,8 +232,10 @@ CREATE TABLE IF NOT EXISTS ai_settings (
     provider VARCHAR(20) NOT NULL DEFAULT 'local' COMMENT 'glm | openai | local',
     openai_key VARCHAR(500) COMMENT 'OpenAI Key（加密存储）',
     openai_model VARCHAR(100) COMMENT 'OpenAI 模型',
+    openai_base_url VARCHAR(300) COMMENT 'OpenAI 自定义 Base URL',
     zhipu_key VARCHAR(500) COMMENT '智谱GLM Key（加密存储）',
     zhipu_model VARCHAR(100) COMMENT '智谱GLM 模型',
+    zhipu_base_url VARCHAR(300) COMMENT '智谱GLM 自定义 Base URL',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 

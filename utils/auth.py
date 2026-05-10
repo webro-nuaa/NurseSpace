@@ -19,13 +19,14 @@ def login_or_jwt_required(f):
             from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
             verify_jwt_in_request(optional=True)
             user_id = get_jwt_identity()
-            if user_id:
-                user = db.session.get(User, int(user_id))
-                if user and user.is_active():
-                    login_user(user, remember=False)
-                    return f(*args, **kwargs)
         except Exception:
-            pass
+            user_id = None
+
+        if user_id:
+            user = db.session.get(User, int(user_id))
+            if user and user.is_active():
+                login_user(user, remember=False)
+                return f(*args, **kwargs)
 
         if request.accept_mimetypes.accept_json and \
            not request.accept_mimetypes.accept_html:
