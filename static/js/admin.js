@@ -128,11 +128,11 @@ function loadUsers(page = 1, role = 'nurse') {
                                             <tr>
                                                 <th>用户名</th>
                                                 <th>真实姓名</th>
-                                                <th>科室</th>
-                                                <th>邮箱</th>
+                                                <th class="d-none d-md-table-cell">科室</th>
+                                                <th class="d-none d-lg-table-cell">邮箱</th>
                                                 <th>状态</th>
-                                                <th>学习统计</th>
-                                                <th>注册时间</th>
+                                                <th class="d-none d-lg-table-cell">学习统计</th>
+                                                <th class="d-none d-md-table-cell">注册时间</th>
                                                 <th>操作</th>
                                             </tr>
                                         </thead>
@@ -141,21 +141,22 @@ function loadUsers(page = 1, role = 'nurse') {
                                                 <tr>
                                                     <td>${user.username}</td>
                                                     <td>${user.real_name}</td>
-                                                    <td>${user.department || '-'}</td>
-                                                    <td>${user.email || '-'}</td>
+                                                    <td class="d-none d-md-table-cell">${user.department || '-'}</td>
+                                                    <td class="d-none d-lg-table-cell">${user.email || '-'}</td>
                                                     <td>
                                                         <span class="badge ${user.status === 'active' ? 'bg-success' : 'bg-danger'}">
                                                             ${user.status === 'active' ? '正常' : '禁用'}
                                                         </span>
                                                     </td>
-                                                    <td>
+                                                    <td class="d-none d-lg-table-cell">
                                                         <small>
                                                             学习: ${user.learning_count}<br>
                                                             错题: ${user.wrong_count}
                                                         </small>
                                                     </td>
-                                                    <td>${formatDateTime(user.created_at)}</td>
+                                                    <td class="d-none d-md-table-cell">${formatDateTime(user.created_at)}</td>
                                                     <td>
+                                                        <div class="btn-action-group">
                                                         <button class="btn btn-sm btn-outline-primary" onclick="renderUserDetailPage(${user.id})">
                                                             <i class="fas fa-eye"></i>
                                                         </button>
@@ -166,6 +167,7 @@ function loadUsers(page = 1, role = 'nurse') {
                                                                 onclick="toggleUserStatus(${user.id}, '${user.status}')">
                                                             <i class="fas ${user.status === 'active' ? 'fa-ban' : 'fa-check'}"></i>
                                                         </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             `).join('')}
@@ -312,12 +314,12 @@ function loadCases(page = 1) {
                                             <tr>
                                                 <th style="width:32px"><input type="checkbox" id="case-check-all" onclick="toggleCheckAll(this)"></th>
                                                 <th>案例标题</th>
-                                                <th>类别</th>
-                                                <th>难度</th>
-                                                <th>类型</th>
+                                                <th class="d-none d-sm-table-cell">类别</th>
+                                                <th class="d-none d-md-table-cell">难度</th>
+                                                <th class="d-none d-md-table-cell">类型</th>
                                                 <th>题目数</th>
-                                                <th>学习次数</th>
-                                                <th>创建时间</th>
+                                                <th class="d-none d-sm-table-cell">学习次数</th>
+                                                <th class="d-none d-lg-table-cell">创建时间</th>
                                                 <th>操作</th>
                                             </tr>
                                         </thead>
@@ -326,19 +328,21 @@ function loadCases(page = 1) {
                                                 <tr>
                                                     <td><input type="checkbox" class="case-check" value="${case_.id}"></td>
                                                     <td>${case_.title}</td>
-                                                    <td><span class="badge bg-secondary">${case_.category_name}</span></td>
-                                                    <td>${getDifficultyBadge(case_.difficulty)}</td>
-                                                    <td>${getCaseTypeBadge(case_.case_type)}</td>
+                                                    <td class="d-none d-sm-table-cell"><span class="badge bg-secondary">${case_.category_name}</span></td>
+                                                    <td class="d-none d-md-table-cell">${getDifficultyBadge(case_.difficulty)}</td>
+                                                    <td class="d-none d-md-table-cell">${getCaseTypeBadge(case_.case_type)}</td>
                                                     <td>${case_.station_count}</td>
-                                                    <td>${case_.learning_count}</td>
-                                                    <td>${formatDateTime(case_.created_at)}</td>
+                                                    <td class="d-none d-sm-table-cell">${case_.learning_count}</td>
+                                                    <td class="d-none d-lg-table-cell">${formatDateTime(case_.created_at)}</td>
                                                     <td>
-                                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="renderCaseDetailPage(${case_.id})">
+                                                        <div class="btn-action-group">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="renderCaseDetailPage(${case_.id})">
                                                             <i class="fas fa-eye me-1"></i>详情
                                                         </button>
                                                         <button class="btn btn-sm btn-outline-danger" onclick="deleteCase(${case_.id})">
                                                             <i class="fas fa-trash-alt me-1"></i>删除
                                                         </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             `).join('')}
@@ -2210,8 +2214,8 @@ function loadExams() {
                                                 <th>状态</th>
                                                 <th>题目数</th>
                                                 <th>参加人数</th>
-                                                <th>时长</th>
-                                                <th>创建时间</th>
+                                                <th class="d-none d-sm-table-cell">时长</th>
+                                                <th class="d-none d-md-table-cell">创建时间</th>
                                                 <th>操作</th>
                                             </tr>
                                         </thead>
@@ -2226,23 +2230,25 @@ function loadExams() {
                                                     </td>
                                                     <td>${exam.question_count}</td>
                                                     <td>${exam.participant_count}</td>
-                                                    <td>${exam.duration}分钟</td>
-                                                    <td>${formatDateTime(exam.created_at)}</td>
+                                                    <td class="d-none d-sm-table-cell">${exam.duration}分钟</td>
+                                                    <td class="d-none d-md-table-cell">${formatDateTime(exam.created_at)}</td>
                                                     <td>
-                                                        <button class="btn btn-sm btn-outline-primary me-1" onclick="manageExamQuestions(${exam.id})">
-                                                            <i class="fas fa-list me-1"></i>题目
+                                                        <div class="btn-action-group">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="manageExamQuestions(${exam.id})">
+                                                            <i class="fas fa-list"></i><span class="d-none d-md-inline ms-1">题目</span>
                                                         </button>
-                                                        <button class="btn btn-sm btn-outline-warning me-1" onclick="showExamQrCode(${exam.id})">
-                                                            <i class="fas fa-qrcode me-1"></i>二维码
+                                                        <button class="btn btn-sm btn-outline-warning" onclick="showExamQrCode(${exam.id})">
+                                                            <i class="fas fa-qrcode"></i>
                                                         </button>
                                                         ${exam.status === 'draft' ? `
-                                                            <button class="btn btn-sm btn-outline-success me-1" onclick="publishExam(${exam.id})">
-                                                                <i class="fas fa-paper-plane me-1"></i>发布
+                                                            <button class="btn btn-sm btn-outline-success" onclick="publishExam(${exam.id})">
+                                                                <i class="fas fa-paper-plane"></i>
                                                             </button>
                                                         ` : ''}
                                                         <button class="btn btn-sm btn-outline-info" onclick="renderExamEditPage(${exam.id})">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             `).join('')}
@@ -2486,8 +2492,8 @@ function buildExamQuestionPage(examId, exam, existingQuestions) {
                             <thead style="position:sticky;top:0;z-index:1;" class="table-light">
                                 <tr>
                                     <th>案例标题</th>
-                                    <th style="width:70px;">类别</th>
-                                    <th style="width:60px;">难度</th>
+                                    <th style="width:70px;" class="d-none d-sm-table-cell">类别</th>
+                                    <th style="width:60px;" class="d-none d-sm-table-cell">难度</th>
                                     <th style="width:60px;">题数</th>
                                     <th style="width:60px;">已选</th>
                                     <th style="width:100px;">操作</th>
@@ -2579,17 +2585,19 @@ function loadExamCaseTable(examId, page) {
                 rows += `
                     <tr>
                         <td><strong>${c.title}</strong></td>
-                        <td><span class="badge bg-secondary">${c.category_name}</span></td>
-                        <td><span class="badge bg-${diffBadge}">${diffLabel}</span></td>
+                        <td class="d-none d-sm-table-cell"><span class="badge bg-secondary">${c.category_name}</span></td>
+                        <td class="d-none d-sm-table-cell"><span class="badge bg-${diffBadge}">${diffLabel}</span></td>
                         <td>${c.station_count}</td>
                         <td>${allAdded ? '<span class="text-success"><i class="fas fa-check-circle fa-lg"></i></span>' : '<span class="text-muted">-</span>'}</td>
                         <td>
+                            <div class="btn-action-group">
                             <button class="btn btn-sm btn-primary" onclick="addCaseToExam(${examId}, ${c.id}, [${stationIds.join(',')}])" title="添加此案例" ${allAdded ? 'disabled' : ''}>
                                 <i class="fas fa-plus"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-info ms-1" onclick="renderCaseDetailPage(${c.id})" title="查看详情">
+                            <button class="btn btn-sm btn-outline-info" onclick="renderCaseDetailPage(${c.id})" title="查看详情">
                                 <i class="fas fa-eye"></i>
                             </button>
+                            </div>
                         </td>
                     </tr>
                 `;
