@@ -53,10 +53,10 @@ def create_app():
 
     # JWT Bearer 认证的请求天然免疫 CSRF，patch CSRF 豁免检查
     _original_is_exempt = csrf._is_exempt
-    def _patched_is_exempt(endpoint):
+    def _patched_is_exempt(self):
         if request.headers.get('Authorization', '').startswith('Bearer '):
             return True
-        return _original_is_exempt(endpoint)
+        return _original_is_exempt()
     csrf._is_exempt = _patched_is_exempt.__get__(csrf, type(csrf))
     CORS(app, supports_credentials=True, origins=Config.CORS_ORIGINS.split(',') if Config.CORS_ORIGINS != '*' else '*')
 
