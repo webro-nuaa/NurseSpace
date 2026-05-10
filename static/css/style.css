@@ -756,8 +756,6 @@ body {
 
 /* ----- Responsive ----- */
 @media (max-width: 991.98px) {
-  .sidebar { display: none; }
-
   .main-content { padding: 1rem; }
 
   .hero-section { padding: 1.5rem; }

@@ -338,6 +338,7 @@ function initVoiceRecognition() {
     };
 
     _voiceRecognition.onend = function() {
+        _voiceTargetId = null;
         resetVoiceButton();
     };
 }
@@ -349,6 +350,7 @@ function toggleVoiceInput(textareaId, btnEl) {
         if (!_voiceRecognition) return;
         _voiceTargetId = textareaId;
         try {
+            try { _voiceRecognition.abort(); } catch(e) {}
             _voiceRecognition.start();
             $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
             $(btnEl).find('i').addClass('fa-beat');
@@ -358,7 +360,7 @@ function toggleVoiceInput(textareaId, btnEl) {
         }
     } else {
         // 停止录音
-        _voiceRecognition.stop();
+        _voiceRecognition.abort();
         _voiceTargetId = null;
         resetVoiceButton();
     }
