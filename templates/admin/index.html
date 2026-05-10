@@ -5,7 +5,7 @@
 {% block nav_items %}{% endblock %}
 
 {% block navbar_toggle %}
-<button class="sidebar-toggle d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">
+<button class="sidebar-toggle d-lg-none" type="button" onclick="toggleSidebar()">
     <i class="fas fa-bars"></i>
 </button>
 {% endblock %}
@@ -95,9 +95,8 @@
         $('#sidebar .nav-link').removeClass('active');
         $('#sidebar .nav-link[data-page="' + page + '"]').addClass('active');
 
-        // Close offcanvas on mobile
-        const offcanvas = bootstrap.Offcanvas.getInstance(document.getElementById('sidebar'));
-        if (offcanvas) offcanvas.hide();
+        // Close sidebar on mobile
+        $('#sidebar, #sidebar-backdrop').removeClass('show');
 
         // Route to the correct loader
         switch(page) {

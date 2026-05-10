@@ -82,6 +82,12 @@ $(document).ajaxError(function(event, xhr, settings, thrownError) {
     }
 });
 
+// 侧边栏切换（移动端）
+function toggleSidebar() {
+    $('#sidebar').toggleClass('show');
+    $('#sidebar-backdrop').toggleClass('show');
+}
+
 // 退出登录
 function logout() {
     if (confirm('确定要退出登录吗？')) {

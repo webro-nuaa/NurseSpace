@@ -57,18 +57,19 @@
 
     <!-- 布局容器 -->
     <div class="layout-wrapper {% block body_class %}{% endblock %}">
-        <!-- 侧边栏（Bootstrap offcanvas-lg：移动端侧滑，桌面端始终可见） -->
-        <div class="offcanvas offcanvas-lg offcanvas-start sidebar" tabindex="-1" id="sidebar">
-            <div class="offcanvas-header d-lg-none">
-                <h5 class="offcanvas-title">导航菜单</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <!-- 侧边栏：桌面端常驻 flex 子元素，移动端 fixed 覆盖层 -->
+        <div class="sidebar-backdrop d-lg-none" id="sidebar-backdrop" onclick="toggleSidebar()"></div>
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header d-lg-none">
+                <span class="sidebar-title">导航菜单</span>
+                <button type="button" class="btn-close btn-close-white" onclick="toggleSidebar()" aria-label="Close"></button>
             </div>
-            <div class="offcanvas-body">
+            <nav class="sidebar-body">
                 <ul class="nav flex-column">
                     {% block sidebar %}{% endblock %}
                 </ul>
-            </div>
-        </div>
+            </nav>
+        </aside>
 
         <!-- 主内容区 -->
         <main class="main-content">
