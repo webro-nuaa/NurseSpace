@@ -1,6 +1,8 @@
 # NurseSpace — 智能护士培训系统
 
-基于 Flask + MySQL + Redis 的智能护士培训系统，支持案例学习、AI 评分、错题管理、考试功能和薄弱点分析。
+基于 Flask + MySQL + Redis 的智能护士培训系统，支持案例学习、AI 评分、语音答题、错题管理、考试功能、二维码分享和薄弱点分析。
+
+> **最新版本：v1.2.0** | 139 单元测试全部通过 | 全页面 SPA 架构
 
 ## 目录
 
@@ -26,6 +28,8 @@
 - 在线考试
 - 积分系统
 - 评论讨论（答案下交流）
+- 语音答题（Web Speech API，Chrome/Edge 支持）
+- 考试二维码分享（移动端扫码答题）
 
 ### 管理员端
 - 用户管理：注册、启禁、Excel 批量导入
@@ -33,7 +37,7 @@
 - 考试管理：组卷、发布、成绩查看
 - 数据看板：学习进度、错题热力图、科室活跃度
 - 群体薄弱点分析
-- AI 设置：运行时切换评分 Provider
+- AI 设置：运行时切换评分 Provider，支持自定义 API Base URL
 
 ---
 
@@ -204,6 +208,10 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 | `REDIS_ENABLED` | — | `1` | 是否启用 Redis 缓存 |
 | `RATELIMIT_ENABLED` | — | `1` | 是否启用速率限制 |
 | `JWT_ACCESS_TOKEN_EXPIRES` | — | `3600` | JWT Token 有效期（秒） |
+| `SITE_URL` | — | — | 站点外部 URL（用于生成考试二维码，生产环境必设） |
+| `CORS_ORIGINS` | — | `*` | CORS 允许的来源，生产环境设为实际域名 |
+| `ENCRYPTION_KEY` | ✅ | — | Fernet 密钥（加密 AI API Key），生成方法见 `.env.example` |
+| `REDIS_PASSWORD` | ✅ | — | Redis 密码（需与 docker-compose.yml 一致） |
 
 ### 第四步：启动服务
 
@@ -211,6 +219,8 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 # 确保在 /opt/nursespace 目录下
 cd /opt/nursespace
 
+# 国内服务器：启用国内镜像加速（编辑 .env 设置 USE_CHINA_MIRROR=true）
+# 海外服务器 / CICD：保持默认 false
 # 构建镜像并启动所有服务
 # 首次构建约 3-5 分钟（拉取基础镜像 + 安装依赖）
 docker compose build --pull
@@ -234,7 +244,7 @@ docker compose ps
 curl http://localhost/api/health
 
 # 预期输出：
-# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"1.0.0"}
+# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"1.2.0"}
 
 # 访问登录页
 curl -I http://localhost/auth/login
@@ -305,6 +315,7 @@ sudo cp /path/to/your/cases/*.docx /var/lib/docker/volumes/nursespace_app_cases/
 
 **批量导入**：
 - 管理员后台 → 用户管理 → 下载 Excel 模板 → 填写后上传
+- 支持自动生成工号和初始密码（按规则随机生成，导入成功后列出账号清单）
 - Excel 列：用户名、初始密码、真实姓名、科室、邮箱、手机号、角色、状态
 
 ### 第九步：配置防火墙和安全组
@@ -344,7 +355,22 @@ sudo ufw enable
 
 降级链：GLM → OpenAI → 本地匹配（自动切换，确保可用性）
 
-在管理员后台 → AI 设置中可运行时切换 Provider。
+在管理员后台 → AI 设置中可运行时切换 Provider，支持自定义 Base URL（兼容第三方 API 代理）。
+
+### 语音答题
+
+答题文本框旁有麦克风按钮，使用浏览器 Web Speech API 将语音转为文字。无需后端支持，零额外成本。
+
+- 需要 Chrome 或 Edge 浏览器
+- 需要 HTTPS 或 localhost 环境（浏览器的安全策略）
+
+### 二维码考试
+
+考试发布后可生成二维码，护士用手机扫码即可进入答题页面。
+
+- 二维码指向站点的考试入口地址
+- 生产环境必须在 `.env` 中设置 `SITE_URL` 为实际域名，否则二维码链接可能不正确
+- 移动端页面已做触屏适配（44px 最小触摸目标，卡片全宽堆叠）
 
 ---
 
@@ -606,7 +632,19 @@ docker compose logs app
 - 如果图标/CSS 加载失败，检查 `static/` 目录是否完整
 - 重启可修复：`docker compose restart app nginx`
 
-### 6. 端口冲突
+### 6. 语音输入不工作
+
+- 语音输入使用浏览器的 Web Speech API，需 Chrome 或 Edge
+- 如果是生产环境，需要 HTTPS（浏览器安全策略限制）
+- 本地开发环境（localhost）不受此限制
+
+### 7. 二维码链接不正确
+
+- 生产环境必须在 `.env` 中设置 `SITE_URL` 为实际域名，如 `https://nurse.hospital.com`
+- 未设置时会从请求头自动探测，可能不准确
+- 设置后需重启：`docker compose restart app`
+
+### 8. 端口冲突
 
 - 检查 80/443 端口是否被占用：`ss -tlnp | grep -E ':80|:443'`
 - 修改 `docker-compose.yml` 中 nginx 的 ports 映射到其他端口
@@ -645,9 +683,19 @@ NurseSpace/
 │   ├── admin.py              # 管理员端（用户/案例/考试/统计）
 │   ├── api.py                # 公共 API（类别/站点/评论/健康检查）
 │   └── main.py               # 页面路由
+├── tests/                    # 测试套件（139 个用例）
+│   ├── conftest.py
+│   ├── test_models.py
+│   ├── test_auth.py
+│   ├── test_admin_routes.py
+│   ├── test_nurse_routes.py
+│   ├── test_docx_parser.py
+│   ├── test_ai_evaluator.py
+│   └── test_security.py
 ├── utils/
 │   ├── __init__.py
 │   ├── ai_evaluator.py       # AI 评分器（OpenAI / GLM / 本地匹配）
+│   ├── crypto.py             # Fernet 加解密（API Key 安全存储）
 │   ├── docx_parser.py        # Word 文档解析器
 │   ├── auth.py               # 混合认证装饰器
 │   └── decorators.py         # 权限装饰器
@@ -679,7 +727,39 @@ NurseSpace/
 | 安全 | Flask-WTF CSRF + Flask-Limiter | — |
 | AI 评分 | OpenAI / 智谱 GLM / 本地匹配 | — |
 | 文档解析 | python-docx | — |
+| 语音识别 | Web Speech API（浏览器端） | — |
 | 容器化 | Docker + Docker Compose | — |
+| 测试 | pytest + pytest-flask + pytest-cov | — |
+
+---
+
+## 运行测试
+
+```bash
+# 安装测试依赖
+pip install pytest pytest-flask pytest-cov
+
+# 运行全部测试（139 个用例）
+pytest tests/ -v
+
+# 带覆盖率报告
+pytest tests/ --cov=. --cov-report=html
+
+# 运行特定模块
+pytest tests/test_models.py -v
+pytest tests/test_auth.py -v
+```
+
+测试覆盖范围：
+- 数据模型创建与关系
+- 用户认证（登录/注册/JWT/权限）
+- 管理员 CRUD 端点
+- 护士端学习流程
+- Word 文档解析
+- AI 评分与降级
+- CSRF/CORS/限流安全
+
+---
 
 ## 许可证
 

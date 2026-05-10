@@ -22,14 +22,16 @@ jobs:
           MYSQL_HOST=db
           MYSQL_PORT=3306
           MYSQL_USER=nursespace_app
-          MYSQL_PASSWORD=CiTest2024!
+          MYSQL_PASSWORD=CiTest2024
           MYSQL_DATABASE=nurse_training_system
           ADMIN_USERNAME=admin
           ADMIN_PASSWORD=admin123
-          REDIS_URL=redis://redis:6379/0
+          REDIS_PASSWORD=nursespace_redis
+          ENCRYPTION_KEY=aH8YSLKsWdeMteeC0uENl9uvDapGMhXq1w2AFnsG1_k=
+          REDIS_URL=redis://:nursespace_redis@redis:6379/0
           REDIS_ENABLED=1
           RATELIMIT_ENABLED=1
-          RATELIMIT_STORAGE_URL=redis://redis:6379/1
+          RATELIMIT_STORAGE_URL=redis://:nursespace_redis@redis:6379/1
           DB_POOL_SIZE=5
           DB_MAX_OVERFLOW=5
           GUNICORN_WORKERS=2
