@@ -160,17 +160,23 @@ body {
   min-height: calc(100vh - var(--topbar-height));
 }
 
-/* ----- Sidebar (desktop) ----- */
+/* ----- Sidebar ----- */
 .sidebar {
   width: var(--sidebar-width);
   background: #fff;
   border-right: 1px solid var(--gray-200);
   padding: 1rem 0;
-  flex-shrink: 0;
   overflow-y: auto;
-  position: sticky;
-  top: var(--topbar-height);
-  height: calc(100vh - var(--topbar-height));
+}
+
+/* Desktop: fixed sidebar (Bootstrap offcanvas-lg handles mobile) */
+@media (min-width: 992px) {
+  .sidebar {
+    position: sticky;
+    top: var(--topbar-height);
+    height: calc(100vh - var(--topbar-height));
+    flex-shrink: 0;
+  }
 }
 
 .sidebar .nav-section-title {
