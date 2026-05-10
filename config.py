@@ -79,16 +79,10 @@ class Config:
     # Redis password (if set)
     REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')
 
-    # HTTPS (由 Nginx 处理，应用层通常不需要)
-    ENABLE_HTTPS = os.environ.get('ENABLE_HTTPS', '0') == '1'
-    HTTPS_PORT = int(os.environ.get('HTTPS_PORT', '8443'))
-    SSL_CERT_FILE = os.environ.get('SSL_CERT_FILE', os.path.join(BASE_DIR, 'certs', 'server.crt'))
-    SSL_KEY_FILE = os.environ.get('SSL_KEY_FILE', os.path.join(BASE_DIR, 'certs', 'server.key'))
-
     @staticmethod
     def ensure_directories():
         """确保必要的目录存在，在 app 初始化后调用"""
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
-        os.makedirs(os.path.join(Config.BASE_DIR, 'certs'), exist_ok=True)
+        pass  # reserved for future directory initialization
         os.makedirs(os.path.join(Config.BASE_DIR, 'logs'), exist_ok=True)
         os.makedirs(Config.CASES_DIR, exist_ok=True)

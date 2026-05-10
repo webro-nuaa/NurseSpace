@@ -161,9 +161,6 @@
   const stationId = parseInt(qs.get('id'));
   const caseId = parseInt(qs.get('case'));
 
-  console.log('URL Search Params:', location.search); // 调试信息
-  console.log('Station ID:', stationId); // 调试信息
-  console.log('Case ID:', caseId); // 调试信息
 
   function renderStation(data){
     const html = `
@@ -215,7 +212,6 @@
   }
 
   $(document).ready(function(){
-    console.log('Document ready, stationId:', stationId); // 调试信息
     
     // 统一与其他页面：检查登录并设置用户信息与token
     if (typeof checkLogin === 'function') { 
@@ -229,9 +225,7 @@
             'Authorization': 'Bearer ' + token
           }
         });
-        console.log('JWT token set manually'); // 调试信息
       } else {
-        console.log('No JWT token found'); // 调试信息
       }
     }
 
@@ -240,8 +234,6 @@
     
     // 检查按钮是否存在
     const submitBtn = $('#btn-submit-comment');
-    console.log('Submit button found:', submitBtn.length > 0); // 调试信息
-    console.log('Submit button HTML:', submitBtn.html()); // 调试信息
     
     // 加载题目内容
     $.get(`/api/stations/${stationId}`, function(res){
@@ -268,7 +260,6 @@
     
     // 绑定评论相关事件
     $('#btn-submit-comment').on('click', submitComment);
-    console.log('Event bound to submit comment button'); // 调试信息
   });
 
   // 禁止复制功能
@@ -453,22 +444,15 @@
 
   // 发表评论
   function submitComment() {
-    console.log('submitComment function called'); // 调试信息
     
     // 检查JWT token
     const token = localStorage.getItem('access_token');
-    console.log('JWT token exists:', !!token); // 调试信息
-    console.log('JWT token length:', token ? token.length : 0); // 调试信息
     
     // 检查AJAX默认header
-    console.log('AJAX default headers:', $.ajaxSettings.headers); // 调试信息
     
     const content = $('#comment-content').val().trim();
     const commentType = $('#comment-type').val();
     
-    console.log('Content:', content); // 调试信息
-    console.log('Comment type:', commentType); // 调试信息
-    console.log('Station ID:', stationId); // 调试信息
     
     if (!content) {
       showAlert('请输入评论内容', 'error');
@@ -484,7 +468,6 @@
     const originalText = btn.html();
     btn.html('<i class="fas fa-spinner fa-spin me-2"></i>发表中...').prop('disabled', true);
     
-    console.log('Sending AJAX request...'); // 调试信息
     
     $.ajax({
       url: '/api/comments',
@@ -500,7 +483,6 @@
         comment_type: commentType
       }),
       success: function(res) {
-        console.log('Success response:', res); // 调试信息
         if (res.success) {
           showAlert('评论发表成功！', 'success');
           $('#comment-content').val('');
@@ -510,8 +492,6 @@
         }
       },
       error: function(xhr, status, error) {
-        console.log('Error response:', xhr, status, error); // 调试信息
-        console.log('Response text:', xhr.responseText); // 调试信息
         showAlert('网络错误，请重试', 'error');
       },
       complete: function() {
@@ -565,8 +545,6 @@
       return;
     }
     
-    console.log('Submitting reply for comment:', commentId); // 调试信息
-    console.log('Reply content:', content); // 调试信息
     
     $.ajax({
       url: '/api/comments',
@@ -583,7 +561,6 @@
         parent_id: commentId
       }),
       success: function(res) {
-        console.log('Reply success response:', res); // 调试信息
         if (res.success) {
           showAlert('回复发表成功！', 'success');
           $(`#reply-content-${commentId}`).val('');
@@ -599,7 +576,6 @@
         }
       },
       error: function(xhr, status, error) {
-        console.log('Reply error:', xhr, status, error); // 调试信息
         showAlert('发表回复失败，请重试', 'error');
       }
     });
@@ -640,17 +616,14 @@
 
   // 加载回复
   function loadReplies(commentId) {
-    console.log('Loading replies for comment:', commentId); // 调试信息
     
     $.get(`/api/comments/${commentId}/replies`, function(res) {
-      console.log('Replies response:', res); // 调试信息
       if (res.success) {
         renderReplies(commentId, res.data.replies);
       } else {
         showAlert(res.message || '加载回复失败', 'error');
       }
     }).fail(function(xhr, status, error) {
-      console.log('Failed to load replies:', xhr, status, error); // 调试信息
       showAlert('加载回复失败，请重试', 'error');
     });
   }

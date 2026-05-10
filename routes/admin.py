@@ -8,7 +8,7 @@ from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRe
 from utils.docx_parser import DocxParser
 from utils.crypto import encrypt_value, decrypt_value
 from sqlalchemy import desc, func
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import tempfile
 import shutil
@@ -293,7 +293,7 @@ def users_batch_import_xlsx():
             return (str(row[i]).strip() if i is not None and row[i] is not None else default)
 
         def _generate_username():
-            year = datetime.now().strftime('%y')
+            year = datetime.now(timezone.utc).strftime('%y')
             prefix = f'NS{year}'
             last = User.query.filter(User.username.like(f'{prefix}%')).order_by(User.username.desc()).first()
             if last:
@@ -1250,7 +1250,7 @@ def manage_case_station(case_id, station_id):
     if request.method == 'DELETE':
         try:
             # 删除关联记录（这些关系没有 cascade，需手动清除）
-            from models import LearningRecord, WrongQuestion, ExamQuestion, ExamAnswer
+            from models import ExamAnswer
             WrongQuestion.query.filter_by(station_id=station_id).delete()
             LearningRecord.query.filter_by(station_id=station_id).delete()
             ExamQuestion.query.filter_by(station_id=station_id).delete()

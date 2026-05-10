@@ -630,105 +630,6 @@ function deleteCase(id){
   });
 }
 
-// 查看案例详情
-function viewCaseDetail(caseId) {
-    $.get(`/admin/cases/${caseId}`, function(response) {
-        if (response.success) {
-            const data = response.data;
-            const html = `
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item">
-                            <a href="#" onclick="loadCases()">案例管理</a>
-                        </li>
-                        <li class="breadcrumb-item active">${data.case.title}</li>
-                    </ol>
-                </nav>
-                <div class="page-header">
-                    <div>
-                        <h4>${data.case.title}</h4>
-                        <p class="text-muted mb-0">
-                            <i class="fas fa-tag me-1"></i>${data.case.category_name}
-                            <i class="fas fa-calendar ms-3 me-1"></i>${formatDateTime(data.case.created_at)}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-8">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5><i class="fas fa-info-circle me-2"></i>案例指引</h5>
-                            </div>
-                            <div class="card-body">
-                                <p>${data.case.case_guide || '暂无案例指引'}</p>
-                            </div>
-                        </div>
-                        
-                        <div class="card">
-                            <div class="card-header">
-                                <h5><i class="fas fa-tasks me-2"></i>学习站点</h5>
-                            </div>
-                            <div class="card-body">
-                                ${data.stations.map(station => `
-                                    <div class="card mb-3">
-                                        <div class="card-header d-flex justify-content-between align-items-center">
-                                            <h6 class="mb-0">${station.name}</h6>
-                                            <div>
-                                                <span class="badge bg-info">${station.learning_count} 次学习</span>
-                                                <span class="badge bg-success">平均分 ${station.avg_score.toFixed(1)}</span>
-                                            </div>
-                                        </div>
-                                        <div class="card-body">
-                                            ${station.assessment_task ? `
-                                                <div class="mb-2">
-                                                    <strong>考核任务：</strong>${station.assessment_task}
-                                                </div>
-                                            ` : ''}
-                                            <div class="mb-3">
-                                                <strong>题目：</strong>${station.question}
-                                            </div>
-                                            <div>
-                                                <strong>标准答案：</strong>
-                                                <ol>
-                                                    ${station.answers.map(answer => `
-                                                        <li>${answer.answer_item}</li>
-                                                    `).join('')}
-                                                </ol>
-                                            </div>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-4">
-                        <div class="card">
-                            <div class="card-header">
-                                <h5><i class="fas fa-lightbulb me-2"></i>扩展知识</h5>
-                            </div>
-                            <div class="card-body">
-                                ${data.extended_knowledge.length > 0 ? 
-                                    data.extended_knowledge.map(knowledge => `
-                                        <div class="mb-3">
-                                            <h6 class="text-primary">${knowledge.question}</h6>
-                                            <p class="small">${knowledge.answer}</p>
-                                        </div>
-                                    `).join('') : 
-                                    '<p class="text-muted">暂无扩展知识</p>'
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            $('#main-content').html(html);
-        }
-    });
-}
-
 // 获取考试状态徽章类
 function getExamStatusBadgeClass(status) {
     const classes = {
@@ -914,7 +815,8 @@ function drawDepartmentActivityChart(data) {
     const ctx = document.getElementById('departmentActivityChart').getContext('2d');
     
     new Chart(ctx, {
-        type: 'horizontalBar',
+        type: 'bar',
+        indexAxis: 'y',
         data: {
             labels: data.map(item => item.department),
             datasets: [{
@@ -1204,18 +1106,6 @@ function addStationForm() {
                     </div>
                 </div>
             </div>
-        </div>
-    `);
-}
-
-function addAnswerRow(stationIdx) {
-    const list = $(`.answers-list-${stationIdx}`);
-    const count = list.find('.answer-row').length + 1;
-    list.append(`
-        <div class="answer-row input-group input-group-sm mb-1">
-            <input type="text" class="form-control answer-item" placeholder="答案项">
-            <input type="number" class="form-control answer-weight" value="1.0" step="0.1" min="0" style="max-width:80px;" placeholder="权重">
-            <button class="btn btn-outline-danger" type="button" onclick="$(this).closest('.answer-row').remove()"><i class="fas fa-times"></i></button>
         </div>
     `);
 }
@@ -2967,14 +2857,6 @@ function testAiConnection() {
         }
     });
 }
-
-// Redirect old modal functions to page versions
-function showAddUserModal() { renderUserCreatePage(); }
-function showUserXlsxImportModal() { renderUserImportPage(); }
-function showCreateExamModal() { renderExamCreatePage(); }
-function showEditCaseModal(id) { renderCaseDetailPage(id); }
-function editUser(id) { renderUserDetailPage(id); }
-function viewCaseDetail(id) { renderCaseDetailPage(id); }
 
 function renderUserImportPage() {
     const html = `

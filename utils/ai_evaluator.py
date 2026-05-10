@@ -5,11 +5,11 @@ from models import AiSetting
 from utils.crypto import decrypt_value
 try:
     import openai
-except Exception:  # openai 非必需，可缺省
+except ImportError:
     openai = None
 try:
     from zhipuai import ZhipuAI
-except Exception:
+except ImportError:
     ZhipuAI = None
 
 class AIEvaluator:

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import User, Case, CaseCategory, Station, StandardAnswer, ExtendedKnowledge, KnowledgeAnswer, Comment, CommentLike, CommentReport, db
-from sqlalchemy import func, text
+from sqlalchemy import func
 
 api_bp = Blueprint('api', __name__)
 
