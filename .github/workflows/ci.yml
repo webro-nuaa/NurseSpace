@@ -77,14 +77,15 @@ jobs:
           echo "=== Diagnostic: failing endpoints ==="
           ADMIN_LOGIN=$(curl -s -X POST http://localhost/auth/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin123"}')
           ADMIN_JWT=$(echo "$ADMIN_LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
-          echo "--- GET /admin/exams ---"
-          curl -sv http://localhost/admin/exams -H "Authorization: Bearer $ADMIN_JWT" 2>&1
-          echo "--- GET /nurse/dashboard ---"
-          NURSE_LOGIN=$(curl -s -X POST http://localhost/auth/login -H "Content-Type: application/json" -d '{"username":"tester_nurse","password":"Test#2024Z"}')
-          NURSE_JWT=$(echo "$NURSE_LOGIN" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)
-          curl -sv http://localhost/nurse/dashboard -H "Authorization: Bearer $NURSE_JWT" 2>&1
-          echo "--- PUT /admin/users/2 ---"
-          curl -sv -X PUT http://localhost/admin/users/2 -H "Content-Type: application/json" -H "Authorization: Bearer $ADMIN_JWT" -d '{"department":"外科"}' 2>&1
+          for url in "/admin/ai-settings" "/admin/ai-settings" "/nurse/dashboard" "/nurse/cases" "/nurse/wrong-questions"; do
+            echo "--- $url ---"
+            curl -s -o /dev/null -w "HTTP %{http_code} Size: %{size_download}\n" "http://localhost$url" -H "Authorization: Bearer $ADMIN_JWT"
+          done
+          echo "--- GET /admin/ai-settings (verbose) ---"
+          curl -s "http://localhost/admin/ai-settings" -H "Authorization: Bearer $ADMIN_JWT"
+          echo ""
+          echo "--- GET /admin/ai-settings (no auth header, expect redirect) ---"
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://localhost/admin/ai-settings"
 
       - name: 清理
         if: always()
