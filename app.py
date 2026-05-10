@@ -47,6 +47,13 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # JWT Bearer 认证的请求天然免疫 CSRF，动态豁免
+    # （需在 csrf.init_app 之前注册，确保先于 CSRF 检查执行）
+    @app.before_request
+    def _csrf_exempt_jwt():
+        if request.headers.get('Authorization', '').startswith('Bearer '):
+            csrf._exempt_views.add(request.endpoint)
+
     login_manager.init_app(app)
     jwt.init_app(app)
     csrf.init_app(app)
