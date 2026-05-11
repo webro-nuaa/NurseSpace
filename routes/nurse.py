@@ -4,7 +4,7 @@ from flask_login import current_user
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from utils.auth import login_or_jwt_required
 from utils.decorators import nurse_required
-from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, ExamRecord, PointRecord, ExtendedKnowledge, KnowledgeAnswer, WeaknessAnalysis, ExtensionVideo, ExtensionLink, db
+from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, Exam, ExamQuestion, ExamRecord, ExamAnswer, PointRecord, ExtendedKnowledge, KnowledgeAnswer, WeaknessAnalysis, ExtensionVideo, ExtensionLink, db
 from utils.ai_evaluator import AIEvaluator
 from sqlalchemy import desc, func
 from datetime import datetime, timezone
@@ -571,8 +571,6 @@ def run_weakness_analysis():
 @login_or_jwt_required
 @nurse_required
 def get_exams():
-    from models import Exam
-
     exams = Exam.query.filter(
         Exam.status == 'published',
         Exam.end_time > datetime.now(timezone.utc)
@@ -600,6 +598,124 @@ def get_exams():
     return jsonify({
         'success': True,
         'data': {'exams': exams_data}
+    })
+
+
+@nurse_bp.route('/exams/<int:exam_id>/start', methods=['POST'])
+@login_or_jwt_required
+@nurse_required
+def start_exam(exam_id):
+    exam = Exam.query.get_or_404(exam_id)
+
+    if exam.status != 'published':
+        return jsonify({'success': False, 'message': '考试未发布'}), 400
+    if exam.end_time and exam.end_time <= datetime.now(timezone.utc):
+        return jsonify({'success': False, 'message': '考试已结束'}), 400
+
+    existing = ExamRecord.query.filter_by(
+        exam_id=exam_id, user_id=current_user.id
+    ).first()
+    if existing:
+        return jsonify({'success': False, 'message': '您已参加过该考试'}), 400
+
+    record = ExamRecord(
+        exam_id=exam_id,
+        user_id=current_user.id,
+        max_score=0,
+        status='in_progress'
+    )
+    db.session.add(record)
+    db.session.flush()
+
+    # Load questions with station details
+    questions = db.session.query(ExamQuestion, Station, Case)\
+        .join(Station, ExamQuestion.station_id == Station.id)\
+        .join(Case, Station.case_id == Case.id)\
+        .filter(ExamQuestion.exam_id == exam_id)\
+        .order_by(ExamQuestion.order_index).all()
+
+    questions_data = []
+    total_max = 0
+    for eq, station, case in questions:
+        total_max += float(eq.score)
+        questions_data.append({
+            'id': eq.id,
+            'station_id': station.id,
+            'station_name': station.name,
+            'question': station.question,
+            'assessment_task': station.assessment_task,
+            'case_title': case.title,
+            'score': float(eq.score),
+            'order_index': eq.order_index
+        })
+
+    record.max_score = total_max
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'record_id': record.id,
+            'exam': {
+                'id': exam.id,
+                'title': exam.title,
+                'description': exam.description,
+                'duration': exam.duration,
+                'end_time': exam.end_time.isoformat() if exam.end_time else None
+            },
+            'questions': questions_data,
+            'total_score': total_max
+        }
+    })
+
+
+@nurse_bp.route('/exams/<int:exam_id>/submit', methods=['POST'])
+@login_or_jwt_required
+@nurse_required
+def submit_exam(exam_id):
+    record = ExamRecord.query.filter_by(
+        exam_id=exam_id, user_id=current_user.id, status='in_progress'
+    ).first()
+    if not record:
+        return jsonify({'success': False, 'message': '未找到进行中的考试记录'}), 404
+
+    data = request.get_json() or {}
+    answers = data.get('answers', [])
+
+    total_earned = 0
+    for a in answers:
+        answer = ExamAnswer(
+            exam_record_id=record.id,
+            station_id=a['station_id'],
+            user_answer=a.get('answer', '')
+        )
+        db.session.add(answer)
+
+    record.status = 'submitted'
+    record.submit_time = datetime.now(timezone.utc)
+    record.total_score = total_earned
+
+    # Award participation points
+    point_record = PointRecord(
+        user_id=current_user.id,
+        points=5,
+        reason=f'参加考试：{record.exam.title}',
+        related_id=exam_id,
+        related_type='exam'
+    )
+    db.session.add(point_record)
+    current_user.points = (current_user.points or 0) + 5
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': '考试已提交',
+        'data': {
+            'total_score': float(total_earned),
+            'max_score': float(record.max_score),
+            'questions_answered': len(answers)
+        }
     })
 
 

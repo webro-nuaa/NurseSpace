@@ -577,11 +577,169 @@ function loadExams() {
 }
 
 // 开始考试
+var _examTimer = null;
+var _examSeconds = 0;
+
 function startExam(examId) {
-    if (confirm('确定要开始考试吗？开始后将无法中断。')) {
-        // 这里应该实现考试功能
-        showAlert('考试功能正在开发中', 'info');
+    if (!confirm('确定要开始考试吗？开始后将无法中断。')) return;
+
+    $.ajax({
+        url: '/nurse/exams/' + examId + '/start',
+        method: 'POST',
+        success: function(res) {
+            if (!res.success) { showAlert(res.message, 'error'); return; }
+            renderExamUI(res.data);
+        },
+        error: function() {
+            showAlert('开始考试失败，请稍后重试', 'error');
+        }
+    });
+}
+
+function renderExamUI(data) {
+    var questions = data.questions;
+    var exam = data.exam;
+    var totalScore = data.total_score;
+    var durationMin = exam.duration || 60;
+
+    _examSeconds = durationMin * 60;
+    var recordId = data.record_id;
+
+    var questionsHtml = questions.map(function(q, i) {
+        return `
+            <div class="card mb-3" id="question-card-${q.station_id}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>
+                        <span class="badge bg-primary me-2">第${i + 1}题</span>
+                        <strong>${sanitizeHTML(q.station_name)}</strong>
+                        <span class="text-muted ms-2 small">(${sanitizeHTML(q.case_title)})</span>
+                    </span>
+                    <span class="badge bg-info">${q.score}分</span>
+                </div>
+                <div class="card-body">
+                    ${q.assessment_task ? `<p class="text-muted small mb-2"><i class="fas fa-tasks me-1"></i>${sanitizeHTML(q.assessment_task)}</p>` : ''}
+                    <p class="fw-bold mb-2">${sanitizeHTML(q.question)}</p>
+                    <textarea class="form-control exam-answer" data-station-id="${q.station_id}"
+                        rows="4" placeholder="请输入您的答案..."></textarea>
+                </div>
+            </div>`;
+    }).join('');
+
+    var html = `
+        <div class="exam-page">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                    <h2 class="mb-1"><i class="fas fa-file-alt me-2"></i>${sanitizeHTML(exam.title)}</h2>
+                    <p class="text-muted mb-0 small">${sanitizeHTML(exam.description || '')}</p>
+                </div>
+                <div class="text-end">
+                    <div class="exam-timer badge bg-warning text-dark fs-5" id="exam-timer">
+                        <i class="fas fa-clock me-1"></i><span id="timer-display">--:--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info small mb-3">
+                <i class="fas fa-info-circle me-1"></i>
+                共 <strong>${questions.length}</strong> 题，满分 <strong>${totalScore}</strong> 分，时长 <strong>${exam.duration}</strong> 分钟。
+                请认真作答，提交后不可修改。
+            </div>
+
+            <div id="exam-questions">
+                ${questionsHtml}
+            </div>
+
+            <div class="text-center my-4">
+                <button class="btn btn-success btn-lg" onclick="submitExam(${exam.id}, ${recordId})">
+                    <i class="fas fa-check me-2"></i>提交答卷
+                </button>
+                <p class="text-muted small mt-2">提交后将无法修改，请确认所有题目已作答完毕</p>
+            </div>
+        </div>`;
+
+    $('#main-content').html(html);
+
+    // Start timer
+    updateTimerDisplay();
+    _examTimer = setInterval(function() {
+        _examSeconds--;
+        updateTimerDisplay();
+        if (_examSeconds <= 0) {
+            clearInterval(_examTimer);
+            showAlert('考试时间已到，系统将自动提交', 'warning', 5000);
+            autoSubmitExam(exam.id, recordId);
+        }
+        // Warning at 5 minutes
+        if (_examSeconds === 300) {
+            showAlert('考试还剩5分钟，请尽快作答', 'warning', 5000);
+        }
+    }, 1000);
+
+    // Scroll to first question
+    $('html, body').animate({ scrollTop: $('#exam-questions').offset().top - 80 }, 300);
+}
+
+function updateTimerDisplay() {
+    var m = Math.floor(_examSeconds / 60);
+    var s = _examSeconds % 60;
+    $('#timer-display').text(
+        String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0')
+    );
+    if (_examSeconds < 300) {
+        $('#exam-timer').removeClass('bg-warning text-dark').addClass('bg-danger text-white');
     }
+}
+
+function submitExam(examId, recordId) {
+    if (!confirm('确定要提交答卷吗？提交后将无法修改。')) return;
+    _doSubmit(examId);
+}
+
+function autoSubmitExam(examId, recordId) {
+    _doSubmit(examId);
+}
+
+function _doSubmit(examId) {
+    if (_examTimer) { clearInterval(_examTimer); _examTimer = null; }
+
+    var answers = [];
+    $('.exam-answer').each(function() {
+        answers.push({
+            station_id: parseInt($(this).data('station-id')),
+            answer: $(this).val().trim()
+        });
+    });
+
+    $.ajax({
+        url: '/nurse/exams/' + examId + '/submit',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ answers: answers }),
+        success: function(res) {
+            if (res.success) {
+                var html = `
+                    <div class="text-center py-5">
+                        <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                        <h3>考试已提交</h3>
+                        <p class="text-muted">您的答卷已成功提交</p>
+                        <p class="mb-1">共作答 <strong>${res.data.questions_answered}</strong> 题</p>
+                        <p class="text-muted small">管理员批阅后会更新成绩</p>
+                        <div class="mt-4">
+                            <button class="btn btn-primary" onclick="loadExams()">
+                                <i class="fas fa-list me-1"></i>返回考试列表
+                            </button>
+                        </div>
+                    </div>`;
+                $('#main-content').html(html);
+                showAlert('考试提交成功', 'success');
+            } else {
+                showAlert(res.message || '提交失败', 'error');
+            }
+        },
+        error: function() {
+            showAlert('提交失败，请稍后重试', 'error');
+        }
+    });
 }
 
 // 加载积分记录

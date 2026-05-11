@@ -40,19 +40,21 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.0/dist/jquery.min.js"></script>
     <script>
-    const token = new URLSearchParams(window.location.search).get('token');
-    const examId = new URLSearchParams(window.location.search).get('exam_id');
+    var token = new URLSearchParams(window.location.search).get('token');
+    var examId = new URLSearchParams(window.location.search).get('exam_id');
 
     if (!token || !examId) {
         $('#exam-title').text('无效链接');
         $('#status-area').html('<div class="alert alert-danger">考试链接无效，请联系管理员重新生成二维码</div>');
     } else {
+        // Try to load exam info; if the user is already logged in with a nurse session,
+        // show the enter button. Otherwise, redirect to login.
         $.ajax({
             url: '/nurse/exams',
             headers: { 'Authorization': 'Bearer ' + token }
         }).done(function(res) {
             if (res.success) {
-                const exam = (res.data.exams || []).find(e => e.id == examId);
+                var exam = (res.data.exams || []).find(function(e) { return e.id == examId; });
                 if (exam) {
                     $('#exam-title').text(exam.title);
                     $('#exam-desc').text(exam.description || '');
@@ -62,20 +64,31 @@
                     }
                     $('#status-area').hide();
                     $('#action-area').show();
-                    let tokenParam = encodeURIComponent(token);
-                    $('#enter-btn').attr('href', '/nurse?token=' + tokenParam + '&exam=' + examId);
+                    $('#enter-btn').click(function(e) {
+                        e.preventDefault();
+                        window.location.href = '/nurse?tab=exams';
+                    });
                 } else {
                     $('#exam-title').text('考试未找到');
                     $('#status-area').html('<div class="alert alert-warning">该考试可能已结束或尚未发布</div>');
                 }
             } else {
-                $('#exam-title').text('需要登录');
-                $('#status-area').html('<div class="alert alert-info">请先登录后再进入考试<br><a href="/auth/login" class="btn btn-primary btn-sm mt-2 rounded-pill">前往登录</a></div>');
+                showLoginPrompt();
             }
         }).fail(function() {
-            $('#exam-title').text('需要登录');
-            $('#status-area').html('<div class="alert alert-info">请先登录后再进入考试<br><a href="/auth/login" class="btn btn-primary btn-sm mt-2 rounded-pill">前往登录</a></div>');
+            showLoginPrompt();
         });
+    }
+
+    function showLoginPrompt() {
+        $('#exam-title').text('需要登录');
+        var loginUrl = '/auth/login';
+        $('#status-area').html(
+            '<div class="alert alert-info">请先登录后再进入考试<br>' +
+            '<a href="' + loginUrl + '" class="btn btn-primary btn-sm mt-2 rounded-pill">' +
+            '<i class="fas fa-sign-in-alt me-1"></i>前往登录</a>' +
+            '<p class="text-muted small mt-2 mb-0">登录后可在「考试中心」找到该考试</p></div>'
+        );
     }
     </script>
 </body>

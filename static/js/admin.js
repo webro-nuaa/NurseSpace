@@ -2474,8 +2474,13 @@ function showExamQrCode(examId) {
     $('#modal-container').html(modal);
     $('#qrModal').modal('show');
 
-    // AJAX 获取二维码图片 blob
-    fetch('/admin/exams/' + examId + '/qr-code', { credentials: 'same-origin' })
+    const token = localStorage.getItem('access_token');
+    const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+
+    fetch('/admin/exams/' + examId + '/qr-code', {
+        headers: headers,
+        credentials: 'same-origin'
+    })
         .then(function(resp) {
             if (!resp.ok) throw new Error('服务器返回 ' + resp.status);
             return resp.blob();

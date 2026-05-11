@@ -25,13 +25,18 @@ def login_or_jwt_required(f):
             claims = {}
 
         if user_id:
-            user = db.session.get(User, int(user_id))
-            if user and user.is_active():
-                token_ver = claims.get('v', 0) if claims else 0
-                if token_ver != (user.token_version or 0):
-                    return jsonify({'success': False, 'message': '密码已修改，请重新登录'}), 401
-                login_user(user, remember=False)
-                return f(*args, **kwargs)
+            try:
+                uid = int(user_id)
+            except (ValueError, TypeError):
+                uid = None
+            if uid:
+                user = db.session.get(User, uid)
+                if user and user.is_active():
+                    token_ver = claims.get('v', 0) if claims else 0
+                    if token_ver != (user.token_version or 0):
+                        return jsonify({'success': False, 'message': '密码已修改，请重新登录'}), 401
+                    login_user(user, remember=False)
+                    return f(*args, **kwargs)
 
         if request.accept_mimetypes.accept_json and \
            not request.accept_mimetypes.accept_html:
