@@ -121,5 +121,9 @@ with app.app_context():
         print('[entrypoint] AI 设置已存在')
 "
 
+echo "[entrypoint] 同步静态文件到 Nginx volume..."
+mkdir -p /app/static_shared
+cp -r /app/static/* /app/static_shared/
+
 echo "[entrypoint] 启动应用..."
 exec "$@"

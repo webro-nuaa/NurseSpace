@@ -60,6 +60,7 @@ services:
       - app_uploads:/app/uploads
       - app_logs:/app/logs
       - app_cases:/app/案例
+      - static_volume:/app/static_shared
     depends_on:
       db:
         condition: service_healthy
