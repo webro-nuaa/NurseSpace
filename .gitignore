@@ -21,7 +21,12 @@ backup/
 logs/
 
 uploads/
-certs/
+certs/*.crt
+certs/*.key
+certs/*.pem
+nginx/certs/*.crt
+nginx/certs/*.key
+nginx/certs/*.pem
 
 案例/
 内科.zip
