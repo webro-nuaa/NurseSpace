@@ -60,9 +60,9 @@ def db_session(app):
     return _db.session
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def admin_user(app):
-    """Create and return an admin user (session scope, created once)."""
+    """Create and return an admin user (function scope to avoid test isolation issues)."""
     from models import User, db
     user = User.query.filter_by(username='testadmin').first()
     if not user:
@@ -73,9 +73,9 @@ def admin_user(app):
     return user
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def nurse_user(app):
-    """Create and return a nurse user (session scope, created once)."""
+    """Create and return a nurse user (function scope to avoid test isolation issues)."""
     from models import User, db
     user = User.query.filter_by(username='testnurse').first()
     if not user:

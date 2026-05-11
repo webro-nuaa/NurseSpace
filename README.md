@@ -2,7 +2,7 @@
 
 基于 Flask + MySQL + Redis 的智能护士培训系统，支持案例学习、AI 评分、语音答题、错题管理、考试功能、二维码分享和薄弱点分析。
 
-> **最新版本：v1.2.1** | 139 单元测试全部通过 | 全页面 SPA 架构
+> **最新版本：v2.0.0** | 全页面 SPA 架构
 
 ## 目录
 
@@ -256,7 +256,7 @@ docker compose ps
 curl http://localhost/api/health
 
 # 预期输出：
-# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"1.2.1"}
+# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"2.0.0"}
 
 # 访问登录页
 curl -I http://localhost/auth/login
@@ -377,7 +377,7 @@ sudo ufw enable
 ### 验证
 
 - [ ] `docker compose ps` 所有服务状态为 `healthy`
-- [ ] `curl http://localhost/api/health` 返回 `{"status":"healthy","version":"1.2.1"}`
+- [ ] `curl http://localhost/api/health` 返回 `{"status":"healthy","version":"2.0.0"}`
 - [ ] 浏览器访问登录页正常加载
 - [ ] 管理员账号可以登录
 - [ ] AI 设置页面可以正常访问（不再出现 302 重定向）

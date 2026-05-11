@@ -61,7 +61,7 @@ with app.app_context():
                 stamp()
             except Exception:
                 pass
-    # 安全补列：token_version（v1.2.2+）
+    # 安全补列：token_version（v2.0.0+）
     try:
         with db.engine.connect() as conn:
             conn.execute(text('ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0'))
@@ -69,7 +69,7 @@ with app.app_context():
             print('[entrypoint] token_version 列已添加')
     except Exception:
         print('[entrypoint] token_version 列已存在，跳过')
-    # 安全补表：baidu_asr_keys（v1.2.2+）
+    # 安全补表：baidu_asr_keys（v2.0.0+）
     try:
         db.create_all()
         print('[entrypoint] 新表检查完成')
