@@ -316,13 +316,15 @@ submitPasswordChange_v2 = function() {
 };
 
 // ========= 语音输入（浏览器 Web Speech API） =========
-// 核心思路：先用 getUserMedia 获取麦克风权限（浏览器弹出更可靠的权限提示），
-// 权限通过后立即释放流，再启动 SpeechRecognition。这是社区验证过的最稳定方案。
+// 桌面端 Chrome：先用 getUserMedia 获取麦克风权限，再启动 SpeechRecognition
+// 移动端 Android Chrome：跳过 getUserMedia，直接 SpeechRecognition.start()（避免音频设备冲突）
+// iOS Safari：不支持 Web Speech API，引导用户使用键盘内置听写
 var _voiceRecognition = null;
 var _voiceTargetId = null;
+var _voiceOriginalText = '';    // 录音前的原始文本
+var _voiceFinalTranscript = ''; // 已确认的最终识别文字
 var _voiceStartTimer = null;
-var _cleaningUp = false;
-var _voiceHadActive = false;
+var _voiceStarting = false;     // 防止短时间内重复 start
 
 function _createSpeechRecognition() {
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -333,75 +335,90 @@ function _createSpeechRecognition() {
     rec.continuous = true;
 
     rec.onresult = function(event) {
-        var transcript = '';
+        var interim = '';
         for (var i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                _voiceFinalTranscript += event.results[i][0].transcript;
+            } else {
+                interim += event.results[i][0].transcript;
+            }
         }
-        var el = $('#' + _voiceTargetId);
-        if (el.length) {
-            var existing = el.val().trim();
-            el.val((existing ? existing + ' ' : '') + transcript);
+        // 最终文本 = 原始内容 + 已确认文字 + 当前候补文字
+        var combined = _voiceOriginalText;
+        if (_voiceFinalTranscript) {
+            combined += (combined ? ' ' : '') + _voiceFinalTranscript;
         }
+        if (interim) {
+            combined += (combined ? ' ' : '') + interim;
+        }
+        $('#' + _voiceTargetId).val(combined);
     };
 
     rec.onerror = function(event) {
         if (event.error === 'no-speech') return;
         if (event.error === 'not-allowed') {
-            showAlert('麦克风权限未授予，请点击地址栏左侧的锁图标 → 网站设置 → 麦克风 → 允许', 'error');
-        } else {
+            showAlert('麦克风权限未授予。请点击地址栏左侧锁图标 → 网站设置 → 麦克风 → 允许', 'error', 6000);
+        } else if (event.error !== 'aborted') {
             showAlert('语音识别出错：' + event.error, 'warning');
         }
-        _cleanup(false);
+        // Force-cleanup: null out recognition BEFORE calling abort to break re-entrancy
+        var r = _voiceRecognition;
+        _voiceRecognition = null;
+        try { r.abort(); } catch(e) {}
+        _finishRecording();
     };
 
     rec.onend = function() {
-        _cleanup(true);
+        // Only treat as natural end if recognition is still set (not already cleaned up by onerror)
+        if (_voiceRecognition) {
+            _voiceRecognition = null;
+            _finishRecording();
+        }
     };
     return rec;
 }
 
-function _cleanup(skipAbort) {
-    if (_cleaningUp) return;
-    _cleaningUp = true;
-
-    if (_voiceRecognition) {
-        if (!skipAbort) {
-            try { _voiceRecognition.abort(); } catch(e) {}
-        }
-        _voiceRecognition = null;
-    }
+function _finishRecording() {
     _voiceTargetId = null;
+    _voiceOriginalText = '';
+    _voiceFinalTranscript = '';
+    _voiceStarting = false;
     if (_voiceStartTimer) {
         clearTimeout(_voiceStartTimer);
         _voiceStartTimer = null;
     }
     resetVoiceButton();
-    _cleaningUp = false;
 }
 
 function toggleVoiceInput(textareaId, btnEl) {
+    if (_voiceStarting) return; // debounce — start in progress
+
     if (_voiceRecognition && _voiceTargetId === textareaId) {
-        _cleanup(false);
+        // Currently recording for this field — stop
+        var r = _voiceRecognition;
+        _voiceRecognition = null;
+        try { r.abort(); } catch(e) {}
+        _finishRecording();
         return;
     }
 
-    _voiceHadActive = _voiceRecognition !== null;
-    _cleanup(false);
-
-    if (_voiceHadActive) {
-        _voiceStartTimer = setTimeout(_doStart, 100, textareaId, btnEl);
-    } else {
-        _doStart(textareaId, btnEl);
+    // If another field was recording, stop it first
+    if (_voiceRecognition) {
+        var old = _voiceRecognition;
+        _voiceRecognition = null;
+        try { old.abort(); } catch(e) {}
+        _finishRecording();
+        // Fall through to start new recording after a short delay
+        _voiceStartTimer = setTimeout(_doStart, 150, textareaId, btnEl);
+        return;
     }
+
+    _doStart(textareaId, btnEl);
 }
 
 function _doStart(textareaId, btnEl) {
     _voiceStartTimer = null;
 
-    // 桌面端 Chrome：先用 getUserMedia 请求麦克风权限（比 SpeechRecognition 的权限提示更可靠）
-    // 移动端 Android Chrome：getUserMedia 会占用音频设备，释放后 SpeechRecognition 可能来不及获取，
-    //   直接调用 SpeechRecognition.start() 即可（移动端 Chrome 自带可靠的权限弹窗）
-    // iOS Safari：不支持 SpeechRecognition → _createSpeechRecognition 返回 null → 提示不支持
     var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (!isMobile && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
@@ -409,7 +426,7 @@ function _doStart(textareaId, btnEl) {
             _startRecognition(textareaId, btnEl);
         }).catch(function(err) {
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                showAlert('麦克风权限未授予。请点击地址栏左侧的锁图标 → 网站设置 → 麦克风 → 允许', 'error', 6000);
+                showAlert('麦克风权限未授予。请点击地址栏左侧锁图标 → 网站设置 → 麦克风 → 允许', 'error', 6000);
             } else if (err.name === 'NotFoundError') {
                 showAlert('未检测到麦克风设备', 'error');
             } else {
@@ -424,9 +441,8 @@ function _doStart(textareaId, btnEl) {
 function _startRecognition(textareaId, btnEl) {
     var rec = _createSpeechRecognition();
     if (!rec) {
-        // iOS Safari 不支持 Web Speech API，引导用户使用键盘自带听写
         if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-            showAlert('iOS 暂不支持语音识别。请点击输入框后使用键盘上的麦克风按钮进行听写输入', 'info', 5000);
+            showAlert('iOS 暂不支持语音识别。请使用键盘上的麦克风按钮进行听写输入', 'info', 5000);
             $('#' + textareaId).focus();
         } else {
             showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
@@ -435,20 +451,23 @@ function _startRecognition(textareaId, btnEl) {
     }
     _voiceRecognition = rec;
     _voiceTargetId = textareaId;
+    _voiceOriginalText = $('#' + textareaId).val().trim();
+    _voiceFinalTranscript = '';
+    _voiceStarting = true;
     try {
         _voiceRecognition.start();
         $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
         $(btnEl).find('i').addClass('fa-beat');
         $(btnEl).find('span').text('录音中...点击停止');
     } catch(e) {
-        if (!_voiceHadActive && e.message && e.message.indexOf('already started') !== -1) {
-            _voiceHadActive = true;
-            _cleanup(false);
-            _voiceStartTimer = setTimeout(_doStart, 100, textareaId, btnEl);
+        _voiceRecognition = null;
+        if (e.message && e.message.indexOf('already started') !== -1) {
+            // Chrome 未完全释放上一次识别 — 延迟重试
+            _voiceStartTimer = setTimeout(_doStart, 150, textareaId, btnEl);
             return;
         }
         showAlert('无法启动语音：' + e.message, 'error');
-        _cleanup(true);
+        _finishRecording();
     }
 }
 
