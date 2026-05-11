@@ -1,6 +1,7 @@
 import os
 from flask import Flask, jsonify, request, redirect, url_for
 from flask_login import LoginManager
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # PyJWT 2.8.x compatibility shim — zhipuai pins PyJWT<2.9 but flask-jwt-extended
 # expects jwt.types.Options (added in PyJWT 2.10+).  Provide a stub.
@@ -40,6 +41,9 @@ def create_app():
 
     # JSON 不应转义中文（提高可读性、减少带宽）
     app.json.ensure_ascii = False
+
+    # 信任 Nginx 反向代理的 X-Forwarded-* 头（HTTPS 终止）
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     # 确保必要目录存在
     Config.ensure_directories()
