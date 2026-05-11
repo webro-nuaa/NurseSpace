@@ -1229,6 +1229,52 @@ def update_exam_answer_score(exam_id, answer_id):
     })
 
 
+@admin_bp.route('/exams/<int:exam_id>/review/<int:answer_id>/re-score', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def re_score_exam_answer(exam_id, answer_id):
+    """Admin re-triggers AI scoring for a single answer."""
+    answer = ExamAnswer.query.get_or_404(answer_id)
+    station = db.session.get(Station, answer.station_id)
+    if not station:
+        return jsonify({'success': False, 'message': '关联站点不存在'}), 404
+
+    standard_answers = [
+        {'answer_item': sa.answer_item, 'score_weight': float(sa.score_weight)}
+        for sa in station.standard_answers.all()
+    ]
+    if not standard_answers:
+        return jsonify({'success': False, 'message': '该站点无标准答案，无法 AI 评分'})
+
+    evaluator = AIEvaluator()
+    result = evaluator.evaluate_answer(
+        question=station.question or '',
+        user_answer=answer.user_answer or '',
+        standard_answers=standard_answers
+    )
+
+    answer.score = result.get('score', 0)
+    answer.ai_feedback = result.get('feedback', '')
+
+    record = db.session.get(ExamRecord, answer.exam_record_id)
+    if record:
+        all_answers = ExamAnswer.query.filter_by(exam_record_id=record.id).all()
+        record.total_score = sum(float(a.score or 0) for a in all_answers)
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'AI 重新评分完成',
+        'data': {
+            'answer_id': answer.id,
+            'score': float(answer.score) if answer.score else 0,
+            'ai_feedback': answer.ai_feedback,
+            'record_total_score': float(record.total_score) if record and record.total_score else 0
+        }
+    })
+
+
 @admin_bp.route('/statistics/learning-data')
 @login_or_jwt_required
 @admin_required

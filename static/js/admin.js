@@ -2954,7 +2954,10 @@ function reviewExam(examId) {
                                                 <span><strong>#${i + 1}</strong> ${a.station_name} <span class="text-muted small">(${a.case_title})</span></span>
                                                 <div class="d-flex align-items-center gap-2">
                                                     <span class="fw-bold" id="score-display-${a.id}">${a.score.toFixed(0)} 分</span>
-                                                    <button class="btn btn-sm btn-outline-warning" onclick="showScoreEdit(${examId}, ${a.id}, ${a.score})" title="调整分数">
+                                                    <button class="btn btn-sm btn-outline-info re-score-btn" id="re-score-btn-${a.id}" onclick="reScoreAnswer(${examId}, ${a.id})" title="AI 重新评分">
+                                                        <i class="fas fa-robot"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-warning" onclick="showScoreEdit(${examId}, ${a.id}, ${a.score})" title="手动调整分数">
                                                         <i class="fas fa-pen"></i>
                                                     </button>
                                                 </div>
@@ -3054,6 +3057,27 @@ function showScoreEdit(examId, answerId, currentScore) {
                 // Reload to update total
                 setTimeout(function() { reviewExam(examId); }, 500);
             } else { showAlert(res.message||'更新失败','error'); }
+        }
+    });
+}
+
+function reScoreAnswer(examId, answerId) {
+    if (!confirm('确定用 AI 重新评分吗？这将覆盖当前分数和反馈。')) return;
+    var $btn = $('#re-score-btn-' + answerId);
+    $btn.prop('disabled', true).find('i').addClass('fa-spin');
+    $.ajax({
+        url: '/admin/exams/' + examId + '/review/' + answerId + '/re-score',
+        method: 'POST',
+        contentType: 'application/json',
+        success: function(res) {
+            if (res.success) {
+                $('#score-display-' + answerId).text(res.data.score.toFixed(0) + ' 分');
+                showAlert('AI 重新评分完成', 'success');
+                setTimeout(function() { reviewExam(examId); }, 500);
+            } else { showAlert(res.message || 'AI评分失败', 'error'); }
+        },
+        complete: function() {
+            $btn.prop('disabled', false).find('i').removeClass('fa-spin');
         }
     });
 }
