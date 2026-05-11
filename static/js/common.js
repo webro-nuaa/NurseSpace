@@ -306,6 +306,7 @@ submitPasswordChange_v2 = function() {
 var _voiceRecognition = null;
 var _voiceTargetId = null;
 var _voiceStartTimer = null;
+var _cleaningUp = false;  // guard against re-entrant abort→onend→cleanup chain
 
 function _createSpeechRecognition() {
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -329,18 +330,28 @@ function _createSpeechRecognition() {
 
     rec.onerror = function(event) {
         if (event.error === 'no-speech') return;
-        showAlert('语音识别出错：' + event.error, 'warning');
-        _cleanup(true);
+        var msg = event.error === 'not-allowed'
+            ? '无法访问麦克风，请允许浏览器使用麦克风权限（需 HTTPS 或 localhost）'
+            : '语音识别出错：' + event.error;
+        showAlert(msg, 'warning');
+        // Must abort — Chrome does NOT terminate recognition on permission errors.
+        // Skipping abort leaves the rec alive, causing "already started" on next start().
+        _cleanup(false);
     };
 
     rec.onend = function() {
+        // Natural end (silence timeout, abort, or stop) — no need to abort again
         _cleanup(true);
     };
     return rec;
 }
 
 function _cleanup(skipAbort) {
-    // skipAbort: true when called from onend/onerror (recognition already stopped)
+    // Guard against re-entrant calls: abort() fires onend synchronously,
+    // which calls _cleanup(true). The flag prevents double-reset.
+    if (_cleaningUp) return;
+    _cleaningUp = true;
+
     if (_voiceRecognition) {
         if (!skipAbort) {
             try { _voiceRecognition.abort(); } catch(e) {}
@@ -353,6 +364,7 @@ function _cleanup(skipAbort) {
         _voiceStartTimer = null;
     }
     resetVoiceButton();
+    _cleaningUp = false;
 }
 
 function toggleVoiceInput(textareaId, btnEl) {
