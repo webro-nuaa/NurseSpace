@@ -367,6 +367,10 @@ function _cleanup(skipAbort) {
     _cleaningUp = false;
 }
 
+// Tracks whether we had an active recognition before the current start attempt.
+// Used to decide: sync start (preserves user gesture for mic permission) vs delayed start.
+var _voiceHadActive = false;
+
 function toggleVoiceInput(textareaId, btnEl) {
     if (_voiceRecognition && _voiceTargetId === textareaId) {
         // Currently recording for this field → stop
@@ -374,30 +378,45 @@ function toggleVoiceInput(textareaId, btnEl) {
         return;
     }
 
-    // Stop any previous recording
+    // If we just aborted a previous recognition, Chrome may not have
+    // reset the state yet — delay start() to avoid "already started".
+    // If no prior recognition existed, call start() synchronously to
+    // preserve the user gesture (required for mic permission prompt).
+    _voiceHadActive = _voiceRecognition !== null;
     _cleanup(false);
 
-    // Chrome bug: abort() doesn't reset state synchronously.
-    // Delay start() by one event-loop tick to avoid "already started".
-    _voiceStartTimer = setTimeout(function() {
-        _voiceStartTimer = null;
-        var rec = _createSpeechRecognition();
-        if (!rec) {
-            showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
+    if (_voiceHadActive) {
+        _voiceStartTimer = setTimeout(_doStart, 100, textareaId, btnEl);
+    } else {
+        _doStart(textareaId, btnEl);
+    }
+}
+
+function _doStart(textareaId, btnEl) {
+    _voiceStartTimer = null;
+    var rec = _createSpeechRecognition();
+    if (!rec) {
+        showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
+        return;
+    }
+    _voiceRecognition = rec;
+    _voiceTargetId = textareaId;
+    try {
+        _voiceRecognition.start();
+        $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
+        $(btnEl).find('i').addClass('fa-beat');
+        $(btnEl).find('span').text('录音中...点击停止');
+    } catch(e) {
+        // If synchronous start fails with "already started", retry once with delay
+        if (!_voiceHadActive && e.message && e.message.indexOf('already started') !== -1) {
+            _voiceHadActive = true;
+            _cleanup(false);
+            _voiceStartTimer = setTimeout(_doStart, 100, textareaId, btnEl);
             return;
         }
-        _voiceRecognition = rec;
-        _voiceTargetId = textareaId;
-        try {
-            _voiceRecognition.start();
-            $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
-            $(btnEl).find('i').addClass('fa-beat');
-            $(btnEl).find('span').text('录音中...点击停止');
-        } catch(e) {
-            showAlert('无法启动语音：' + e.message, 'error');
-            _cleanup(true);
-        }
-    }, 100);
+        showAlert('无法启动语音：' + e.message, 'error');
+        _cleanup(true);
+    }
 }
 
 function resetVoiceButton() {
