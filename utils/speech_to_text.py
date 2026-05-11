@@ -74,7 +74,7 @@ def transcribe(audio_data: bytes, audio_format: str = 'pcm',
     if not keys:
         return {
             'success': False,
-            'message': '未配置百度语音识别。请在系统管理 → AI 设置中添加百度 ASR Key。'
+            'message': '未配置百度语音识别。请在系统管理 → 语音设置中添加百度 ASR Key。'
         }
 
     import base64

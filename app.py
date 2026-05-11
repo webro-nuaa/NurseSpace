@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify, request, redirect, url_for
 from flask_login import LoginManager
 
@@ -129,10 +130,9 @@ def create_app():
 
     # 上传文件服务（视频等）
     from flask import send_from_directory
-    import os as _os
     @app.route('/uploads/<path:filename>')
     def serve_upload(filename):
-        upload_dir = app.config.get('UPLOAD_DIR', _os.path.join(app.root_path, 'uploads'))
+        upload_dir = app.config.get('UPLOAD_DIR', os.path.join(app.root_path, 'uploads'))
         return send_from_directory(upload_dir, filename)
 
     return app
