@@ -356,8 +356,15 @@ function _doStart(textareaId, btnEl) {
         return;
     }
 
+    // 在用户手势内同步创建 AudioContext，避免异步回调中被浏览器挂起
+    var audioCtx = null;
+    try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AC({ sampleRate: 16000 });
+    } catch(e) {}
+
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
-        _startPcmRecording(stream, textareaId, btnEl, originalText);
+        _startPcmRecording(stream, textareaId, btnEl, originalText, audioCtx);
     }).catch(function(err) {
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
             showAlert('麦克风权限未授予。请点击地址栏左侧锁图标 → 网站设置 → 麦克风 → 允许', 'error', 6000);
@@ -369,8 +376,13 @@ function _doStart(textareaId, btnEl) {
     });
 }
 
-function _startPcmRecording(stream, textareaId, btnEl, originalText) {
-    var audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+function _startPcmRecording(stream, textareaId, btnEl, originalText, audioCtx) {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
     var source = audioCtx.createMediaStreamSource(stream);
     var processor = audioCtx.createScriptProcessor(4096, 1, 1);
     var chunks = [];
