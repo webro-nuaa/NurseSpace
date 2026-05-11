@@ -573,7 +573,7 @@ def run_weakness_analysis():
 def get_exams():
     exams = Exam.query.filter(
         Exam.status == 'published',
-        Exam.end_time > datetime.now(timezone.utc)
+        Exam.end_time > datetime.utcnow()
     ).order_by(desc(Exam.created_at)).all()
 
     exams_data = []
@@ -609,7 +609,7 @@ def start_exam(exam_id):
 
     if exam.status != 'published':
         return jsonify({'success': False, 'message': '考试未发布'}), 400
-    if exam.end_time and exam.end_time <= datetime.now(timezone.utc):
+    if exam.end_time and exam.end_time <= datetime.utcnow():
         return jsonify({'success': False, 'message': '考试已结束'}), 400
 
     existing = ExamRecord.query.filter_by(
