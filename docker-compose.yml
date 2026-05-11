@@ -32,7 +32,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-nursespace_redis} --no-auth-warning ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -60,7 +60,6 @@ services:
       - app_uploads:/app/uploads
       - app_logs:/app/logs
       - app_cases:/app/案例
-      - static_volume:/app/static
     depends_on:
       db:
         condition: service_healthy
@@ -87,15 +86,10 @@ services:
       - ./nginx/certbot-webroot:/var/www/certbot
       - static_volume:/usr/share/nginx/html/static:ro
       - app_uploads:/usr/share/nginx/html/uploads:ro
-      - app_logs:/var/log/nginx:rw
+      - nginx_logs:/var/log/nginx:rw
     depends_on:
       app:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
     networks:
       - nursespace-net
 
@@ -107,6 +101,8 @@ volumes:
   app_uploads:
     driver: local
   app_logs:
+    driver: local
+  nginx_logs:
     driver: local
   app_cases:
     driver: local

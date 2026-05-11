@@ -83,7 +83,7 @@ with app.app_context():
             real_name='系统管理员',
             role='admin',
             status='active',
-            email='admin@hospital.com'
+            email=os.environ.get('ADMIN_EMAIL', 'admin@hospital.com')
         )
         admin.set_password(admin_password)
         db.session.add(admin)

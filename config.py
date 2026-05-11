@@ -58,7 +58,7 @@ class Config:
 
     # File upload
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
+    UPLOAD_DIR = os.environ.get('UPLOAD_DIR', os.path.join(BASE_DIR, 'uploads'))
     MAX_CONTENT_LENGTH = 128 * 1024 * 1024
     CASES_DIR = os.environ.get('CASES_DIR', os.path.join(BASE_DIR, '案例'))
 
@@ -82,7 +82,6 @@ class Config:
     @staticmethod
     def ensure_directories():
         """确保必要的目录存在，在 app 初始化后调用"""
-        os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
-        pass  # reserved for future directory initialization
+        os.makedirs(Config.UPLOAD_DIR, exist_ok=True)
         os.makedirs(os.path.join(Config.BASE_DIR, 'logs'), exist_ok=True)
         os.makedirs(Config.CASES_DIR, exist_ok=True)

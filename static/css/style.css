@@ -252,32 +252,6 @@ body {
   border-bottom: none;
 }
 
-/* Stat cards in dashboard */
-.stat-card {
-  border-radius: 12px;
-  padding: 1.25rem;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.stat-card .stat-icon {
-  font-size: 2rem;
-  opacity: 0.7;
-}
-
-.stat-card .stat-value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.stat-card .stat-label {
-  font-size: 0.8rem;
-  opacity: 0.85;
-}
-
 /* ----- Buttons ----- */
 .btn {
   border-radius: 8px;
@@ -495,14 +469,6 @@ body {
   margin-bottom: 1.25rem;
 }
 
-.question-title {
-  font-weight: 700;
-  color: var(--gray-900);
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 2px solid var(--gray-100);
-}
-
 .answer-textarea {
   min-height: 200px;
   border: 1px solid var(--gray-300);
@@ -560,14 +526,6 @@ body {
 }
 
 .reply-content { line-height: 1.5; }
-
-.comment-stats {
-  background: #eef2ff;
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  border-left: 4px solid var(--brand-500);
-}
 
 /* ----- Hero Section (nurse landing) ----- */
 .hero-section {
@@ -633,22 +591,6 @@ body {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-/* ----- Knowledge items ----- */
-.extended-knowledge-item {
-  border: 1px solid var(--gray-200);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.5rem;
-}
-
-/* ----- QR page ----- */
-.qr-page-container {
-  min-height: 80vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* ----- Answer view ----- */
@@ -731,9 +673,40 @@ body {
   font-weight: 600;
 }
 
-/* ----- Legacy utility classes (no-op / minimal styling) ----- */
-.fade-in { } /* no-op — animation removed */
+.feedback-score {
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 0.5rem 0;
+}
 
+.feedback-container {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+}
+
+/* Page titles used in nurse/admin page rendering */
+.page-title {
+  margin-bottom: 1.5rem;
+}
+
+.page-title h2 {
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 0.25rem;
+}
+
+.page-title p {
+  color: var(--gray-500);
+  margin: 0;
+}
+
+/* ----- Button effects ----- */
 .btn-glow {
   position: relative;
   overflow: hidden;
@@ -744,11 +717,6 @@ body {
   box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
 }
 
-.glass-card {
-  background: rgba(255,255,255,0.15);
-  border-radius: 12px;
-}
-
 /* ----- Responsive ----- */
 @media (max-width: 991.98px) {
   .main-content { padding: 1rem; }
@@ -756,8 +724,6 @@ body {
   .hero-section { padding: 1.5rem; }
 
   .hero-title { font-size: 1.5rem; }
-
-  .stat-card .stat-value { font-size: 1.35rem; }
 
   .btn { min-height: 42px; }
   .btn-sm { min-height: 34px; }
@@ -772,15 +738,6 @@ body {
   .modal-dialog {
     margin: 0.5rem;
     max-width: none;
-  }
-
-  /* Stack form groups on mobile */
-  .form-row-mobile {
-    flex-direction: column;
-  }
-  .form-row-mobile > * {
-    width: 100%;
-    margin-bottom: 0.75rem;
   }
 
   /* Stack page header actions */
@@ -807,12 +764,6 @@ body {
 
   /* Sidebar hidden on mobile */
   .sidebar { display: none; }
-
-  /* Single-column grid on small phones */
-  .row-cols-sm-2 > [class*="col"] {
-    flex: 0 0 100%;
-    max-width: 100%;
-  }
 
   /* Stack button groups */
   .d-flex.gap-2.flex-wrap {

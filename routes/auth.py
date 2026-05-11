@@ -174,6 +174,9 @@ def profile():
         if field in data:
             value = data[field]
 
+            if field == 'real_name' and not value.strip():
+                return jsonify({'success': False, 'message': '真实姓名不能为空'})
+
             if field == 'email' and value and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', value):
                 return jsonify({'success': False, 'message': '邮箱格式不正确'})
 

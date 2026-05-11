@@ -143,6 +143,16 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
     });
 }
 
+// 搜索案例（客户端过滤）
+function searchCases(keyword) {
+    const kw = (keyword || '').trim().toLowerCase();
+    const cards = document.querySelectorAll('#main-content .col-md-6.col-lg-4.mb-4');
+    cards.forEach(function(card) {
+        const title = (card.querySelector('.card-title')?.textContent || '').toLowerCase();
+        card.style.display = (!kw || title.includes(kw)) ? '' : 'none';
+    });
+}
+
 // 按类别筛选
 function filterByCategory() {
     const categoryId = $('#category-filter').val();

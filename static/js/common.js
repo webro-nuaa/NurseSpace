@@ -169,6 +169,19 @@ function generatePagination(pagination, onPageClick) {
     return html;
 }
 
+// 日期时间格式化
+function formatDateTime(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch (e) {
+        return dateStr;
+    }
+}
+
 // 防抖函数
 function debounce(func, wait) {
     let timeout;
@@ -302,11 +315,14 @@ submitPasswordChange_v2 = function() {
     });
 };
 
-// ========= 语音输入（浏览器 Web Speech API，无需后端） =========
+// ========= 语音输入（浏览器 Web Speech API） =========
+// 核心思路：先用 getUserMedia 获取麦克风权限（浏览器弹出更可靠的权限提示），
+// 权限通过后立即释放流，再启动 SpeechRecognition。这是社区验证过的最稳定方案。
 var _voiceRecognition = null;
 var _voiceTargetId = null;
 var _voiceStartTimer = null;
-var _cleaningUp = false;  // guard against re-entrant abort→onend→cleanup chain
+var _cleaningUp = false;
+var _voiceHadActive = false;
 
 function _createSpeechRecognition() {
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -330,25 +346,21 @@ function _createSpeechRecognition() {
 
     rec.onerror = function(event) {
         if (event.error === 'no-speech') return;
-        var msg = event.error === 'not-allowed'
-            ? '无法访问麦克风，请允许浏览器使用麦克风权限（需 HTTPS 或 localhost）'
-            : '语音识别出错：' + event.error;
-        showAlert(msg, 'warning');
-        // Must abort — Chrome does NOT terminate recognition on permission errors.
-        // Skipping abort leaves the rec alive, causing "already started" on next start().
+        if (event.error === 'not-allowed') {
+            showAlert('麦克风权限未授予，请点击地址栏左侧的锁图标 → 网站设置 → 麦克风 → 允许', 'error');
+        } else {
+            showAlert('语音识别出错：' + event.error, 'warning');
+        }
         _cleanup(false);
     };
 
     rec.onend = function() {
-        // Natural end (silence timeout, abort, or stop) — no need to abort again
         _cleanup(true);
     };
     return rec;
 }
 
 function _cleanup(skipAbort) {
-    // Guard against re-entrant calls: abort() fires onend synchronously,
-    // which calls _cleanup(true). The flag prevents double-reset.
     if (_cleaningUp) return;
     _cleaningUp = true;
 
@@ -367,21 +379,12 @@ function _cleanup(skipAbort) {
     _cleaningUp = false;
 }
 
-// Tracks whether we had an active recognition before the current start attempt.
-// Used to decide: sync start (preserves user gesture for mic permission) vs delayed start.
-var _voiceHadActive = false;
-
 function toggleVoiceInput(textareaId, btnEl) {
     if (_voiceRecognition && _voiceTargetId === textareaId) {
-        // Currently recording for this field → stop
         _cleanup(false);
         return;
     }
 
-    // If we just aborted a previous recognition, Chrome may not have
-    // reset the state yet — delay start() to avoid "already started".
-    // If no prior recognition existed, call start() synchronously to
-    // preserve the user gesture (required for mic permission prompt).
     _voiceHadActive = _voiceRecognition !== null;
     _cleanup(false);
 
@@ -394,9 +397,40 @@ function toggleVoiceInput(textareaId, btnEl) {
 
 function _doStart(textareaId, btnEl) {
     _voiceStartTimer = null;
+
+    // 桌面端 Chrome：先用 getUserMedia 请求麦克风权限（比 SpeechRecognition 的权限提示更可靠）
+    // 移动端 Android Chrome：getUserMedia 会占用音频设备，释放后 SpeechRecognition 可能来不及获取，
+    //   直接调用 SpeechRecognition.start() 即可（移动端 Chrome 自带可靠的权限弹窗）
+    // iOS Safari：不支持 SpeechRecognition → _createSpeechRecognition 返回 null → 提示不支持
+    var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (!isMobile && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+            stream.getTracks().forEach(function(t) { t.stop(); });
+            _startRecognition(textareaId, btnEl);
+        }).catch(function(err) {
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                showAlert('麦克风权限未授予。请点击地址栏左侧的锁图标 → 网站设置 → 麦克风 → 允许', 'error', 6000);
+            } else if (err.name === 'NotFoundError') {
+                showAlert('未检测到麦克风设备', 'error');
+            } else {
+                showAlert('麦克风访问失败：' + (err.message || err.name), 'error');
+            }
+        });
+    } else {
+        _startRecognition(textareaId, btnEl);
+    }
+}
+
+function _startRecognition(textareaId, btnEl) {
     var rec = _createSpeechRecognition();
     if (!rec) {
-        showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
+        // iOS Safari 不支持 Web Speech API，引导用户使用键盘自带听写
+        if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            showAlert('iOS 暂不支持语音识别。请点击输入框后使用键盘上的麦克风按钮进行听写输入', 'info', 5000);
+            $('#' + textareaId).focus();
+        } else {
+            showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
+        }
         return;
     }
     _voiceRecognition = rec;
@@ -407,7 +441,6 @@ function _doStart(textareaId, btnEl) {
         $(btnEl).find('i').addClass('fa-beat');
         $(btnEl).find('span').text('录音中...点击停止');
     } catch(e) {
-        // If synchronous start fails with "already started", retry once with delay
         if (!_voiceHadActive && e.message && e.message.indexOf('already started') !== -1) {
             _voiceHadActive = true;
             _cleanup(false);

@@ -22,10 +22,10 @@ def get_categories():
     if cached:
         result = cached.get('api_categories')
         if result:
-            return result
+            return jsonify(result)
     categories = CaseCategory.query.all()
     categories_data = []
-    
+
     for category in categories:
         case_count = Case.query.filter_by(category_id=category.id).count()
         categories_data.append({
@@ -34,15 +34,15 @@ def get_categories():
             'description': category.description,
             'case_count': case_count
         })
-    
-    result = jsonify({
+
+    cache_data = {
         'success': True,
         'data': categories_data
-    })
+    }
     cached = _cache()
     if cached:
-        cached.set('api_categories', result, timeout=300)
-    return result
+        cached.set('api_categories', cache_data, timeout=300)
+    return jsonify(cache_data)
 
 @api_bp.route('/stations/<int:station_id>')
 @jwt_required(optional=True)
@@ -237,7 +237,7 @@ def health_check():
     return jsonify({
         'status': 'healthy' if db_ok else 'degraded',
         'service': 'nurse_training_system',
-        'version': '1.2.1',
+        'version': current_app.config.get('VERSION', 'unknown'),
         'database': 'connected' if db_ok else 'disconnected'
     }), status_code
 
