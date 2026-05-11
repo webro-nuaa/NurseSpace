@@ -60,7 +60,6 @@ services:
       - app_uploads:/app/uploads
       - app_logs:/app/logs
       - app_cases:/app/案例
-      - static_volume:/app/static_shared
     depends_on:
       db:
         condition: service_healthy
@@ -85,7 +84,6 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./nginx/certbot-webroot:/var/www/certbot
-      - static_volume:/usr/share/nginx/html/static:ro
       - app_uploads:/usr/share/nginx/html/uploads:ro
       - nginx_logs:/var/log/nginx:rw
     depends_on:
@@ -106,8 +104,6 @@ volumes:
   nginx_logs:
     driver: local
   app_cases:
-    driver: local
-  static_volume:
     driver: local
 
 networks:
