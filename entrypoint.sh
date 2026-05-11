@@ -3,7 +3,7 @@ set -e
 
 MYSQL_HOST=${MYSQL_HOST:-db}
 MYSQL_PORT=${MYSQL_PORT:-3306}
-MYSQL_ROOT_PASSWORD=${MYSQL_PASSWORD:-}
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-}}
 
 echo "[entrypoint] 等待 MySQL 就绪 (${MYSQL_HOST}:${MYSQL_PORT})..."
 MAX_RETRIES=60
@@ -15,7 +15,7 @@ try:
         host=os.environ.get('MYSQL_HOST', 'db'),
         port=int(os.environ.get('MYSQL_PORT', 3306)),
         user='root',
-        password=os.environ.get('MYSQL_PASSWORD', ''),
+        password=os.environ.get('MYSQL_ROOT_PASSWORD', os.environ.get('MYSQL_PASSWORD', '')),
         connect_timeout=3,
     )
     conn.close()
