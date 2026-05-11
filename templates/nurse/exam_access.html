@@ -27,10 +27,10 @@
                             </div>
                         </div>
                         <div id="action-area" class="mt-3" style="display:none;">
-                            <a id="enter-btn" href="#" class="btn btn-primary btn-lg w-100 rounded-pill">
-                                <i class="fas fa-play me-2"></i>进入考试
+                            <a id="enter-btn" href="/nurse" class="btn btn-primary btn-lg w-100 rounded-pill">
+                                <i class="fas fa-play me-2"></i>进入考试中心
                             </a>
-                            <p class="text-muted mt-2 small">请确保网络连接稳定，考试期间请勿切换页面</p>
+                            <p class="text-muted mt-2 small">在考试中心找到该考试即可作答</p>
                         </div>
                     </div>
                 </div>
@@ -47,47 +47,54 @@
         $('#exam-title').text('无效链接');
         $('#status-area').html('<div class="alert alert-danger">考试链接无效，请联系管理员重新生成二维码</div>');
     } else {
-        // Try to load exam info; if the user is already logged in with a nurse session,
-        // show the enter button. Otherwise, redirect to login.
+        checkAuthAndLoad();
+    }
+
+    function checkAuthAndLoad() {
         $.ajax({
-            url: '/nurse/exams',
-            headers: { 'Authorization': 'Bearer ' + token }
+            url: '/nurse/exams'
         }).done(function(res) {
             if (res.success) {
                 var exam = (res.data.exams || []).find(function(e) { return e.id == examId; });
                 if (exam) {
-                    $('#exam-title').text(exam.title);
-                    $('#exam-desc').text(exam.description || '');
-                    $('#exam-duration').text('时长 ' + exam.duration + ' 分钟');
-                    if (exam.end_time) {
-                        $('#exam-time').text('截止 ' + new Date(exam.end_time).toLocaleString('zh-CN'));
-                    }
-                    $('#status-area').hide();
-                    $('#action-area').show();
-                    $('#enter-btn').click(function(e) {
-                        e.preventDefault();
-                        window.location.href = '/nurse?tab=exams';
-                    });
+                    showExam(exam);
                 } else {
                     $('#exam-title').text('考试未找到');
-                    $('#status-area').html('<div class="alert alert-warning">该考试可能已结束或尚未发布</div>');
+                    $('#status-area').html('<div class="alert alert-warning">该考试可能已结束或尚未发布，请确认考试状态</div>');
                 }
             } else {
                 showLoginPrompt();
             }
-        }).fail(function() {
-            showLoginPrompt();
+        }).fail(function(xhr) {
+            if (xhr.status === 401) {
+                showLoginPrompt();
+            } else {
+                $('#exam-title').text('加载失败');
+                $('#status-area').html('<div class="alert alert-danger">加载失败，请稍后重试</div>');
+            }
         });
+    }
+
+    function showExam(exam) {
+        $('#exam-title').text(exam.title);
+        $('#exam-desc').text(exam.description || '');
+        $('#exam-duration').text('时长 ' + exam.duration + ' 分钟');
+        if (exam.end_time) {
+            $('#exam-time').text('截止 ' + new Date(exam.end_time).toLocaleString('zh-CN'));
+        }
+        $('#status-area').hide();
+        $('#action-area').show();
     }
 
     function showLoginPrompt() {
         $('#exam-title').text('需要登录');
-        var loginUrl = '/auth/login';
+        var currentUrl = '/nurse/exam-access?token=' + encodeURIComponent(token) + '&exam_id=' + encodeURIComponent(examId);
+        var loginUrl = '/auth/login?next=' + encodeURIComponent(currentUrl);
         $('#status-area').html(
             '<div class="alert alert-info">请先登录后再进入考试<br>' +
             '<a href="' + loginUrl + '" class="btn btn-primary btn-sm mt-2 rounded-pill">' +
             '<i class="fas fa-sign-in-alt me-1"></i>前往登录</a>' +
-            '<p class="text-muted small mt-2 mb-0">登录后可在「考试中心」找到该考试</p></div>'
+            '<p class="text-muted small mt-2 mb-0">登录后将自动返回此页面</p></div>'
         );
     }
     </script>

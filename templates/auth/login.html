@@ -161,29 +161,28 @@
                 const originalText = submitBtn.html();
                 submitBtn.html('<i class="fas fa-spinner fa-spin me-2"></i>登录中...').prop('disabled', true);
                 
+                const nextUrl = new URLSearchParams(window.location.search).get('next') || '';
                 $.ajax({
                     url: '/auth/login',
                     method: 'POST',
                     contentType: 'application/json',
                     data: JSON.stringify({
                         username: username,
-                        password: password
+                        password: password,
+                        next: nextUrl
                     }),
                     success: function(response) {
                         if (response.success) {
                             // 保存token
                             localStorage.setItem('access_token', response.access_token);
                             localStorage.setItem('user_info', JSON.stringify(response.user));
-                            
+
                             showAlert('登录成功！', 'success');
-                            
-                            // 根据角色跳转
+
+                            // 根据角色跳转（支持 next 参数）
                             setTimeout(() => {
-                                if (response.user.role === 'admin') {
-                                    window.location.href = '/admin';
-                                } else {
-                                    window.location.href = '/nurse';
-                                }
+                                var target = nextUrl || (response.user.role === 'admin' ? '/admin' : '/nurse');
+                                window.location.href = target;
                             }, 1000);
                         } else {
                             showAlert(response.message, 'error');

@@ -3,6 +3,7 @@ from flask_login import current_user
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import csrf
 from utils.auth import login_or_jwt_required
+from utils.ai_evaluator import AIEvaluator
 from utils.decorators import admin_required
 from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, Exam, ExamQuestion, ExamAnswer, ExamRecord, PointRecord, ExtendedKnowledge, KnowledgeAnswer, ExtensionVideo, ExtensionLink, AiSetting, BaiduAsrKey, db
 from utils.docx_parser import DocxParser
@@ -1273,6 +1274,44 @@ def re_score_exam_answer(exam_id, answer_id):
             'record_total_score': float(record.total_score) if record and record.total_score else 0
         }
     })
+
+
+@admin_bp.route('/exams/<int:exam_id>/export')
+@login_or_jwt_required
+@admin_required
+def export_exam_results(exam_id):
+    """导出某次考试全部考生成绩为 CSV"""
+    import csv
+    from io import StringIO
+
+    exam = Exam.query.get_or_404(exam_id)
+    records = ExamRecord.query.filter_by(
+        exam_id=exam_id, status='submitted'
+    ).order_by(ExamRecord.submit_time.desc()).all()
+
+    si = StringIO()
+    si.write('﻿')  # BOM for Excel Chinese support
+    writer = csv.writer(si)
+    writer.writerow(['考生姓名', '科室', '总分', '满分', '提交时间'])
+
+    for r in records:
+        user = db.session.get(User, r.user_id)
+        writer.writerow([
+            user.real_name if user else '未知',
+            user.department if user else '',
+            f"{float(r.total_score or 0):.0f}",
+            f"{float(r.max_score or 0):.0f}",
+            r.submit_time.strftime('%Y-%m-%d %H:%M') if r.submit_time else ''
+        ])
+
+    output = si.getvalue().encode('utf-8-sig')
+    from io import BytesIO
+    bio = BytesIO(output)
+    filename = f"{exam.title}_成绩_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return send_file(
+        bio, mimetype='text/csv; charset=utf-8', as_attachment=True,
+        download_name=filename
+    )
 
 
 @admin_bp.route('/statistics/learning-data')

@@ -2995,9 +2995,14 @@ function reviewExam(examId) {
                     <h4><i class="fas fa-check-double me-2"></i>批阅 — ${exam.title}</h4>
                     <p class="text-muted mb-0">查看考生作答、AI评分，并手动调整分数</p>
                 </div>
-                <a href="#" class="btn btn-sm btn-outline-secondary" onclick="loadExams(); return false;">
-                    <i class="fas fa-arrow-left me-1"></i>返回考试列表
-                </a>
+                <div class="d-flex gap-2">
+                    <a href="/admin/exams/${examId}/export" class="btn btn-sm btn-outline-primary" target="_blank">
+                        <i class="fas fa-download me-1"></i>导出成绩 (CSV)
+                    </a>
+                    <a href="#" class="btn btn-sm btn-outline-secondary" onclick="loadExams(); return false;">
+                        <i class="fas fa-arrow-left me-1"></i>返回考试列表
+                    </a>
+                </div>
             </div>
 
             <div class="card">

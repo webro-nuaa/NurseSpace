@@ -12,7 +12,7 @@ def _require_env(key):
 
 
 class Config:
-    VERSION = '3.0.0'
+    VERSION = '3.0.1'
 
     SECRET_KEY = _require_env('SECRET_KEY')
 

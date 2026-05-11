@@ -541,14 +541,14 @@ function loadExams() {
                                         ${exam.participated ? `
                                             <div class="alert alert-info">
                                                 <i class="fas fa-check-circle me-2"></i>
-                                                已参加 ${exam.score ? `(得分: ${exam.score})` : ''}
+                                                已参加 ${exam.score != null ? `(总分: ${exam.score})` : ''}
                                             </div>
                                         ` : ''}
                                     </div>
                                     <div class="card-footer">
                                         ${exam.participated ? `
-                                            <button class="btn btn-secondary btn-sm" disabled>
-                                                <i class="fas fa-check me-1"></i>已完成
+                                            <button class="btn btn-outline-primary btn-sm" onclick="viewExamResult(${exam.id})">
+                                                <i class="fas fa-eye me-1"></i>查看结果
                                             </button>
                                         ` : `
                                             <button class="btn btn-primary btn-sm" onclick="startExam(${exam.id})">
@@ -710,6 +710,51 @@ function updateTimerDisplay() {
     if (_examSeconds < 300) {
         $('#exam-timer').removeClass('bg-warning text-dark').addClass('bg-danger text-white');
     }
+}
+
+function viewExamResult(examId) {
+    $.get('/nurse/exams/' + examId + '/result', function(res) {
+        if (!res.success) { showAlert(res.message || '加载失败', 'error'); return; }
+        var d = res.data;
+        var html = `
+            <nav aria-label="breadcrumb"><ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="#" onclick="loadTab('exams')">考试中心</a></li>
+                <li class="breadcrumb-item active">考试结果</li>
+            </ol></nav>
+            <div class="page-title">
+                <h2><i class="fas fa-poll me-2"></i>${d.exam ? d.exam.title : '考试结果'}</h2>
+                <p>总分 <span class="fw-bold fs-4 text-primary">${d.total_score.toFixed(0)}</span> / ${d.max_score.toFixed(0)}</p>
+            </div>
+            <div class="row">
+                <div class="col-12">
+                    ${d.answers.map(function(a, i) {
+                        var badgeClass = a.score >= 80 ? 'bg-success' : (a.score >= 60 ? 'bg-warning text-dark' : 'bg-danger');
+                        return `
+                            <div class="card mb-3">
+                                <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                    <span><strong>#${i + 1}</strong> ${a.station_name} <span class="text-muted small">(${a.case_title})</span></span>
+                                    <span class="badge ${badgeClass} fs-6">${a.score.toFixed(0)} 分</span>
+                                </div>
+                                <div class="card-body py-2">
+                                    <div class="mb-2"><small class="text-muted">题目：</small>${a.question}</div>
+                                    <div class="mb-2"><small class="text-muted">你的作答：</small><div class="border rounded p-2 bg-white">${a.user_answer || '<span class="text-muted">(未作答)</span>'}</div></div>
+                                    ${a.ai_feedback ? '<div class="mb-2"><small class="text-muted">AI 反馈：</small><div class="border rounded p-2 bg-light">' + a.ai_feedback + '</div></div>' : ''}
+                                    ${a.standard_answers && a.standard_answers.length ? `
+                                        <div class="mb-2"><small class="text-muted">标准答案：</small>
+                                            <div class="border rounded p-2 bg-white">
+                                                ${a.standard_answers.map(function(sa) {
+                                                    return '<span class="badge bg-light text-dark me-1 mb-1">' + sa.answer_item + '</span>';
+                                                }).join('')}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        $('#main-content').html(html);
+    });
 }
 
 function submitExam(examId) {

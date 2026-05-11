@@ -699,6 +699,9 @@ def submit_exam(exam_id):
     data = request.get_json() or {}
     answers = data.get('answers', [])
 
+    if not answers:
+        return jsonify({'success': False, 'message': '请至少作答一题'}), 400
+
     # Verify station-exam ownership: build a set of valid (exam_question_id, station_id) pairs
     exam_questions = ExamQuestion.query.filter_by(exam_id=exam_id).all()
     valid_pairs = set()
@@ -707,8 +710,9 @@ def submit_exam(exam_id):
         for s in case_stations:
             valid_pairs.add((eq.id, s.id))
 
-    # Validate no empty answers
+    # Validate no empty answers and no duplicate (exam_question_id, station_id) pairs
     empty_stations = []
+    seen_pairs = set()
     for a in answers:
         answer_text = (a.get('answer') or '').strip()
         station_id = a.get('station_id')
@@ -716,6 +720,11 @@ def submit_exam(exam_id):
 
         if (exam_question_id, station_id) not in valid_pairs:
             return jsonify({'success': False, 'message': '提交数据无效'}), 400
+
+        pair = (exam_question_id, station_id)
+        if pair in seen_pairs:
+            return jsonify({'success': False, 'message': f'站点答案重复提交'}), 400
+        seen_pairs.add(pair)
 
         if not answer_text:
             station = db.session.get(Station, station_id)
@@ -790,6 +799,64 @@ def submit_exam(exam_id):
             'total_score': float(total_earned),
             'max_score': float(record.max_score),
             'questions_answered': len(answers)
+        }
+    })
+
+
+@nurse_bp.route('/exams/<int:exam_id>/result')
+@login_or_jwt_required
+@nurse_required
+def get_exam_result(exam_id):
+    """获取护士某次考试的详细结果（含每题得分和AI反馈）"""
+    record = ExamRecord.query.filter_by(
+        exam_id=exam_id, user_id=current_user.id
+    ).first()
+
+    if not record:
+        return jsonify({'success': False, 'message': '未找到考试记录'}), 404
+
+    answers = ExamAnswer.query.filter_by(exam_record_id=record.id).order_by(ExamAnswer.id).all()
+
+    answers_data = []
+    for ans in answers:
+        station = db.session.get(Station, ans.station_id) if ans.station_id else None
+        exam_question = db.session.get(ExamQuestion, ans.exam_question_id) if ans.exam_question_id else None
+        case = db.session.get(Case, exam_question.case_id) if exam_question else None
+
+        standard_answers_data = []
+        if station:
+            standard_answers_data = [
+                {'answer_item': sa.answer_item, 'score_weight': float(sa.score_weight)}
+                for sa in station.standard_answers.order_by(StandardAnswer.order_index).all()
+            ]
+
+        answers_data.append({
+            'id': ans.id,
+            'station_name': station.name if station else '',
+            'question': station.question if station else '',
+            'case_title': case.title if case else '',
+            'user_answer': ans.user_answer or '',
+            'score': float(ans.score) if ans.score else 0,
+            'ai_feedback': ans.ai_feedback or '',
+            'standard_answers': standard_answers_data
+        })
+
+    exam = db.session.get(Exam, exam_id)
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'exam': {
+                'id': exam.id,
+                'title': exam.title,
+                'description': exam.description,
+                'duration': exam.duration
+            } if exam else None,
+            'total_score': float(record.total_score) if record.total_score else 0,
+            'max_score': float(record.max_score) if record.max_score else 0,
+            'status': record.status,
+            'submit_time': record.submit_time.isoformat() if record.submit_time else None,
+            'answers': answers_data
         }
     })
 

@@ -49,6 +49,9 @@ def login():
                 }
             })
 
+        next_url = request.args.get('next') or (data.get('next') if not request.is_json else None)
+        if next_url and next_url.startswith('/') and not next_url.startswith('//'):
+            return redirect(next_url)
         if user.role == 'admin':
             return redirect(url_for('main.admin_index'))
         else:
