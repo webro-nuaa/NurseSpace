@@ -87,18 +87,18 @@ def nurse_user(app):
     return user
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def admin_token(app, admin_user):
-    """JWT access token for admin user."""
+    """JWT access token for admin user (function scope to pick up token_version changes)."""
     from flask_jwt_extended import create_access_token
-    return create_access_token(identity=str(admin_user.id))
+    return create_access_token(identity=str(admin_user.id), additional_claims={'v': admin_user.token_version or 0})
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def nurse_token(app, nurse_user):
-    """JWT access token for nurse user."""
+    """JWT access token for nurse user (function scope to pick up token_version changes)."""
     from flask_jwt_extended import create_access_token
-    return create_access_token(identity=str(nurse_user.id))
+    return create_access_token(identity=str(nurse_user.id), additional_claims={'v': nurse_user.token_version or 0})
 
 
 @pytest.fixture(scope='session')

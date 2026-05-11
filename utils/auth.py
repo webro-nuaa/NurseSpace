@@ -16,15 +16,20 @@ def login_or_jwt_required(f):
             return f(*args, **kwargs)
 
         try:
-            from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+            from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
             verify_jwt_in_request(optional=True)
             user_id = get_jwt_identity()
+            claims = get_jwt()
         except Exception:
             user_id = None
+            claims = {}
 
         if user_id:
             user = db.session.get(User, int(user_id))
             if user and user.is_active():
+                token_ver = claims.get('v', 0) if claims else 0
+                if token_ver != (user.token_version or 0):
+                    return jsonify({'success': False, 'message': '密码已修改，请重新登录'}), 401
                 login_user(user, remember=False)
                 return f(*args, **kwargs)
 

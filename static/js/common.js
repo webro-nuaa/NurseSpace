@@ -309,107 +309,34 @@ submitPasswordChange_v2 = function() {
         contentType: 'application/json',
         data: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
         success: function(response) {
-            if (response.success) { showAlert('密码修改成功', 'success'); }
-            else { showAlert(response.message, 'error'); }
+            if (response.success) {
+                showAlert('密码修改成功，请重新登录', 'success', 2000);
+                setTimeout(function() {
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('user_info');
+                    window.location.href = '/auth/login';
+                }, 2000);
+            } else { showAlert(response.message, 'error'); }
         }
     });
 };
 
-// ========= 语音输入（浏览器 Web Speech API） =========
-// 桌面端 Chrome：先用 getUserMedia 获取麦克风权限，再启动 SpeechRecognition
-// 移动端 Android Chrome：跳过 getUserMedia，直接 SpeechRecognition.start()（避免音频设备冲突）
-// iOS Safari：不支持 Web Speech API，引导用户使用键盘内置听写
-var _voiceRecognition = null;
-var _voiceTargetId = null;
-var _voiceOriginalText = '';    // 录音前的原始文本
-var _voiceFinalTranscript = ''; // 已确认的最终识别文字
-var _voiceStartTimer = null;
-var _voiceStarting = false;     // 防止短时间内重复 start
-
-function _createSpeechRecognition() {
-    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return null;
-    var rec = new SpeechRecognition();
-    rec.lang = 'zh-CN';
-    rec.interimResults = true;
-    rec.continuous = true;
-
-    rec.onresult = function(event) {
-        var interim = '';
-        for (var i = event.resultIndex; i < event.results.length; i++) {
-            if (event.results[i].isFinal) {
-                _voiceFinalTranscript += event.results[i][0].transcript;
-            } else {
-                interim += event.results[i][0].transcript;
-            }
-        }
-        // 最终文本 = 原始内容 + 已确认文字 + 当前候补文字
-        var combined = _voiceOriginalText;
-        if (_voiceFinalTranscript) {
-            combined += (combined ? ' ' : '') + _voiceFinalTranscript;
-        }
-        if (interim) {
-            combined += (combined ? ' ' : '') + interim;
-        }
-        $('#' + _voiceTargetId).val(combined);
-    };
-
-    rec.onerror = function(event) {
-        if (event.error === 'no-speech') return;
-        if (event.error === 'not-allowed') {
-            showAlert('麦克风权限未授予。请点击地址栏左侧锁图标 → 网站设置 → 麦克风 → 允许', 'error', 6000);
-        } else if (event.error !== 'aborted') {
-            showAlert('语音识别出错：' + event.error, 'warning');
-        }
-        // Force-cleanup: null out recognition BEFORE calling abort to break re-entrancy
-        var r = _voiceRecognition;
-        _voiceRecognition = null;
-        try { r.abort(); } catch(e) {}
-        _finishRecording();
-    };
-
-    rec.onend = function() {
-        // Only treat as natural end if recognition is still set (not already cleaned up by onerror)
-        if (_voiceRecognition) {
-            _voiceRecognition = null;
-            _finishRecording();
-        }
-    };
-    return rec;
-}
-
-function _finishRecording() {
-    _voiceTargetId = null;
-    _voiceOriginalText = '';
-    _voiceFinalTranscript = '';
-    _voiceStarting = false;
-    if (_voiceStartTimer) {
-        clearTimeout(_voiceStartTimer);
-        _voiceStartTimer = null;
-    }
-    resetVoiceButton();
-}
+// ========= 语音输入（PCM 录音 + 后端百度 ASR） =========
+var _voiceState = null; // { targetId, originalText, stream, audioCtx, source, processor, chunks, btnEl }
 
 function toggleVoiceInput(textareaId, btnEl) {
-    if (_voiceStarting) return; // debounce — start in progress
-
-    if (_voiceRecognition && _voiceTargetId === textareaId) {
-        // Currently recording for this field — stop
-        var r = _voiceRecognition;
-        _voiceRecognition = null;
-        try { r.abort(); } catch(e) {}
-        _finishRecording();
-        return;
+    if (_voiceState && _voiceState.btnEl) {
+        resetVoiceButtonState(_voiceState.btnEl);
     }
 
-    // If another field was recording, stop it first
-    if (_voiceRecognition) {
-        var old = _voiceRecognition;
-        _voiceRecognition = null;
-        try { old.abort(); } catch(e) {}
-        _finishRecording();
-        // Fall through to start new recording after a short delay
-        _voiceStartTimer = setTimeout(_doStart, 150, textareaId, btnEl);
+    // Stop current recording
+    if (_voiceState) {
+        if (_voiceState.targetId === textareaId) {
+            _stopRecording();
+            return;
+        }
+        _stopRecording();
+        setTimeout(function() { _doStart(textareaId, btnEl); }, 150);
         return;
     }
 
@@ -417,64 +344,141 @@ function toggleVoiceInput(textareaId, btnEl) {
 }
 
 function _doStart(textareaId, btnEl) {
-    _voiceStartTimer = null;
+    var originalText = $('#' + textareaId).val().trim();
 
-    var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (!isMobile && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
-            stream.getTracks().forEach(function(t) { t.stop(); });
-            _startRecognition(textareaId, btnEl);
-        }).catch(function(err) {
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                showAlert('麦克风权限未授予。请点击地址栏左侧锁图标 → 网站设置 → 麦克风 → 允许', 'error', 6000);
-            } else if (err.name === 'NotFoundError') {
-                showAlert('未检测到麦克风设备', 'error');
-            } else {
-                showAlert('麦克风访问失败：' + (err.message || err.name), 'error');
-            }
-        });
-    } else {
-        _startRecognition(textareaId, btnEl);
-    }
-}
-
-function _startRecognition(textareaId, btnEl) {
-    var rec = _createSpeechRecognition();
-    if (!rec) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
             showAlert('iOS 暂不支持语音识别。请使用键盘上的麦克风按钮进行听写输入', 'info', 5000);
             $('#' + textareaId).focus();
         } else {
-            showAlert('当前浏览器不支持语音识别，请使用 Chrome 或 Edge', 'error');
+            showAlert('当前浏览器不支持麦克风访问', 'error');
         }
         return;
     }
-    _voiceRecognition = rec;
-    _voiceTargetId = textareaId;
-    _voiceOriginalText = $('#' + textareaId).val().trim();
-    _voiceFinalTranscript = '';
-    _voiceStarting = true;
-    try {
-        _voiceRecognition.start();
-        $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
-        $(btnEl).find('i').addClass('fa-beat');
-        $(btnEl).find('span').text('录音中...点击停止');
-    } catch(e) {
-        _voiceRecognition = null;
-        if (e.message && e.message.indexOf('already started') !== -1) {
-            // Chrome 未完全释放上一次识别 — 延迟重试
-            _voiceStartTimer = setTimeout(_doStart, 150, textareaId, btnEl);
-            return;
+
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+        _startPcmRecording(stream, textareaId, btnEl, originalText);
+    }).catch(function(err) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            showAlert('麦克风权限未授予。请点击地址栏左侧锁图标 → 网站设置 → 麦克风 → 允许', 'error', 6000);
+        } else if (err.name === 'NotFoundError') {
+            showAlert('未检测到麦克风设备', 'error');
+        } else {
+            showAlert('麦克风访问失败：' + (err.message || err.name), 'error');
         }
-        showAlert('无法启动语音：' + e.message, 'error');
-        _finishRecording();
+    });
+}
+
+function _startPcmRecording(stream, textareaId, btnEl, originalText) {
+    var audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    var source = audioCtx.createMediaStreamSource(stream);
+    var processor = audioCtx.createScriptProcessor(4096, 1, 1);
+    var chunks = [];
+
+    processor.onaudioprocess = function(e) {
+        var input = e.inputBuffer.getChannelData(0);
+        var pcm = new Int16Array(input.length);
+        for (var i = 0; i < input.length; i++) {
+            var s = Math.max(-1, Math.min(1, input[i]));
+            pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        chunks.push(pcm);
+    };
+
+    source.connect(processor);
+    processor.connect(audioCtx.destination);
+
+    _voiceState = {
+        targetId: textareaId,
+        originalText: originalText,
+        stream: stream,
+        audioCtx: audioCtx,
+        source: source,
+        processor: processor,
+        chunks: chunks,
+        btnEl: btnEl
+    };
+
+    $(btnEl).addClass('btn-danger').removeClass('btn-outline-secondary');
+    $(btnEl).find('i').addClass('fa-beat');
+    $(btnEl).find('span').text('录音中...点击停止');
+}
+
+function _stopRecording() {
+    if (!_voiceState) return;
+    var state = _voiceState;
+    _voiceState = null;
+
+    state.source.disconnect();
+    state.processor.disconnect();
+    state.audioCtx.close();
+
+    // Merge PCM chunks
+    var totalLen = 0;
+    state.chunks.forEach(function(c) { totalLen += c.length; });
+    if (totalLen === 0) {
+        _cleanupStreamAndUI_state(state);
+        return;
+    }
+    var merged = new Int16Array(totalLen);
+    var offset = 0;
+    state.chunks.forEach(function(c) {
+        merged.set(c, offset);
+        offset += c.length;
+    });
+
+    var rawBytes = new Uint8Array(merged.buffer);
+    var base64 = btoa(String.fromCharCode.apply(null, rawBytes));
+
+    $(state.btnEl).find('span').text('识别中...');
+    $(state.btnEl).find('i').removeClass('fa-microphone fa-beat').addClass('fa-spinner fa-spin');
+
+    var targetId = state.targetId;
+    var originalText = state.originalText;
+    var btnEl = state.btnEl;
+
+    $.ajax({
+        url: '/api/speech-to-text',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ audio: base64 }),
+        success: function(res) {
+            if (res.success && res.text) {
+                var combined = originalText;
+                if (res.text) {
+                    combined += (combined ? ' ' : '') + res.text;
+                }
+                $('#' + targetId).val(combined);
+            } else {
+                showAlert(res.message || '语音识别失败', 'warning');
+            }
+        },
+        error: function() {
+            showAlert('语音识别请求失败，请检查网络', 'error');
+        },
+        complete: function() {
+            _cleanupStreamAndUI_state({ btnEl: btnEl });
+        }
+    });
+}
+
+function _cleanupStreamAndUI_state(state) {
+    if (state && state.stream) {
+        state.stream.getTracks().forEach(function(t) { t.stop(); });
+    }
+    if (state && state.btnEl) {
+        resetVoiceButtonState(state.btnEl);
     }
 }
 
 function resetVoiceButton() {
     $('.btn-voice-input').each(function() {
-        $(this).removeClass('btn-danger').addClass('btn-outline-secondary');
-        $(this).find('i').removeClass('fa-beat');
-        $(this).find('span').text('语音输入');
+        resetVoiceButtonState(this);
     });
+}
+
+function resetVoiceButtonState(btnEl) {
+    $(btnEl).removeClass('btn-danger').addClass('btn-outline-secondary');
+    $(btnEl).find('i').removeClass('fa-beat fa-spin').addClass('fa-microphone');
+    $(btnEl).find('span').text('语音输入');
 }

@@ -24,6 +24,7 @@ class User(UserMixin, db.Model):
     department = db.Column(db.String(100))
     status = db.Column(db.Enum('active', 'disabled'), default='active')
     points = db.Column(db.Integer, default=0)
+    token_version = db.Column(db.Integer, nullable=False, default=0, server_default='0')
     created_at = db.Column(db.DateTime, default=_utcnow)
     updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
     
@@ -264,6 +265,18 @@ class AiSetting(db.Model):
             db.session.add(setting)
             db.session.commit()
         return setting
+
+
+class BaiduAsrKey(db.Model):
+    __tablename__ = 'baidu_asr_keys'
+
+    id = db.Column(db.Integer, primary_key=True)
+    app_id = db.Column(db.String(100), nullable=False)
+    # API Key / Secret Key 加密存储
+    api_key = db.Column(db.String(500), nullable=False)
+    secret_key = db.Column(db.String(500), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=_utcnow)
 
 
 class WeaknessAnalysis(db.Model):

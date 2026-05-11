@@ -37,7 +37,7 @@ python3 -c "
 from app import create_app
 from models import db
 from flask_migrate import upgrade, stamp
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 app = create_app()
 with app.app_context():
@@ -61,6 +61,20 @@ with app.app_context():
                 stamp()
             except Exception:
                 pass
+    # 安全补列：token_version（v1.2.2+）
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(text('ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0'))
+            conn.commit()
+            print('[entrypoint] token_version 列已添加')
+    except Exception:
+        print('[entrypoint] token_version 列已存在，跳过')
+    # 安全补表：baidu_asr_keys（v1.2.2+）
+    try:
+        db.create_all()
+        print('[entrypoint] 新表检查完成')
+    except Exception:
+        print('[entrypoint] 新表检查跳过')
 "
 
 echo "[entrypoint] 创建初始管理员账号..."

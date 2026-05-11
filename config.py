@@ -45,6 +45,11 @@ class Config:
     ZHIPU_API_KEY = os.environ.get('ZHIPU_API_KEY')
     ZHIPU_MODEL = os.environ.get('ZHIPU_MODEL', 'glm-4-air')
 
+    # Baidu ASR (语音识别，国内免费额度 5万次/天)
+    BAIDU_ASR_APP_ID = os.environ.get('BAIDU_ASR_APP_ID')
+    BAIDU_ASR_API_KEY = os.environ.get('BAIDU_ASR_API_KEY')
+    BAIDU_ASR_SECRET_KEY = os.environ.get('BAIDU_ASR_SECRET_KEY')
+
     # Redis
     _redis_password = os.environ.get('REDIS_PASSWORD', '')
     _redis_auth = f":{_redis_password}@" if _redis_password else ""

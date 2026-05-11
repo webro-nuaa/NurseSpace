@@ -523,3 +523,29 @@ def get_knowledge_answers(knowledge_id: int):
         'success': True,
         'data': answers_data
     })
+
+@api_bp.route('/speech-to-text', methods=['POST'])
+@jwt_required(optional=True)
+def speech_to_text():
+    """语音识别 — 接受 PCM 音频，返回文字"""
+    if request.content_type and 'application/json' in request.content_type:
+        data = request.get_json() or {}
+        audio_b64 = data.get('audio')
+        if not audio_b64:
+            return jsonify({'success': False, 'message': '缺少音频数据'})
+        import base64
+        try:
+            audio_data = base64.b64decode(audio_b64)
+        except Exception:
+            return jsonify({'success': False, 'message': '音频数据格式错误'})
+    else:
+        audio_data = request.get_data()
+        if not audio_data:
+            return jsonify({'success': False, 'message': '缺少音频数据'})
+
+    if len(audio_data) < 160:  # < 10ms PCM
+        return jsonify({'success': False, 'message': '音频太短，请重新录制'})
+
+    from utils.speech_to_text import transcribe
+    result = transcribe(audio_data)
+    return jsonify(result)

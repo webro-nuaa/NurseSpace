@@ -36,7 +36,7 @@ def login():
 
     if user and user.check_password(password) and user.is_active():
         login_user(user, remember=True)
-        access_token = create_access_token(identity=str(user.id))
+        access_token = create_access_token(identity=str(user.id), additional_claims={'v': user.token_version})
 
         if request.is_json:
             return jsonify({
@@ -223,8 +223,9 @@ def change_password():
 
     try:
         user.set_password(new_password)
+        user.token_version = (user.token_version or 0) + 1
         db.session.commit()
-        return jsonify({'success': True, 'message': '密码修改成功'})
+        return jsonify({'success': True, 'message': '密码修改成功，请重新登录'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': f'密码修改失败：{str(e)}'})
