@@ -590,8 +590,13 @@ function startExam(examId) {
             if (!res.success) { showAlert(res.message, 'error'); return; }
             renderExamUI(res.data);
         },
-        error: function() {
-            showAlert('开始考试失败，请稍后重试', 'error');
+        error: function(xhr) {
+            var msg = '开始考试失败，请稍后重试';
+            try {
+                var body = JSON.parse(xhr.responseText);
+                if (body.message) msg = body.message;
+            } catch(e) {}
+            showAlert(msg + ' (' + xhr.status + ')', 'error');
         }
     });
 }
@@ -736,8 +741,13 @@ function _doSubmit(examId) {
                 showAlert(res.message || '提交失败', 'error');
             }
         },
-        error: function() {
-            showAlert('提交失败，请稍后重试', 'error');
+        error: function(xhr) {
+            var msg = '提交失败，请稍后重试';
+            try {
+                var body = JSON.parse(xhr.responseText);
+                if (body.message) msg = body.message;
+            } catch(e) {}
+            showAlert(msg + ' (' + xhr.status + ')', 'error');
         }
     });
 }
