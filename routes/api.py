@@ -45,7 +45,7 @@ def get_categories():
     return jsonify(cache_data)
 
 @api_bp.route('/stations/<int:station_id>')
-@jwt_required(optional=True)
+@jwt_required()
 def get_station_detail(station_id: int):
     """获取单个站点详情（题干/考核任务/标准答案）"""
     station = Station.query.get_or_404(station_id)
@@ -68,7 +68,7 @@ def get_station_detail(station_id: int):
     })
 
 @api_bp.route('/stations/<int:station_id>/answers')
-@jwt_required(optional=True)
+@jwt_required()
 def get_station_answers(station_id: int):
     """获取站点的标准答案"""
     station = Station.query.get_or_404(station_id)
@@ -377,7 +377,8 @@ def create_comment():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'发布评论失败：{str(e)}'})
+        current_app.logger.error(f"发布评论失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '发布评论失败，请稍后重试'})
 
 @api_bp.route('/comments/<int:comment_id>/like', methods=['POST'])
 @jwt_required()
@@ -426,7 +427,8 @@ def toggle_comment_like(comment_id):
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'操作失败：{str(e)}'})
+        current_app.logger.error(f"评论点赞操作失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '操作失败，请稍后重试'})
 
 @api_bp.route('/comments/<int:comment_id>/replies', methods=['GET'])
 @jwt_required(optional=True)

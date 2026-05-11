@@ -73,6 +73,7 @@ class Case(db.Model):
     # 关系
     stations = db.relationship('Station', backref='case', lazy='dynamic', cascade='all, delete-orphan')
     extended_knowledge = db.relationship('ExtendedKnowledge', backref='case', lazy='dynamic', cascade='all, delete-orphan')
+    exam_questions = db.relationship('ExamQuestion', backref='case', lazy='dynamic', cascade='all, delete-orphan')
     videos = db.relationship('ExtensionVideo', backref='case', lazy='dynamic', cascade='all, delete-orphan')
     links = db.relationship('ExtensionLink', backref='case', lazy='dynamic', cascade='all, delete-orphan')
 
@@ -91,7 +92,6 @@ class Station(db.Model):
     standard_answers = db.relationship('StandardAnswer', backref='station', lazy='dynamic', cascade='all, delete-orphan')
     learning_records = db.relationship('LearningRecord', backref='station', lazy='dynamic', cascade='all, delete-orphan')
     wrong_questions = db.relationship('WrongQuestion', backref='station', lazy='dynamic', cascade='all, delete-orphan')
-    exam_questions = db.relationship('ExamQuestion', backref='station', lazy='dynamic', cascade='all, delete-orphan')
     exam_answers = db.relationship('ExamAnswer', backref='station', lazy='dynamic', cascade='all, delete-orphan')
 
 class StandardAnswer(db.Model):
@@ -194,12 +194,15 @@ class Exam(db.Model):
 
 class ExamQuestion(db.Model):
     __tablename__ = 'exam_questions'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=False)
-    station_id = db.Column(db.Integer, db.ForeignKey('stations.id'), nullable=False)
-    score = db.Column(db.Numeric(5, 2), default=10.00)
+    case_id = db.Column(db.Integer, db.ForeignKey('cases.id'), nullable=False)
+    score = db.Column(db.Numeric(5, 2), default=100.00)
     order_index = db.Column(db.Integer, default=0)
+
+    # 关系
+    answers = db.relationship('ExamAnswer', backref='exam_question', lazy='dynamic')
 
 class ExamRecord(db.Model):
     __tablename__ = 'exam_records'
@@ -218,9 +221,10 @@ class ExamRecord(db.Model):
 
 class ExamAnswer(db.Model):
     __tablename__ = 'exam_answers'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     exam_record_id = db.Column(db.Integer, db.ForeignKey('exam_records.id'), nullable=False)
+    exam_question_id = db.Column(db.Integer, db.ForeignKey('exam_questions.id'), nullable=False)
     station_id = db.Column(db.Integer, db.ForeignKey('stations.id'), nullable=False)
     user_answer = db.Column(db.Text)
     score = db.Column(db.Numeric(5, 2), default=0)

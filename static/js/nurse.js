@@ -34,7 +34,7 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                     <div class="row">
                         ${data.categories.map((cat, idx) => `
                             <div class="col-md-4 mb-4">
-                                <div class="card h-100 fade-in" style="animation-delay: ${idx * 0.05}s; cursor: pointer;" onclick="loadCases(1, ${cat.id}, '${cat.name}')">
+                                <div class="card h-100 fade-in" style="animation-delay: ${idx * 0.05}s; cursor: pointer;" onclick="loadCases(1, ${cat.id}, ${JSON.stringify(cat.name)})">
                                     <div class="card-body d-flex flex-column justify-content-center text-center">
                                         <div class="mb-2"><i class="fas fa-folder-open fa-2x text-primary"></i></div>
                                         <h5 class="card-title mb-1">${cat.name}</h5>
@@ -610,22 +610,39 @@ function renderExamUI(data) {
     _examSeconds = durationMin * 60;
     var recordId = data.record_id;
 
+    var totalStationCount = 0;
     var questionsHtml = questions.map(function(q, i) {
+        totalStationCount += q.stations.length;
+        var caseGuideHtml = q.case_guide ?
+            '<div class="alert alert-light border mb-3"><small class="text-muted fw-bold d-block mb-1">案例背景</small>' + sanitizeHTML(q.case_guide) + '</div>' : '';
+
+        var stationsHtml = q.stations.map(function(s, si) {
+            return `
+                <div class="border rounded p-3 mb-2 bg-light">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold small text-muted">题目 ${si + 1}</span>
+                        <span class="text-muted small">${sanitizeHTML(s.name)}</span>
+                    </div>
+                    ${s.assessment_task ? '<p class="text-muted small mb-1"><i class="fas fa-tasks me-1"></i>' + sanitizeHTML(s.assessment_task) + '</p>' : ''}
+                    <p class="fw-bold mb-2">${sanitizeHTML(s.question)}</p>
+                    <textarea class="form-control exam-answer" data-station-id="${s.id}" data-exam-question-id="${q.id}"
+                        rows="3" placeholder="请输入您的答案..."></textarea>
+                </div>`;
+        }).join('');
+
         return `
-            <div class="card mb-3" id="question-card-${q.station_id}">
+            <div class="card mb-4" id="question-card-${q.id}">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>
                         <span class="badge bg-primary me-2">第${i + 1}题</span>
-                        <strong>${sanitizeHTML(q.station_name)}</strong>
-                        <span class="text-muted ms-2 small">(${sanitizeHTML(q.case_title)})</span>
+                        <strong>${sanitizeHTML(q.case_title)}</strong>
+                        <span class="badge bg-secondary ms-2">${q.difficulty === 'advanced' ? '高级' : (q.difficulty === 'basic' ? '基础' : '中级')}</span>
                     </span>
                     <span class="badge bg-info">${q.score}分</span>
                 </div>
                 <div class="card-body">
-                    ${q.assessment_task ? `<p class="text-muted small mb-2"><i class="fas fa-tasks me-1"></i>${sanitizeHTML(q.assessment_task)}</p>` : ''}
-                    <p class="fw-bold mb-2">${sanitizeHTML(q.question)}</p>
-                    <textarea class="form-control exam-answer" data-station-id="${q.station_id}"
-                        rows="4" placeholder="请输入您的答案..."></textarea>
+                    ${caseGuideHtml}
+                    ${stationsHtml}
                 </div>
             </div>`;
     }).join('');
@@ -646,7 +663,7 @@ function renderExamUI(data) {
 
             <div class="alert alert-info small mb-3">
                 <i class="fas fa-info-circle me-1"></i>
-                共 <strong>${questions.length}</strong> 题，满分 <strong>${totalScore}</strong> 分，时长 <strong>${exam.duration}</strong> 分钟。
+                共 <strong>${questions.length}</strong> 个案例，<strong>${totalStationCount}</strong> 道题目，满分 <strong>${totalScore}</strong> 分，时长 <strong>${exam.duration}</strong> 分钟。
                 请认真作答，提交后不可修改。
             </div>
 
@@ -695,12 +712,12 @@ function updateTimerDisplay() {
     }
 }
 
-function submitExam(examId, recordId) {
+function submitExam(examId) {
     if (!confirm('确定要提交答卷吗？提交后将无法修改。')) return;
     _doSubmit(examId);
 }
 
-function autoSubmitExam(examId, recordId) {
+function autoSubmitExam(examId) {
     _doSubmit(examId);
 }
 
@@ -711,6 +728,7 @@ function _doSubmit(examId) {
     $('.exam-answer').each(function() {
         answers.push({
             station_id: parseInt($(this).data('station-id')),
+            exam_question_id: parseInt($(this).data('exam-question-id')),
             answer: $(this).val().trim()
         });
     });
@@ -728,6 +746,7 @@ function _doSubmit(examId) {
                         <h3>考试已提交</h3>
                         <p class="text-muted">您的答卷已成功提交</p>
                         <p class="mb-1">共作答 <strong>${res.data.questions_answered}</strong> 题</p>
+                        ${res.data.total_score !== undefined ? '<p class="h4 text-primary mt-2">AI评分：<strong>' + res.data.total_score.toFixed(0) + '</strong> / ' + res.data.max_score.toFixed(0) + '</p>' : ''}
                         <p class="text-muted small">管理员批阅后会更新成绩</p>
                         <div class="mt-4">
                             <button class="btn btn-primary" onclick="loadExams()">

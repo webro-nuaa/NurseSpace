@@ -4,7 +4,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import csrf
 from utils.auth import login_or_jwt_required
 from utils.decorators import admin_required
-from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, Exam, ExamQuestion, ExamRecord, PointRecord, ExtendedKnowledge, KnowledgeAnswer, ExtensionVideo, ExtensionLink, AiSetting, BaiduAsrKey, db
+from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, Exam, ExamQuestion, ExamAnswer, ExamRecord, PointRecord, ExtendedKnowledge, KnowledgeAnswer, ExtensionVideo, ExtensionLink, AiSetting, BaiduAsrKey, db
 from utils.docx_parser import DocxParser
 from utils.crypto import encrypt_value, decrypt_value
 from sqlalchemy import desc, func
@@ -139,7 +139,8 @@ def ai_settings():
         return jsonify({'success': True, 'message': 'AI设置已更新'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'保存失败：{str(e)}'})
+        current_app.logger.error(f"AI设置保存失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '保存失败，请稍后重试'})
 
 
 @admin_bp.route('/users')
@@ -239,7 +240,8 @@ def admin_user_detail(user_id: int):
         return jsonify({'success': True, 'message': '用户信息已更新'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+        current_app.logger.error(f"管理员更新用户信息失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试'})
 
 
 @admin_bp.route('/users/xlsx-template', methods=['GET'])
@@ -261,7 +263,8 @@ def users_xlsx_template():
         return send_file(bio, as_attachment=True, download_name='用户批量导入模板.xlsx',
                          mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as e:
-        return jsonify({'success': False, 'message': f'生成模板失败：{str(e)}'})
+        current_app.logger.error(f"生成用户导入模板失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '生成模板失败，请稍后重试'})
 
 
 @admin_bp.route('/users/batch-import-xlsx', methods=['POST'])
@@ -351,7 +354,8 @@ def users_batch_import_xlsx():
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+        current_app.logger.error(f"用户批量导入失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试'})
 
 
 @admin_bp.route('/cases', methods=['GET', 'POST'])
@@ -587,7 +591,8 @@ def manage_cases():
         })
 
     except Exception as e:
-        return jsonify({'success': False, 'message': f'上传失败：{str(e)}'})
+        current_app.logger.error(f"案例上传失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '上传失败，请稍后重试'})
 
 
 @admin_bp.route('/cases/<int:case_id>', methods=['PUT', 'DELETE'])
@@ -605,7 +610,8 @@ def update_or_delete_case(case_id: int):
             return jsonify({'success': True, 'message': '案例已删除'})
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+            current_app.logger.error(f"案例删除失败: {e}", exc_info=True)
+            return jsonify({'success': False, 'message': '删除失败，请稍后重试'})
 
     data = request.get_json() or {}
     title = (data.get('title') or '').strip()
@@ -630,7 +636,8 @@ def update_or_delete_case(case_id: int):
         return jsonify({'success': True, 'message': '案例已更新'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+        current_app.logger.error(f"案例更新失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试'})
 
 
 @admin_bp.route('/cases/batch-delete', methods=['POST'])
@@ -650,7 +657,8 @@ def batch_delete_cases():
         return jsonify({'success': True, 'message': f'已删除 {len(ids)} 个案例'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'批量删除失败：{str(e)}'})
+        current_app.logger.error(f"批量删除案例失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '批量删除失败，请稍后重试'})
 
 
 @admin_bp.route('/cases/batch-upload', methods=['POST'])
@@ -739,7 +747,8 @@ def batch_upload_cases():
         })
 
     except Exception as e:
-        return jsonify({'success': False, 'message': f'批量上传失败：{str(e)}'})
+        current_app.logger.error(f"案例批量上传失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '批量上传失败，请稍后重试'})
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -766,7 +775,8 @@ def download_cases_xlsx_template():
         return send_file(bio, as_attachment=True, download_name='案例批量导入模板.xlsx',
                          mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as e:
-        return jsonify({'success': False, 'message': f'生成模板失败：{str(e)}'})
+        current_app.logger.error(f"生成案例导入模板失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '生成模板失败，请稍后重试'})
 
 
 @admin_bp.route('/cases/batch-import-xlsx', methods=['POST'])
@@ -858,7 +868,8 @@ def batch_import_cases_xlsx():
         return jsonify({'success': True, 'message': f'导入完成：新建 {created}，跳过 {skipped}'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'导入失败：{str(e)}'})
+        current_app.logger.error(f"案例导入失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '导入失败，请稍后重试'})
 
 
 @admin_bp.route('/cases/<int:case_id>')
@@ -1014,7 +1025,8 @@ def manage_exams():
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'创建失败：{str(e)}'})
+        current_app.logger.error(f"考试创建失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '创建失败，请稍后重试'})
 
 
 @admin_bp.route('/exams/<int:exam_id>/questions', methods=['GET', 'POST', 'DELETE'])
@@ -1025,38 +1037,38 @@ def manage_exam_questions(exam_id):
 
     if request.method == 'DELETE':
         data = request.get_json()
-        station_ids = data.get('station_ids', [])
-        if not station_ids:
+        case_ids = data.get('case_ids', [])
+        if not case_ids:
             return jsonify({'success': False, 'message': '请指定要移除的题目'})
         try:
             ExamQuestion.query.filter(
                 ExamQuestion.exam_id == exam_id,
-                ExamQuestion.station_id.in_(station_ids)
+                ExamQuestion.case_id.in_(case_ids)
             ).delete(synchronize_session='fetch')
             db.session.commit()
             return jsonify({'success': True, 'message': '已移除'})
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'移除失败：{str(e)}'})
+            current_app.logger.error(f"从考试移除案例失败: {e}", exc_info=True)
+            return jsonify({'success': False, 'message': '移除失败，请稍后重试'})
 
     if request.method == 'GET':
-        questions = db.session.query(ExamQuestion, Station, Case)\
-            .join(Station, ExamQuestion.station_id == Station.id)\
-            .join(Case, Station.case_id == Case.id)\
+        questions = db.session.query(ExamQuestion, Case)\
+            .join(Case, ExamQuestion.case_id == Case.id)\
             .filter(ExamQuestion.exam_id == exam_id)\
             .order_by(ExamQuestion.order_index).all()
 
         questions_data = []
-        for eq, station, case in questions:
+        for eq, case in questions:
+            station_count = Station.query.filter_by(case_id=case.id).count()
             questions_data.append({
                 'id': eq.id,
-                'station_id': station.id,
-                'station_name': station.name,
-                'question': station.question,
                 'case_id': case.id,
                 'case_title': case.title,
+                'difficulty': case.difficulty,
                 'score': float(eq.score),
-                'order_index': eq.order_index
+                'order_index': eq.order_index,
+                'station_count': station_count
             })
 
         return jsonify({
@@ -1069,37 +1081,38 @@ def manage_exam_questions(exam_id):
 
     # POST: 添加题目
     data = request.get_json()
-    station_ids = data.get('station_ids', [])
+    case_ids = data.get('case_ids', [])
 
-    if not station_ids:
-        return jsonify({'success': False, 'message': '请选择至少一个题目'})
+    if not case_ids:
+        return jsonify({'success': False, 'message': '请选择至少一个案例'})
 
     try:
         max_order = db.session.query(func.max(ExamQuestion.order_index))\
             .filter_by(exam_id=exam_id).scalar() or 0
 
-        for i, station_id in enumerate(station_ids):
+        for i, case_id in enumerate(case_ids):
             existing = ExamQuestion.query.filter_by(
                 exam_id=exam_id,
-                station_id=station_id
+                case_id=case_id
             ).first()
 
             if not existing:
                 exam_question = ExamQuestion(
                     exam_id=exam_id,
-                    station_id=station_id,
-                    score=10.0,
+                    case_id=case_id,
+                    score=100.0,
                     order_index=max_order + i + 1
                 )
                 db.session.add(exam_question)
 
         db.session.commit()
 
-        return jsonify({'success': True, 'message': '题目添加成功'})
+        return jsonify({'success': True, 'message': '案例添加成功'})
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+        current_app.logger.error(f"考试添加案例失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '添加失败，请稍后重试'})
 
 @admin_bp.route('/exams/<int:exam_id>/questions/clear', methods=['POST'])
 @login_or_jwt_required
@@ -1109,6 +1122,111 @@ def clear_exam_questions(exam_id):
     ExamQuestion.query.filter_by(exam_id=exam_id).delete()
     db.session.commit()
     return jsonify({'success': True, 'message': '已清空所有题目'})
+
+
+@admin_bp.route('/exams/<int:exam_id>/review', methods=['GET'])
+@login_or_jwt_required
+@admin_required
+def get_exam_review(exam_id):
+    """List all participants and their answers for an exam."""
+    exam = Exam.query.get_or_404(exam_id)
+
+    records = ExamRecord.query.filter_by(
+        exam_id=exam_id, status='submitted'
+    ).order_by(ExamRecord.submit_time.desc()).all()
+
+    participants = []
+    for record in records:
+        user = db.session.get(User, record.user_id)
+        answers = ExamAnswer.query.filter_by(
+            exam_record_id=record.id
+        ).order_by(ExamAnswer.id).all()
+
+        answers_data = []
+        for ans in answers:
+            station = db.session.get(Station, ans.station_id) if ans.station_id else None
+            exam_question = db.session.get(ExamQuestion, ans.exam_question_id) if ans.exam_question_id else None
+            case = db.session.get(Case, exam_question.case_id) if exam_question else None
+
+            standard_answers_data = []
+            if station:
+                standard_answers_data = [
+                    {'answer_item': sa.answer_item, 'score_weight': float(sa.score_weight)}
+                    for sa in station.standard_answers.all()
+                ]
+
+            answers_data.append({
+                'id': ans.id,
+                'exam_question_id': ans.exam_question_id,
+                'station_id': ans.station_id,
+                'station_name': station.name if station else '',
+                'question': station.question if station else '',
+                'user_answer': ans.user_answer,
+                'score': float(ans.score) if ans.score else 0,
+                'ai_feedback': ans.ai_feedback,
+                'standard_answers': standard_answers_data,
+                'case_title': case.title if case else '',
+                'case_id': case.id if case else None
+            })
+
+        participants.append({
+            'record_id': record.id,
+            'user_id': user.id if user else record.user_id,
+            'real_name': user.real_name if user else '未知',
+            'username': user.username if user else '',
+            'department': user.department if user else '',
+            'total_score': float(record.total_score) if record.total_score else 0,
+            'max_score': float(record.max_score) if record.max_score else 0,
+            'start_time': record.start_time.isoformat() if record.start_time else None,
+            'submit_time': record.submit_time.isoformat() if record.submit_time else None,
+            'answers': answers_data
+        })
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'exam': {'id': exam.id, 'title': exam.title, 'status': exam.status},
+            'participants': participants
+        }
+    })
+
+
+@admin_bp.route('/exams/<int:exam_id>/review/<int:answer_id>/score', methods=['PUT'])
+@login_or_jwt_required
+@admin_required
+def update_exam_answer_score(exam_id, answer_id):
+    """Admin manually adjusts an answer's score and recalculates record total."""
+    data = request.get_json() or {}
+    new_score = data.get('score')
+
+    if new_score is None:
+        return jsonify({'success': False, 'message': '请提供分数'}), 400
+
+    try:
+        new_score = float(new_score)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': '分数格式无效'}), 400
+
+    answer = ExamAnswer.query.get_or_404(answer_id)
+    answer.score = new_score
+
+    # Recalculate the exam record's total score
+    record = db.session.get(ExamRecord, answer.exam_record_id)
+    if record:
+        all_answers = ExamAnswer.query.filter_by(exam_record_id=record.id).all()
+        record.total_score = sum(float(a.score or 0) for a in all_answers)
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': '分数已更新',
+        'data': {
+            'answer_id': answer.id,
+            'score': float(answer.score) if answer.score else 0,
+            'record_total_score': float(record.total_score) if record and record.total_score else 0
+        }
+    })
 
 
 @admin_bp.route('/statistics/learning-data')
@@ -1258,14 +1376,14 @@ def manage_case_station(case_id, station_id):
             from models import ExamAnswer
             WrongQuestion.query.filter_by(station_id=station_id).delete()
             LearningRecord.query.filter_by(station_id=station_id).delete()
-            ExamQuestion.query.filter_by(station_id=station_id).delete()
             ExamAnswer.query.filter_by(station_id=station_id).delete()
             db.session.delete(station)
             db.session.commit()
             return jsonify({'success': True, 'message': '站点已删除'})
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'删除失败：{str(e)}'}), 400
+            current_app.logger.error(f"站点删除失败: {e}", exc_info=True)
+            return jsonify({'success': False, 'message': '删除失败，请稍后重试'}), 400
 
     data = request.get_json() or {}
     for field in ['name', 'assessment_task', 'question']:
@@ -1540,7 +1658,8 @@ def test_ai_connection():
         latency = round((time.time() - start) * 1000)
         return jsonify({'success': True, 'message': f'连接成功，延迟 {latency}ms', 'latency_ms': latency})
     except Exception as e:
-        return jsonify({'success': False, 'message': f'连接失败：{str(e)}'})
+        current_app.logger.error(f"AI连接测试失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '连接失败，请稍后重试'})
 
 
 # ---- Exam QR Code ----
@@ -1650,7 +1769,8 @@ def add_baidu_asr_key():
         return jsonify({'success': True, 'message': 'Key 已添加', 'data': {'id': k.id}})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'添加失败：{str(e)}'})
+        current_app.logger.error(f"百度ASR Key添加失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '添加失败，请稍后重试'})
 
 
 @admin_bp.route('/baidu-asr-keys/<int:key_id>', methods=['DELETE'])
@@ -1666,7 +1786,8 @@ def delete_baidu_asr_key(key_id):
         return jsonify({'success': True, 'message': 'Key 已删除'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'删除失败：{str(e)}'})
+        current_app.logger.error(f"百度ASR Key删除失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '删除失败，请稍后重试'})
 
 
 @admin_bp.route('/baidu-asr-keys/<int:key_id>/toggle', methods=['POST'])

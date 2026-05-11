@@ -2026,7 +2026,7 @@ function renderUserDetailPage(userId) {
                             <tbody>
                                 ${p.recent_records && p.recent_records.length ? p.recent_records.map(r => `
                                     <tr><td>${r.case_title}</td><td>${r.station_name}</td>
-                                    <td>${getScoreBadgeClass(r.score)}</td><td>${formatDateTime(r.completed_at)}</td></tr>
+                                    <td><span class="badge ${getScoreBadgeClass(r.score)}">${r.score != null ? r.score : '-'}</span></td><td>${formatDateTime(r.completed_at)}</td></tr>
                                 `).join('') : '<tr><td colspan="4" class="text-muted">暂无记录</td></tr>'}
                             </tbody>
                         </table>
@@ -2282,7 +2282,11 @@ function loadExams() {
                                                             <button class="btn btn-sm btn-outline-success" onclick="publishExam(${exam.id})">
                                                                 <i class="fas fa-paper-plane"></i>
                                                             </button>
-                                                        ` : ''}
+                                                        ` : `
+                                                            <button class="btn btn-sm btn-outline-success" onclick="reviewExam(${exam.id})">
+                                                                <i class="fas fa-check-double"></i><span class="d-none d-md-inline ms-1">批阅</span>
+                                                            </button>
+                                                        `}
                                                         <button class="btn btn-sm btn-outline-info" onclick="renderExamEditPage(${exam.id})">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
@@ -2488,6 +2492,10 @@ function showExamQrCode(examId) {
         .then(function(blob) {
             if (blob.type.startsWith('image/')) {
                 $('#qr-loading').hide();
+                var oldUrl = $('#qr-img').attr('src');
+                if (oldUrl && oldUrl.startsWith('blob:')) {
+                    URL.revokeObjectURL(oldUrl);
+                }
                 $('#qr-img').attr('src', URL.createObjectURL(blob));
                 $('#qr-result').show();
             } else {
@@ -2518,7 +2526,7 @@ function manageExamQuestions(examId) {
     $.get(`/admin/exams/${examId}/questions`, function(res) {
         if (!res.success) { showAlert(res.message||'加载失败','error'); return; }
         const d = res.data;
-        window._examExistingIds = d.questions.map(q => q.station_id);
+        window._examExistingIds = d.questions.map(q => q.case_id);
         window._examExistingCaseIds = [];
         // 按案例分组已选站点
         const caseMap = {};
@@ -2538,14 +2546,15 @@ function buildExamQuestionPage(examId, exam, existingCaseMap) {
     let existingCardsHtml = '';
     Object.keys(existingCaseMap).forEach(function(caseId) {
         const c = existingCaseMap[caseId];
-        const sids = c.stations.map(function(s) { return s.station_id; });
+        const q = c.stations[0];
+        const stationCount = q ? (q.station_count || c.stations.length) : c.stations.length;
         existingCardsHtml += `
             <div class="d-flex align-items-center justify-content-between border rounded p-2 me-2 mb-2 bg-white" style="min-width:200px;max-width:260px;">
                 <div style="min-width:0;">
                     <div class="text-truncate small fw-bold">${c.title}</div>
-                    <span class="badge bg-info" style="font-size:0.7rem;">${c.stations.length} 题</span>
+                    <span class="badge bg-info" style="font-size:0.7rem;">${stationCount} 题</span>
                 </div>
-                <button class="btn btn-sm text-danger flex-shrink-0 ms-2" title="移除" onclick="removeCaseFromExam(${examId}, ${caseId}, [${sids.join(',')}])" style="padding:0 4px;line-height:1;">
+                <button class="btn btn-sm text-danger flex-shrink-0 ms-2" title="移除" onclick="removeCaseFromExam(${examId}, ${caseId})" style="padding:0 4px;line-height:1;">
                     <i class="fas fa-times" style="font-size:0.75rem;"></i>
                 </button>
             </div>`;
@@ -2662,8 +2671,7 @@ function loadExamCaseTable(examId, page) {
                 const diffBadge = c.difficulty === 'advanced' ? 'danger' : (c.difficulty === 'basic' ? 'success' : 'warning');
                 const diffLabel = c.difficulty === 'advanced' ? '高级' : (c.difficulty === 'basic' ? '基础' : '中级');
                 const stations = c.stations || [];
-                const stationIds = stations.map(function(s) { return s.id; });
-                const allAdded = stationIds.length > 0 && stationIds.every(function(sid) { return existingIds.indexOf(sid) !== -1; });
+                const allAdded = existingIds.indexOf(c.id) !== -1;
 
                 // 构建站点预览列表（用于展开）
                 let stationsPreview = '';
@@ -2705,7 +2713,7 @@ function loadExamCaseTable(examId, page) {
                         <td>${allAdded ? '<span class="text-success fw-bold">已添加</span>' : '<span class="text-muted">未添加</span>'}</td>
                         <td>
                             <div class="btn-action-group">
-                            <button class="btn btn-sm ${allAdded ? 'btn-outline-danger' : 'btn-primary'}" onclick="${allAdded ? 'removeCaseFromExam(' + examId + ',' + c.id + ',[' + stationIds.join(',') + '])' : 'addCaseToExam(' + examId + ',' + c.id + ',[' + stationIds.join(',') + '])'}" title="${allAdded ? '移除此案例' : '添加此案例'}">
+                            <button class="btn btn-sm ${allAdded ? 'btn-outline-danger' : 'btn-primary'}" onclick="${allAdded ? 'removeCaseFromExam(' + examId + ',' + c.id + ')' : 'addCaseToExam(' + examId + ',' + c.id + ')'}" title="${allAdded ? '移除此案例' : '添加此案例'}">
                                 <i class="fas ${allAdded ? 'fa-minus' : 'fa-plus'}"></i>
                             </button>
                             <button class="btn btn-sm btn-outline-info" onclick="showCasePreviewModal(${c.id})" title="预览案例详情">
@@ -2801,17 +2809,17 @@ function showCasePreviewModal(caseId) {
     });
 }
 
-function addCaseToExam(examId, caseId, stationIds) {
+function addCaseToExam(examId, caseId) {
     $.ajax({
         url: `/admin/exams/${examId}/questions`,
         method: 'POST',
         contentType: 'application/json',
-        data: JSON.stringify({ station_ids: stationIds }),
+        data: JSON.stringify({ case_ids: [caseId] }),
         success: function(res) {
             if (res.success) {
-                showAlert('案例已添加到考试（包含 ' + stationIds.length + ' 道题目）', 'success');
+                showAlert('案例已添加到考试', 'success');
                 if (!window._examExistingIds) window._examExistingIds = [];
-                stationIds.forEach(function(sid) { window._examExistingIds.push(sid); });
+                window._examExistingIds.push(caseId);
                 const activePage = $('.pagination .active .page-link').text() || 1;
                 loadExamCaseTable(examId, parseInt(activePage));
                 // 刷新已选列表
@@ -2828,26 +2836,25 @@ function addCaseToExam(examId, caseId, stationIds) {
 function refreshExistingCasesPanel(questions) {
     const caseMap = {};
     questions.forEach(function(q) {
-        if (!caseMap[q.case_id]) caseMap[q.case_id] = { title: q.case_title, count: 0, station_ids: [] };
+        if (!caseMap[q.case_id]) caseMap[q.case_id] = { title: q.case_title, count: 0, station_count: q.station_count || 0 };
         caseMap[q.case_id].count++;
-        caseMap[q.case_id].station_ids.push(q.station_id);
     });
     const caseIds = Object.keys(caseMap);
     const examId = window._currentExamId || 0;
+    const totalStations = Object.values(caseMap).reduce(function(sum, c) { return sum + c.station_count; }, 0);
 
     $('#existing-count').text(caseIds.length);
-    $('#existing-total-stations').text(questions.length);
+    $('#existing-total-stations').text(totalStations);
 
     if (caseIds.length) {
         const cardsHtml = caseIds.map(function(cid) {
             const c = caseMap[cid];
-            const sidList = '[' + c.station_ids.join(',') + ']';
             return '<div class="d-flex align-items-center justify-content-between border rounded p-2 me-2 mb-2 bg-white" style="min-width:200px;max-width:260px;">' +
                 '<div style="min-width:0;">' +
                     '<div class="text-truncate small fw-bold">' + c.title + '</div>' +
-                    '<span class="badge bg-info" style="font-size:0.7rem;">' + c.count + ' 题</span>' +
+                    '<span class="badge bg-info" style="font-size:0.7rem;">' + c.station_count + ' 题</span>' +
                 '</div>' +
-                '<button class="btn btn-sm text-danger flex-shrink-0 ms-2" title="移除" onclick="removeCaseFromExam(' + examId + ',' + cid + ',' + sidList + ')" style="padding:0 4px;line-height:1;">' +
+                '<button class="btn btn-sm text-danger flex-shrink-0 ms-2" title="移除" onclick="removeCaseFromExam(' + examId + ',' + cid + ')" style="padding:0 4px;line-height:1;">' +
                     '<i class="fas fa-times" style="font-size:0.75rem;"></i>' +
                 '</button>' +
             '</div>';
@@ -2868,18 +2875,17 @@ function refreshExistingCasesPanel(questions) {
     }
 }
 
-function removeCaseFromExam(examId, caseId, stationIds) {
-    if (!stationIds || stationIds.length === 0) return;
+function removeCaseFromExam(examId, caseId) {
     $.ajax({
         url: `/admin/exams/${examId}/questions`,
         method: 'DELETE',
         contentType: 'application/json',
-        data: JSON.stringify({ station_ids: stationIds }),
+        data: JSON.stringify({ case_ids: [caseId] }),
         success: function(res) {
             if (res.success) {
                 showAlert('案例已从考试中移除', 'success');
-                window._examExistingIds = (window._examExistingIds || []).filter(function(sid) {
-                    return stationIds.indexOf(sid) === -1;
+                window._examExistingIds = (window._examExistingIds || []).filter(function(cid) {
+                    return cid !== caseId;
                 });
                 const activePage = $('.pagination .active .page-link').text() || 1;
                 loadExamCaseTable(examId, parseInt(activePage));
@@ -2908,6 +2914,146 @@ function clearExamCases(examId) {
                 var clearBtn = $('#existing-questions-bar').closest('.card').find('.card-header .btn-outline-danger');
                 if (clearBtn.length) clearBtn.remove();
             } else { showAlert(res.message||'操作失败','error'); }
+        }
+    });
+}
+
+function reviewExam(examId) {
+    setActiveNav('考试管理');
+    $.get(`/admin/exams/${examId}/review`, function(res) {
+        if (!res.success) { showAlert(res.message||'加载失败','error'); return; }
+        const d = res.data;
+        const exam = d.exam;
+        const participants = d.participants;
+
+        let rows = '';
+        if (participants.length === 0) {
+            rows = '<tr><td colspan="7" class="text-center text-muted py-4">暂无考生提交</td></tr>';
+        } else {
+            participants.forEach(function(p) {
+                rows += `
+                    <tr>
+                        <td>${p.real_name}</td>
+                        <td>${p.department || '-'}</td>
+                        <td><span class="fw-bold">${p.total_score.toFixed(0)}</span> / ${p.max_score.toFixed(0)}</td>
+                        <td>${p.submit_time ? formatDateTime(p.submit_time) : '-'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleParticipantAnswers(${p.record_id})">
+                                <i class="fas fa-chevron-down" id="toggle-icon-${p.record_id}"></i> 展开
+                            </button>
+                        </td>
+                    </tr>
+                    <tr id="answers-row-${p.record_id}" style="display:none;">
+                        <td colspan="5" class="p-0">
+                            <div class="p-3 bg-light border-top">
+                                <div class="fw-bold mb-2">答题详情</div>
+                                ${p.answers.map(function(a, i) {
+                                    return `
+                                        <div class="card mb-2">
+                                            <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                                <span><strong>#${i + 1}</strong> ${a.station_name} <span class="text-muted small">(${a.case_title})</span></span>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="fw-bold" id="score-display-${a.id}">${a.score.toFixed(0)} 分</span>
+                                                    <button class="btn btn-sm btn-outline-warning" onclick="showScoreEdit(${examId}, ${a.id}, ${a.score})" title="调整分数">
+                                                        <i class="fas fa-pen"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="card-body py-2">
+                                                <div class="mb-2"><small class="text-muted">题目：</small>${a.question}</div>
+                                                <div class="mb-2"><small class="text-muted">考生作答：</small><div class="border rounded p-2 bg-white">${a.user_answer || '<span class="text-muted">(未作答)</span>'}</div></div>
+                                                ${a.ai_feedback ? '<div class="mb-2"><small class="text-muted">AI 反馈：</small><div class="border rounded p-2 bg-white">' + a.ai_feedback + '</div></div>' : ''}
+                                                ${a.standard_answers && a.standard_answers.length ? `
+                                                    <div class="mb-2"><small class="text-muted">标准答案：</small>
+                                                        <div class="border rounded p-2 bg-white">
+                                                            ${a.standard_answers.map(function(sa) {
+                                                                return '<span class="badge bg-light text-dark me-1 mb-1">' + sa.answer_item + (sa.score_weight !== 1 ? ' (权重:' + sa.score_weight + ')' : '') + '</span>';
+                                                            }).join('')}
+                                                        </div>
+                                                    </div>
+                                                ` : ''}
+                                            </div>
+                                        </div>`;
+                                }).join('')}
+                            </div>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        const html = `
+            <nav aria-label="breadcrumb"><ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="#" onclick="loadExams()">考试管理</a></li>
+                <li class="breadcrumb-item active">批阅：${exam.title}</li>
+            </ol></nav>
+
+            <div class="page-header">
+                <div>
+                    <h4><i class="fas fa-check-double me-2"></i>批阅 — ${exam.title}</h4>
+                    <p class="text-muted mb-0">查看考生作答、AI评分，并手动调整分数</p>
+                </div>
+                <a href="#" class="btn btn-sm btn-outline-secondary" onclick="loadExams(); return false;">
+                    <i class="fas fa-arrow-left me-1"></i>返回考试列表
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>考生姓名</th>
+                                    <th>科室</th>
+                                    <th>得分</th>
+                                    <th>提交时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>`;
+
+        $('#main-content').html(html);
+    });
+}
+
+function toggleParticipantAnswers(recordId) {
+    const row = $('#answers-row-' + recordId);
+    const icon = $('#toggle-icon-' + recordId);
+    if (row.is(':visible')) {
+        row.hide();
+        icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+    } else {
+        row.show();
+        icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+    }
+}
+
+function showScoreEdit(examId, answerId, currentScore) {
+    const newScore = prompt('调整分数（当前：' + currentScore.toFixed(0) + '）：', currentScore.toFixed(0));
+    if (newScore === null) return;
+
+    const scoreNum = parseFloat(newScore);
+    if (isNaN(scoreNum) || scoreNum < 0) {
+        showAlert('请输入有效的分数', 'error');
+        return;
+    }
+
+    $.ajax({
+        url: `/admin/exams/${examId}/review/${answerId}/score`,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({ score: scoreNum }),
+        success: function(res) {
+            if (res.success) {
+                $('#score-display-' + answerId).text(res.data.score.toFixed(0) + ' 分');
+                showAlert('分数已更新', 'success');
+                // Reload to update total
+                setTimeout(function() { reviewExam(examId); }, 500);
+            } else { showAlert(res.message||'更新失败','error'); }
         }
     });
 }

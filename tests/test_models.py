@@ -154,7 +154,7 @@ class TestExamModels:
             exam = Exam(title='考试2', creator_id=u.id)
             db.session.add(exam)
             db.session.flush()
-            eq = ExamQuestion(exam_id=exam.id, station_id=station.id, score=10.0)
+            eq = ExamQuestion(exam_id=exam.id, case_id=c.id, score=100.0)
             db.session.add(eq)
             db.session.commit()
             assert exam.questions.count() == 1

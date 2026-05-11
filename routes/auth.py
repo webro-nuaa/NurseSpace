@@ -1,8 +1,8 @@
-from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash
+from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash, current_app
 from flask_login import current_user, login_user, logout_user
 from utils.auth import login_or_jwt_required
 from utils.decorators import admin_required
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token
 from models import User, db
 from app import limiter
 import re
@@ -50,9 +50,9 @@ def login():
             })
 
         if user.role == 'admin':
-            return redirect('/admin')
+            return redirect(url_for('main.admin_index'))
         else:
-            return redirect('/nurse')
+            return redirect(url_for('main.nurse_index'))
     else:
         if request.is_json:
             return jsonify({'success': False, 'message': '用户名或密码错误，或账号已被禁用'})
@@ -133,7 +133,8 @@ def register():
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'注册失败：{str(e)}'})
+        current_app.logger.error(f"用户注册失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '注册失败，请稍后重试'})
 
 
 @auth_bp.route('/profile', methods=['GET', 'PUT'])
@@ -191,7 +192,8 @@ def profile():
         return jsonify({'success': True, 'message': '个人信息更新成功'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'更新失败：{str(e)}'})
+        current_app.logger.error(f"更新个人信息失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '更新失败，请稍后重试'})
 
 
 @auth_bp.route('/change-password', methods=['POST'])
@@ -224,7 +226,8 @@ def change_password():
         return jsonify({'success': True, 'message': '密码修改成功，请重新登录'})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'密码修改失败：{str(e)}'})
+        current_app.logger.error(f"密码修改失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '密码修改失败，请稍后重试'})
 
 
 @auth_bp.route('/users/<int:user_id>/toggle-status', methods=['POST'])
@@ -249,7 +252,8 @@ def toggle_user_status(user_id):
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'状态更新失败：{str(e)}'})
+        current_app.logger.error(f"更新用户状态失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '状态更新失败，请稍后重试'})
 
 
 @auth_bp.route('/users/<int:user_id>/reset-password', methods=['POST'])
@@ -271,4 +275,5 @@ def admin_reset_user_password(user_id):
         })
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'密码重置失败：{str(e)}'})
+        current_app.logger.error(f"密码重置失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '密码重置失败，请稍后重试'})

@@ -276,7 +276,7 @@ class TestAdminExamManagement:
         # Add question
         resp = client.post(f'/admin/exams/{exam_id}/questions',
                            headers={'Authorization': f'Bearer {admin_token}'},
-                           json={'station_ids': [sample_case.id]})
+                           json={'case_ids': [sample_case.id]})
         assert resp.status_code == 200
 
         # List questions

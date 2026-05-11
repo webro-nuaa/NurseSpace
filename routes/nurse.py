@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 import json
 from flask_login import current_user
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -343,11 +343,14 @@ def submit_answer(station_id):
                 station_id=station_id
             ).delete()
 
-        # 积分奖励
+        # 积分奖励（原子更新，避免竞态条件）
         if evaluation['score'] >= 80:
             points_to_add = 20 if evaluation['score'] >= 90 else 10
 
-            user.points += points_to_add
+            User.query.filter_by(id=user.id).update(
+                {'points': User.points + points_to_add},
+                synchronize_session=False
+            )
 
             point_record = PointRecord(
                 user_id=current_user.id,
@@ -380,7 +383,8 @@ def submit_answer(station_id):
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'message': f'提交失败：{str(e)}'})
+        current_app.logger.error(f"答案提交失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '提交失败，请稍后重试'})
 
 
 @nurse_bp.route('/wrong-questions')
@@ -573,7 +577,7 @@ def run_weakness_analysis():
 def get_exams():
     exams = Exam.query.filter(
         Exam.status == 'published',
-        Exam.end_time > datetime.utcnow()
+        Exam.end_time > datetime.now(timezone.utc).replace(tzinfo=None)
     ).order_by(desc(Exam.created_at)).all()
 
     exams_data = []
@@ -609,7 +613,7 @@ def start_exam(exam_id):
 
     if exam.status != 'published':
         return jsonify({'success': False, 'message': '考试未发布'}), 400
-    if exam.end_time and exam.end_time <= datetime.utcnow():
+    if exam.end_time and exam.end_time <= datetime.now(timezone.utc).replace(tzinfo=None):
         return jsonify({'success': False, 'message': '考试已结束'}), 400
 
     existing = ExamRecord.query.filter_by(
@@ -627,26 +631,39 @@ def start_exam(exam_id):
     db.session.add(record)
     db.session.flush()
 
-    # Load questions with station details
-    questions = db.session.query(ExamQuestion, Station, Case)\
-        .join(Station, ExamQuestion.station_id == Station.id)\
-        .join(Case, Station.case_id == Case.id)\
+    # Load exam questions grouped by case
+    exam_questions = db.session.query(ExamQuestion, Case)\
+        .join(Case, ExamQuestion.case_id == Case.id)\
         .filter(ExamQuestion.exam_id == exam_id)\
         .order_by(ExamQuestion.order_index).all()
 
     questions_data = []
     total_max = 0
-    for eq, station, case in questions:
+    for eq, case in exam_questions:
         total_max += float(eq.score)
+        stations = Station.query.filter_by(case_id=case.id).order_by(Station.order_index).all()
+        stations_data = []
+        for station in stations:
+            standard_answers = [
+                {'answer_item': sa.answer_item, 'score_weight': float(sa.score_weight)}
+                for sa in station.standard_answers.all()
+            ]
+            stations_data.append({
+                'id': station.id,
+                'name': station.name,
+                'question': station.question,
+                'assessment_task': station.assessment_task,
+                'standard_answers': standard_answers
+            })
         questions_data.append({
             'id': eq.id,
-            'station_id': station.id,
-            'station_name': station.name,
-            'question': station.question,
-            'assessment_task': station.assessment_task,
+            'case_id': case.id,
             'case_title': case.title,
+            'case_guide': case.case_guide,
+            'difficulty': case.difficulty,
             'score': float(eq.score),
-            'order_index': eq.order_index
+            'order_index': eq.order_index,
+            'stations': stations_data
         })
 
     record.max_score = total_max
@@ -682,12 +699,67 @@ def submit_exam(exam_id):
     data = request.get_json() or {}
     answers = data.get('answers', [])
 
+    # Verify station-exam ownership: build a set of valid (exam_question_id, station_id) pairs
+    exam_questions = ExamQuestion.query.filter_by(exam_id=exam_id).all()
+    valid_pairs = set()
+    for eq in exam_questions:
+        case_stations = Station.query.filter_by(case_id=eq.case_id).all()
+        for s in case_stations:
+            valid_pairs.add((eq.id, s.id))
+
+    # Validate no empty answers
+    empty_stations = []
+    for a in answers:
+        answer_text = (a.get('answer') or '').strip()
+        station_id = a.get('station_id')
+        exam_question_id = a.get('exam_question_id')
+
+        if (exam_question_id, station_id) not in valid_pairs:
+            return jsonify({'success': False, 'message': '提交数据无效'}), 400
+
+        if not answer_text:
+            station = db.session.get(Station, station_id)
+            empty_stations.append(station.name if station else f'站点#{station_id}')
+
+    if empty_stations:
+        return jsonify({
+            'success': False,
+            'message': f'请完成以下题目的作答：{", ".join(empty_stations)}'
+        }), 400
+
     total_earned = 0
     for a in answers:
+        answer_text = (a.get('answer') or '').strip()
+        station_id = a['station_id']
+        exam_question_id = a.get('exam_question_id')
+
+        station = db.session.get(Station, station_id)
+        standard_answers = [
+            {'answer_item': sa.answer_item, 'score_weight': float(sa.score_weight)}
+            for sa in (station.standard_answers.all() if station else [])
+        ]
+
+        if standard_answers and answer_text:
+            result = ai_evaluator.evaluate_answer(
+                question=station.question if station else '',
+                user_answer=answer_text,
+                standard_answers=standard_answers
+            )
+            score = result.get('score', 0)
+            feedback = result.get('feedback', '')
+        else:
+            score = 0
+            feedback = ''
+
+        total_earned += score
+
         answer = ExamAnswer(
             exam_record_id=record.id,
-            station_id=a['station_id'],
-            user_answer=a.get('answer', '')
+            exam_question_id=exam_question_id,
+            station_id=station_id,
+            user_answer=answer_text,
+            score=score,
+            ai_feedback=feedback
         )
         db.session.add(answer)
 
@@ -695,7 +767,7 @@ def submit_exam(exam_id):
     record.submit_time = datetime.now(timezone.utc)
     record.total_score = total_earned
 
-    # Award participation points
+    # Award participation points (atomic update to avoid race condition)
     point_record = PointRecord(
         user_id=current_user.id,
         points=5,
@@ -704,7 +776,10 @@ def submit_exam(exam_id):
         related_type='exam'
     )
     db.session.add(point_record)
-    current_user.points = (current_user.points or 0) + 5
+    User.query.filter_by(id=current_user.id).update(
+        {'points': User.points + 5},
+        synchronize_session=False
+    )
 
     db.session.commit()
 
