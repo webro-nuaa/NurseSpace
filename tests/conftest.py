@@ -20,9 +20,9 @@ os.environ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
 from app import create_app
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def app():
-    """Session-wide Flask app with SQLite in-memory database."""
+    """Per-test Flask app with SQLite in-memory database (clean isolation)."""
     _app = create_app()
     _app.config.update({
         'TESTING': True,
@@ -101,9 +101,9 @@ def nurse_token(app, nurse_user):
     return create_access_token(identity=str(nurse_user.id), additional_claims={'v': nurse_user.token_version or 0})
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def category(app):
-    """Create a test case category (session scope, created once)."""
+    """Create a test case category (per-test, clean isolation)."""
     from models import CaseCategory, db
     cat = CaseCategory.query.filter_by(name='儿科模块').first()
     if not cat:
@@ -113,9 +113,9 @@ def category(app):
     return cat
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def sample_case(app, category):
-    """Create a sample learning case with stations (session scope, created once)."""
+    """Create a sample learning case with stations (per-test, clean isolation)."""
     from models import Case, Station, StandardAnswer, db
     case = Case.query.filter_by(title='测试案例').first()
     if not case:

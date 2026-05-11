@@ -89,10 +89,10 @@ class Station(db.Model):
     
     # 关系
     standard_answers = db.relationship('StandardAnswer', backref='station', lazy='dynamic', cascade='all, delete-orphan')
-    learning_records = db.relationship('LearningRecord', backref='station', lazy='dynamic')
-    wrong_questions = db.relationship('WrongQuestion', backref='station', lazy='dynamic')
-    exam_questions = db.relationship('ExamQuestion', backref='station', lazy='dynamic')
-    exam_answers = db.relationship('ExamAnswer', backref='station', lazy='dynamic')
+    learning_records = db.relationship('LearningRecord', backref='station', lazy='dynamic', cascade='all, delete-orphan')
+    wrong_questions = db.relationship('WrongQuestion', backref='station', lazy='dynamic', cascade='all, delete-orphan')
+    exam_questions = db.relationship('ExamQuestion', backref='station', lazy='dynamic', cascade='all, delete-orphan')
+    exam_answers = db.relationship('ExamAnswer', backref='station', lazy='dynamic', cascade='all, delete-orphan')
 
 class StandardAnswer(db.Model):
     __tablename__ = 'standard_answers'

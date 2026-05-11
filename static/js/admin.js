@@ -980,23 +980,27 @@ function renderCaseCreatePage() {
             <div class="page-header">
                 <div>
                     <h4><i class="fas fa-plus me-2"></i>创建完整案例</h4>
-                    <p class="text-muted mb-0">一次性填写案例元数据、站点、扩展资源</p>
+                    <p class="text-muted mb-0">一次填写案例基本信息、站点考核、扩展资源，点击创建即可使用</p>
                 </div>
             </div>
 
-            <!-- 1. 案例元数据 -->
-            <div class="card mb-3"><div class="card-header"><i class="fas fa-info-circle me-2"></i>案例元数据</div><div class="card-body">
+            <!-- 1. 案例基本信息 -->
+            <div class="card mb-3"><div class="card-header"><i class="fas fa-info-circle me-2"></i>案例基本信息</div><div class="card-body">
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">案例标题 *</label>
+                        <label class="form-label">案例标题 <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="create-title" placeholder="如：新生儿黄疸护理案例">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">类别 *</label>
-                        <select class="form-select" id="create-category">
-                            <option value="">选择类别</option>
-                            ${catOptions}
-                        </select>
+                        <label class="form-label">类别 <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <select class="form-select" id="create-category">
+                                <option value="">选择已有类别</option>
+                                ${catOptions}
+                            </select>
+                            <input type="text" class="form-control" id="create-category-new" placeholder="或输入新类别名称" style="max-width:180px;">
+                        </div>
+                        <small class="text-muted">可从已有类别中选择，或直接输入新类别名称自动创建</small>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">难度</label>
@@ -1007,53 +1011,55 @@ function renderCaseCreatePage() {
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">类型</label>
+                        <label class="form-label">类型 <span class="text-danger">*</span></label>
                         <select class="form-select" id="create-type">
                             <option value="learning">学习案例</option>
                             <option value="exam">考试案例</option>
                         </select>
+                        <small class="text-muted">学习案例用于日常练习，考试案例用于组织考试</small>
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">站点</label>
-                        <input type="text" class="form-control" id="create-site" placeholder="如：东22区新生儿科">
-                    </div>
+                    <div class="col-md-4"></div>
                     <div class="col-12">
                         <label class="form-label">案例指引</label>
-                        <textarea class="form-control" id="create-guide" rows="4" placeholder="输入案例指引文本..."></textarea>
+                        <textarea class="form-control" id="create-guide" rows="3" placeholder="输入案例背景介绍和教学指引..."></textarea>
+                        <small class="text-muted">可选。简要说明本案例的教学目标、适用对象和注意事项</small>
                     </div>
                 </div>
             </div></div>
 
-            <!-- 2. 站点 -->
-            <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-map-pin me-2"></i>站点（考核点）</span>
+            <!-- 2. 站点/考核点 -->
+            <div class="card mb-3 border-primary"><div class="card-header bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="fas fa-map-pin me-2 text-primary"></i><strong>站点（考核点）</strong>
+                    <small class="text-muted ms-2">每个站点代表案例中的一个考核环节，可以有多个站点</small>
+                </div>
                 <button class="btn btn-primary btn-sm" onclick="addStationForm()"><i class="fas fa-plus me-1"></i>添加站点</button>
             </div><div class="card-body" id="stations-container">
-                <p class="text-muted small mb-0" id="stations-empty">暂无站点，请点击"添加站点"按钮</p>
+                <p class="text-muted small mb-0 text-center py-2" id="stations-empty">点击上方「添加站点」按钮创建第一个考核站点</p>
             </div></div>
 
             <!-- 3. 扩展视频 -->
             <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-video me-2"></i>扩展视频</span>
+                <span><i class="fas fa-video me-2"></i>扩展视频 <small class="text-muted">（可选）</small></span>
                 <button class="btn btn-outline-primary btn-sm" onclick="addVideoForm()"><i class="fas fa-plus me-1"></i>添加视频</button>
             </div><div class="card-body" id="videos-container">
-                <p class="text-muted small mb-0" id="videos-empty">暂无视频</p>
+                <p class="text-muted small mb-0 text-center py-2" id="videos-empty">暂无视频，可不填</p>
             </div></div>
 
             <!-- 4. 扩展链接 -->
             <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-link me-2"></i>扩展链接</span>
+                <span><i class="fas fa-link me-2"></i>扩展链接 <small class="text-muted">（可选）</small></span>
                 <button class="btn btn-outline-primary btn-sm" onclick="addLinkForm()"><i class="fas fa-plus me-1"></i>添加链接</button>
             </div><div class="card-body" id="links-container">
-                <p class="text-muted small mb-0" id="links-empty">暂无链接</p>
+                <p class="text-muted small mb-0 text-center py-2" id="links-empty">暂无链接，可不填</p>
             </div></div>
 
             <!-- 5. 扩展知识 -->
             <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="fas fa-lightbulb me-2"></i>扩展知识问答</span>
+                <span><i class="fas fa-lightbulb me-2"></i>扩展知识问答 <small class="text-muted">（可选）</small></span>
                 <button class="btn btn-outline-primary btn-sm" onclick="addKnowledgeForm()"><i class="fas fa-plus me-1"></i>添加知识</button>
             </div><div class="card-body" id="knowledge-container">
-                <p class="text-muted small mb-0" id="knowledge-empty">暂无知识条目</p>
+                <p class="text-muted small mb-0 text-center py-2" id="knowledge-empty">暂无知识条目，可不填</p>
             </div></div>
 
             <!-- 提交 -->
@@ -1063,12 +1069,11 @@ function renderCaseCreatePage() {
             </div>
         `;
         $('#main-content').html(html);
-        // 预添加一个空站点
+        // 预添加一个空站点让用户看到站点表单结构
         addStationForm();
     });
 }
 
-// 动态站点表单计数器
 let _stationIdx = 0;
 let _videoIdx = 0;
 let _linkIdx = 0;
@@ -1079,37 +1084,62 @@ function addStationForm() {
     const si = _stationIdx;
     $('#stations-empty').hide();
     $('#stations-container').append(`
-        <div class="station-card border rounded p-3 mb-2 bg-light" id="station-${si}">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-                <strong class="text-primary">站点 #${si}</strong>
+        <div class="station-card border rounded p-3 mb-3" id="station-${si}" style="background:#f8faff;">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <span class="badge bg-primary me-2">站点 ${si}</span>
+                    <small class="text-muted">填写该考核点的名称、任务、题目和标准答案</small>
+                </div>
                 <button class="btn btn-sm btn-outline-danger" onclick="$('#station-${si}').remove(); if(!$('.station-card').length) $('#stations-empty').show();">
-                    <i class="fas fa-trash"></i>
+                    <i class="fas fa-trash me-1"></i>删除此站点
                 </button>
             </div>
-            <div class="row g-2">
+            <div class="row g-2 mb-2">
                 <div class="col-md-4">
-                    <label class="form-label small">站点名称 *</label>
-                    <input type="text" class="form-control form-control-sm station-name" placeholder="如：护理评估">
+                    <label class="form-label small fw-bold">站点名称 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm station-name" placeholder="如：东22区新生儿科 或 护理评估">
+                    <small class="text-muted" style="font-size:0.7rem;">科室名或考核环节名称</small>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">考核任务</label>
-                    <input type="text" class="form-control form-control-sm station-task" placeholder="如：有条理采集病史">
+                    <label class="form-label small fw-bold">考核任务</label>
+                    <input type="text" class="form-control form-control-sm station-task" placeholder="如：有条理地采集病史、选择性进行体格评估">
+                    <small class="text-muted" style="font-size:0.7rem;">该站点的考核目标描述</small>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">题目 *</label>
-                    <input type="text" class="form-control form-control-sm station-question" placeholder="如：请写出护理评估要点">
+                    <label class="form-label small fw-bold">题目 <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm station-question" placeholder="如：请写出新生儿黄疸的护理评估要点">
+                    <small class="text-muted" style="font-size:0.7rem;">护士需要回答的问题</small>
                 </div>
             </div>
-            <div class="mt-2">
-                <label class="form-label small">标准答案</label>
-                <div class="answers-list-${si}" style="padding-left:0.5rem;">
+            <div class="mt-2 p-2 bg-white rounded border">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <label class="form-label small fw-bold mb-0">标准答案（分项评分）</label>
+                    <button class="btn btn-outline-primary btn-sm py-0" onclick="addCreateAnswerRow(${si})" style="font-size:0.75rem;">
+                        <i class="fas fa-plus me-1"></i>添加评分项
+                    </button>
+                </div>
+                <small class="text-muted" style="font-size:0.7rem;">每个评分项是一个独立采分点，权重表示该项在总分中的占比</small>
+                <div class="answers-list-${si} mt-2">
                     <div class="answer-row-${si}-1 input-group input-group-sm mb-1">
-                        <input type="text" class="form-control answer-item" placeholder="答案项">
-                        <input type="number" class="form-control answer-weight" value="1.0" step="0.1" min="0" style="max-width:80px;" placeholder="权重">
-                        <button class="btn btn-outline-secondary" type="button" onclick="addAnswerRow(${si})"><i class="fas fa-plus"></i></button>
+                        <input type="text" class="form-control answer-item" placeholder="答案评分项内容（如：评估胎龄、日龄与喂养方式）">
+                        <span class="input-group-text" style="font-size:0.7rem;">权重</span>
+                        <input type="number" class="form-control answer-weight" value="1.0" step="0.1" min="0" style="max-width:70px;" placeholder="1.0">
+                        <button class="btn btn-outline-secondary" type="button" onclick="addCreateAnswerRow(${si})"><i class="fas fa-plus"></i></button>
                     </div>
                 </div>
             </div>
+        </div>
+    `);
+}
+
+function addCreateAnswerRow(si) {
+    const $container = $(`.answers-list-${si}`);
+    $container.append(`
+        <div class="answer-row input-group input-group-sm mb-1">
+            <input type="text" class="form-control answer-item" placeholder="答案评分项内容">
+            <span class="input-group-text" style="font-size:0.7rem;">权重</span>
+            <input type="number" class="form-control answer-weight" value="1.0" step="0.1" min="0" style="max-width:70px;" placeholder="1.0">
+            <button class="btn btn-outline-danger" type="button" onclick="$(this).closest('.answer-row').remove()"><i class="fas fa-times"></i></button>
         </div>
     `);
 }
@@ -1131,7 +1161,7 @@ function addVideoForm() {
                     <input type="text" class="form-control form-control-sm video-title" placeholder="视频标题">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small">上传视频文件 *</label>
+                    <label class="form-label small">上传视频文件</label>
                     <input type="file" class="form-control form-control-sm video-file" accept="video/*">
                 </div>
                 <div class="col-md-4">
@@ -1184,7 +1214,7 @@ function addKnowledgeForm() {
     $('#knowledge-container').append(`
         <div class="knowledge-card border rounded p-3 mb-2" id="knowledge-${_knowledgeIdx}">
             <div class="d-flex justify-content-between align-items-start mb-2">
-                <strong class="text-warning">知识 #${_knowledgeIdx}</strong>
+                <strong class="text-warning">知识问答 #${_knowledgeIdx}</strong>
                 <button class="btn btn-sm btn-outline-danger" onclick="$('#knowledge-${_knowledgeIdx}').remove(); if(!$('.knowledge-card').length) $('#knowledge-empty').show();">
                     <i class="fas fa-trash"></i>
                 </button>
@@ -1225,6 +1255,7 @@ function submitCreateCase() {
     const payload = {
         title: ($('#create-title').val() || '').trim(),
         category_id: parseInt($('#create-category').val()) || null,
+        category_name: ($('#create-category-new').val() || '').trim(),
         difficulty: $('#create-difficulty').val(),
         case_type: $('#create-type').val(),
         case_guide: ($('#create-guide').val() || '').trim(),
@@ -1234,20 +1265,23 @@ function submitCreateCase() {
         extended_knowledge: []
     };
 
-    if (!payload.title || !payload.category_id) {
-        showAlert('标题和类别不能为空', 'error');
+    if (!payload.title) {
+        showAlert('请输入案例标题', 'error');
+        return;
+    }
+    if (!payload.category_id && !payload.category_name) {
+        showAlert('请选择已有类别或输入新类别名称', 'error');
         return;
     }
 
     // 收集所有站点数据
-    const siteName = ($('#create-site').val() || '').trim();
     $('.station-card').each(function(i) {
-        const name = $(this).find('.station-name').val().trim();
-        const question = $(this).find('.station-question').val().trim();
-        if (!name && !question) return;
+        const name = ($(this).find('.station-name').val() || '').trim();
+        const question = ($(this).find('.station-question').val() || '').trim();
+        if (!name || !question) return;
         const answers = [];
         $(this).find('.answer-row').each(function() {
-            const item = $(this).find('.answer-item').val().trim();
+            const item = ($(this).find('.answer-item').val() || '').trim();
             if (item) {
                 answers.push({
                     answer_item: item,
@@ -1255,15 +1289,19 @@ function submitCreateCase() {
                 });
             }
         });
-        const station = {
-            name: name || (siteName ? siteName + '站点' + (i+1) : ''),
-            assessment_task: $(this).find('.station-task').val().trim(),
+        payload.stations.push({
+            name: name,
+            assessment_task: ($(this).find('.station-task').val() || '').trim(),
             question: question,
             order_index: i,
             standard_answers: answers
-        };
-        if (station.name && station.question) payload.stations.push(station);
+        });
     });
+
+    if (payload.stations.length === 0) {
+        showAlert('请至少添加一个站点（含站点名称和题目）', 'error');
+        return;
+    }
 
     // 收集链接
     $('.link-card').each(function(i) {
@@ -2117,7 +2155,7 @@ function resetUserPassword(userId) {
         method: 'POST',
         success: function(res) {
             if (res.success) {
-                showAlert(`<strong>密码已重置</strong><br>新密码：<code>${res.new_password}</code><br><span class="text-danger">请妥善保管并告知用户</span>`, 'success', 0);
+                showAlert('密码已重置！新密码：' + res.new_password + '——请妥善保管并告知用户', 'success', 0);
             } else { showAlert(res.message || '操作失败', 'error'); }
         }
     });
@@ -2407,6 +2445,7 @@ function submitExamEdit(examId) {
 }
 
 function showExamQrCode(examId) {
+    // 先显示 modal 含 loading 状态，AJAX 加载图片更可靠
     const modal = `
         <div class="modal fade" id="qrModal" tabindex="-1">
             <div class="modal-dialog modal-sm modal-dialog-centered">
@@ -2416,14 +2455,45 @@ function showExamQrCode(examId) {
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body text-center">
-                        <img src="/admin/exams/${examId}/qr-code" class="img-fluid" alt="QR Code">
-                        <p class="text-muted small mt-2">用手机扫描进入考试</p>
+                        <div id="qr-loading" class="py-4">
+                            <div class="spinner-border text-primary mb-2" role="status"></div>
+                            <p class="text-muted small mb-0">生成二维码中...</p>
+                        </div>
+                        <div id="qr-result" style="display:none;">
+                            <img id="qr-img" class="img-fluid border rounded" alt="QR Code">
+                            <p class="text-muted small mt-2">用手机扫描进入考试</p>
+                        </div>
+                        <div id="qr-error" class="py-3 text-danger" style="display:none;">
+                            <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                            <p class="mb-0 small" id="qr-error-msg">二维码加载失败</p>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>`;
     $('#modal-container').html(modal);
     $('#qrModal').modal('show');
+
+    // AJAX 获取二维码图片 blob
+    fetch('/admin/exams/' + examId + '/qr-code', { credentials: 'same-origin' })
+        .then(function(resp) {
+            if (!resp.ok) throw new Error('服务器返回 ' + resp.status);
+            return resp.blob();
+        })
+        .then(function(blob) {
+            if (blob.type.startsWith('image/')) {
+                $('#qr-loading').hide();
+                $('#qr-img').attr('src', URL.createObjectURL(blob));
+                $('#qr-result').show();
+            } else {
+                throw new Error('返回格式不是图片（可能是登录页面）');
+            }
+        })
+        .catch(function(err) {
+            $('#qr-loading').hide();
+            $('#qr-error-msg').text('二维码加载失败：' + err.message);
+            $('#qr-error').show();
+        });
 }
 
 function publishExam(examId) {
@@ -2444,101 +2514,110 @@ function manageExamQuestions(examId) {
         if (!res.success) { showAlert(res.message||'加载失败','error'); return; }
         const d = res.data;
         window._examExistingIds = d.questions.map(q => q.station_id);
-        buildExamQuestionPage(examId, d.exam, d.questions);
+        window._examExistingCaseIds = [];
+        // 按案例分组已选站点
+        const caseMap = {};
+        d.questions.forEach(function(q) {
+            if (!caseMap[q.case_id]) { caseMap[q.case_id] = { title: q.case_title, stations: [] }; }
+            caseMap[q.case_id].stations.push(q);
+        });
+        window._examExistingCaseIds = Object.keys(caseMap).map(Number);
+        buildExamQuestionPage(examId, d.exam, caseMap);
     });
 }
 
-function buildExamQuestionPage(examId, exam, existingQuestions) {
-    // 将已选站点按案例分组
-    const caseStationMap = {};
-    existingQuestions.forEach(function(q) {
-        if (!caseStationMap[q.case_id]) caseStationMap[q.case_id] = [];
-        caseStationMap[q.case_id].push(q);
+function buildExamQuestionPage(examId, exam, existingCaseMap) {
+    const existingCaseCount = Object.keys(existingCaseMap).length;
+    const existingTotalStations = Object.values(existingCaseMap).reduce(function(sum, c) { return sum + c.stations.length; }, 0);
+
+    let existingCardsHtml = '';
+    Object.keys(existingCaseMap).forEach(function(caseId) {
+        const c = existingCaseMap[caseId];
+        const sids = c.stations.map(function(s) { return s.station_id; });
+        existingCardsHtml += `
+            <div class="d-flex align-items-center justify-content-between border rounded p-2 me-2 mb-2 bg-white" style="min-width:200px;max-width:260px;">
+                <div style="min-width:0;">
+                    <div class="text-truncate small fw-bold">${c.title}</div>
+                    <span class="badge bg-info" style="font-size:0.7rem;">${c.stations.length} 题</span>
+                </div>
+                <button class="btn btn-sm text-danger flex-shrink-0 ms-2" title="移除" onclick="removeCaseFromExam(${examId}, ${caseId}, [${sids.join(',')}])" style="padding:0 4px;line-height:1;">
+                    <i class="fas fa-times" style="font-size:0.75rem;"></i>
+                </button>
+            </div>`;
     });
-    const addedCaseIds = Object.keys(caseStationMap).map(Number);
 
     const html = `
         <nav aria-label="breadcrumb"><ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="#" onclick="loadExams()">考试管理</a></li>
-            <li class="breadcrumb-item active">${exam.title} - 选择案例</li>
+            <li class="breadcrumb-item active">${exam.title} - 添加题目</li>
         </ol></nav>
+
         <div class="page-header">
             <div>
-                <h4><i class="fas fa-list-check me-2"></i>${exam.title} - 选择案例</h4>
-                <p class="text-muted mb-0">从考试案例库中选择案例加入本场考试（选中的案例将包含其全部站点）</p>
+                <h4><i class="fas fa-list-check me-2"></i>${exam.title} — 添加题目</h4>
+                <p class="text-muted mb-0">从考试案例库中选择案例加入本场考试，每个案例包含其全部站点题目</p>
             </div>
             <a href="#" class="btn btn-sm btn-outline-secondary" onclick="loadExams(); return false;">
                 <i class="fas fa-arrow-left me-1"></i>返回考试列表
             </a>
         </div>
 
-        <div class="row">
-            <!-- 左侧：案例库 -->
-            <div class="col-lg-8">
-                <div class="card"><div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <span><i class="fas fa-folder-open me-2"></i>考试案例库</span>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <select class="form-select form-select-sm" id="exam-case-category-filter" style="width:auto;" onchange="loadExamCaseTable(${examId})">
-                            <option value="">全部类别</option>
-                        </select>
-                        <div class="search-box" style="width:220px;">
-                            <span class="search-icon"><i class="fas fa-search"></i></span>
-                            <input type="text" class="form-control form-control-sm" id="exam-case-search" placeholder="搜索案例标题..." onkeyup="debounceExamCaseSearch(${examId})">
-                        </div>
-                    </div>
-                </div><div class="card-body p-0">
-                    <div class="table-responsive" style="max-height:520px;overflow-y:auto;">
-                        <table class="table table-hover mb-0">
-                            <thead style="position:sticky;top:0;z-index:1;" class="table-light">
-                                <tr>
-                                    <th>案例标题</th>
-                                    <th style="width:70px;" class="d-none d-sm-table-cell">类别</th>
-                                    <th style="width:60px;" class="d-none d-sm-table-cell">难度</th>
-                                    <th style="width:60px;">题数</th>
-                                    <th style="width:60px;">已选</th>
-                                    <th style="width:100px;">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody id="exam-case-tbody">
-                                <tr><td colspan="6" class="text-center text-muted py-3">
-                                    <div class="spinner-border spinner-border-sm me-2"></div>加载中...
-                                </td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div id="exam-case-pagination" class="p-3 border-top"></div>
-                </div></div>
+        <!-- 已选案例条 -->
+        <div class="card mb-3 border-success"><div class="card-header bg-success bg-opacity-10 d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-check-circle me-2 text-success"></i><strong>已选案例</strong>
+                <span class="badge bg-success ms-2" id="existing-count">${existingCaseCount}</span>
+                <small class="text-muted ms-1">个案例，共 <span id="existing-total-stations">${existingTotalStations}</span> 道题目</small>
+            </span>
+            ${existingCaseCount ? '<button class="btn btn-sm btn-outline-danger" onclick="clearExamCases(' + examId + ')"><i class="fas fa-trash-alt me-1"></i>清空全部</button>' : ''}
+        </div><div class="card-body" id="existing-questions-bar">
+            <div class="d-flex flex-wrap align-items-start">
+                ${existingCaseCount ? existingCardsHtml : '<p class="text-muted small mb-0 text-center w-100 py-2">暂未选择案例，从下方表格中选择案例添加</p>'}
             </div>
+        </div></div>
 
-            <!-- 右侧：已选案例 -->
-            <div class="col-lg-4">
-                <div class="card" style="position:sticky;top:calc(var(--topbar-height) + 1rem);">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="fas fa-check-circle me-2 text-success"></i>已选案例 <span class="badge bg-success ms-1" id="existing-count">${addedCaseIds.length}</span></span>
-                        ${addedCaseIds.length ? '<button class="btn btn-sm btn-outline-danger" onclick="clearExamCases(' + examId + ')"><i class="fas fa-trash-alt me-1"></i>清空</button>' : ''}
+        <!-- 案例选择表格 -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span><i class="fas fa-folder-open me-2"></i><strong>考试案例库</strong>
+                    <small class="text-muted ms-2">仅显示类型为「考试案例」的案例</small>
+                </span>
+                <div class="d-flex gap-2 flex-wrap">
+                    <select class="form-select form-select-sm" id="exam-case-category-filter" style="width:auto;" onchange="loadExamCaseTable(${examId})">
+                        <option value="">全部类别</option>
+                    </select>
+                    <div class="input-group input-group-sm" style="width:260px;">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="exam-case-search" placeholder="搜索案例标题、站点名称..." onkeyup="debounceExamCaseSearch(${examId})">
                     </div>
-                    <div class="card-body" id="existing-questions-list" style="max-height:480px;overflow-y:auto;">
-                        ${addedCaseIds.length ? Object.values(caseStationMap).map(function(stations) {
-                            return `<div class="d-flex align-items-center justify-content-between border rounded p-2 mb-2">
-                                <div style="min-width:0;">
-                                    <div class="text-truncate fw-bold small">${stations[0].case_title}</div>
-                                    <span class="badge bg-info" style="font-size:0.7rem;">${stations.length} 题</span>
-                                </div>
-                                <button class="btn btn-sm text-danger flex-shrink-0 ms-1" title="移除此案例" onclick="removeCaseFromExam(${examId}, ${stations[0].case_id}, [${stations.map(function(s){return s.station_id;}).join(',')}])" style="padding:0 4px;line-height:1;">
-                                    <i class="fas fa-times" style="font-size:0.75rem;"></i>
-                                </button>
-                            </div>`;
-                        }).join('') : '<p class="text-muted small mb-0 text-center py-3">暂未选择案例<br>点击左侧「选择此案例」添加</p>'}
-                    </div>
-                    ${addedCaseIds.length ? `<div class="card-footer bg-white border-top text-end">
-                        <small class="text-muted">共 <strong id="existing-total-stations">${existingQuestions.length}</strong> 道题目</small>
-                    </div>` : ''}
                 </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>案例标题</th>
+                                <th style="width:80px;" class="d-none d-sm-table-cell">类别</th>
+                                <th style="width:70px;" class="d-none d-sm-table-cell">难度</th>
+                                <th style="width:60px;">题数</th>
+                                <th style="width:60px;">状态</th>
+                                <th style="width:110px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="exam-case-tbody">
+                            <tr><td colspan="6" class="text-center text-muted py-3">
+                                <div class="spinner-border spinner-border-sm me-2"></div>加载中...
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="exam-case-pagination" class="p-3 border-top"></div>
             </div>
         </div>
     `;
     $('#main-content').html(html);
 
+    // 加载类别筛选下拉
     $.get('/api/categories', function(res) {
         if (res.success) {
             const opts = res.data.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
@@ -2552,7 +2631,7 @@ function buildExamQuestionPage(examId, exam, existingQuestions) {
 let _examCaseSearchTimer = null;
 function debounceExamCaseSearch(examId) {
     clearTimeout(_examCaseSearchTimer);
-    _examCaseSearchTimer = setTimeout(function() { loadExamCaseTable(examId); }, 300);
+    _examCaseSearchTimer = setTimeout(function() { loadExamCaseTable(examId); }, 350);
 }
 
 function loadExamCaseTable(examId, page) {
@@ -2572,34 +2651,65 @@ function loadExamCaseTable(examId, page) {
 
         let rows = '';
         if (cases.length === 0) {
-            rows = '<tr><td colspan="6" class="text-center text-muted py-3">无匹配的考试案例</td></tr>';
+            rows = '<tr><td colspan="6" class="text-center text-muted py-4">无匹配的考试案例<p class="small mt-1 mb-0">请确认已创建类型为「考试案例」的案例，或调整搜索条件</p></td></tr>';
         } else {
             cases.forEach(function(c) {
                 const diffBadge = c.difficulty === 'advanced' ? 'danger' : (c.difficulty === 'basic' ? 'success' : 'warning');
                 const diffLabel = c.difficulty === 'advanced' ? '高级' : (c.difficulty === 'basic' ? '基础' : '中级');
                 const stations = c.stations || [];
                 const stationIds = stations.map(function(s) { return s.id; });
-                // 如果该案例所有站点都已在考试中，则标记为已添加
                 const allAdded = stationIds.length > 0 && stationIds.every(function(sid) { return existingIds.indexOf(sid) !== -1; });
 
+                // 构建站点预览列表（用于展开）
+                let stationsPreview = '';
+                if (stations.length > 0) {
+                    stationsPreview = `
+                        <tr class="station-detail-row" id="station-detail-${c.id}" style="display:none;background:#f8f9fb;">
+                            <td colspan="6" class="p-0">
+                                <div class="p-3 border-top">
+                                    <small class="text-muted fw-bold d-block mb-2">包含的站点题目：</small>
+                                    ${stations.map(function(s, si) {
+                                        const sAdded = existingIds.indexOf(s.id) !== -1;
+                                        const answers = s.standard_answers || [];
+                                        return `<div class="d-flex border rounded p-2 mb-2 bg-white ${sAdded ? 'border-success' : ''}">
+                                            <div style="min-width:0;flex:1;">
+                                                <div class="small fw-bold">${s.name || '站点 ' + (si+1)} ${sAdded ? '<span class="text-success"><i class="fas fa-check-circle"></i> 已选</span>' : ''}</div>
+                                                <div class="small text-muted">${s.question || '(无题目)'}</div>
+                                                ${answers.length ? '<div class="mt-1">' + answers.map(function(a) {
+                                                    return '<span class="badge bg-light text-dark me-1 mb-1" style="font-size:0.7rem;">' + a.answer_item + (a.score_weight !== 1 ? ' (x' + a.score_weight + ')' : '') + '</span>';
+                                                }).join('') + '</div>' : ''}
+                                            </div>
+                                        </div>`;
+                                    }).join('')}
+                                </div>
+                            </td>
+                        </tr>`;
+                }
+
                 rows += `
-                    <tr>
-                        <td><strong>${c.title}</strong></td>
+                    <tr class="case-main-row">
+                        <td>
+                            <strong>${c.title}</strong>
+                            ${stations.length > 0 ? `<a href="#" class="text-decoration-none ms-2 small" onclick="toggleStationDetail(${c.id}); return false;" title="展开查看站点">
+                                <i class="fas fa-chevron-down" id="toggle-icon-${c.id}" style="font-size:0.7rem;"></i> <span class="d-none d-sm-inline">站点</span>
+                            </a>` : ''}
+                        </td>
                         <td class="d-none d-sm-table-cell"><span class="badge bg-secondary">${c.category_name}</span></td>
                         <td class="d-none d-sm-table-cell"><span class="badge bg-${diffBadge}">${diffLabel}</span></td>
                         <td>${c.station_count}</td>
-                        <td>${allAdded ? '<span class="text-success"><i class="fas fa-check-circle fa-lg"></i></span>' : '<span class="text-muted">-</span>'}</td>
+                        <td>${allAdded ? '<span class="text-success fw-bold">已添加</span>' : '<span class="text-muted">未添加</span>'}</td>
                         <td>
                             <div class="btn-action-group">
-                            <button class="btn btn-sm btn-primary" onclick="addCaseToExam(${examId}, ${c.id}, [${stationIds.join(',')}])" title="添加此案例" ${allAdded ? 'disabled' : ''}>
-                                <i class="fas fa-plus"></i>
+                            <button class="btn btn-sm ${allAdded ? 'btn-outline-danger' : 'btn-primary'}" onclick="${allAdded ? 'removeCaseFromExam(' + examId + ',' + c.id + ',[' + stationIds.join(',') + '])' : 'addCaseToExam(' + examId + ',' + c.id + ',[' + stationIds.join(',') + '])'}" title="${allAdded ? '移除此案例' : '添加此案例'}">
+                                <i class="fas ${allAdded ? 'fa-minus' : 'fa-plus'}"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-info" onclick="renderCaseDetailPage(${c.id})" title="查看详情">
+                            <button class="btn btn-sm btn-outline-info" onclick="showCasePreviewModal(${c.id})" title="预览案例详情">
                                 <i class="fas fa-eye"></i>
                             </button>
                             </div>
                         </td>
                     </tr>
+                    ${stationsPreview}
                 `;
             });
         }
@@ -2609,17 +2719,80 @@ function loadExamCaseTable(examId, page) {
         // 分页
         let pagHtml = '';
         if (pg.pages > 1) {
-            pagHtml = '<nav><ul class="pagination pagination-sm mb-0">';
+            pagHtml = '<nav><ul class="pagination pagination-sm mb-0 justify-content-center">';
             pagHtml += `<li class="page-item ${pg.has_prev ? '' : 'disabled'}"><a class="page-link" href="#" onclick="loadExamCaseTable(${examId}, ${pg.page - 1}); return false;">上一页</a></li>`;
             for (let p = 1; p <= pg.pages; p++) {
                 pagHtml += `<li class="page-item ${p === pg.page ? 'active' : ''}"><a class="page-link" href="#" onclick="loadExamCaseTable(${examId}, ${p}); return false;">${p}</a></li>`;
                 if (p >= pg.page + 4 && p < pg.pages - 1) { pagHtml += '<li class="page-item disabled"><span class="page-link">...</span></li>'; p = pg.pages - 2; }
             }
             pagHtml += `<li class="page-item ${pg.has_next ? '' : 'disabled'}"><a class="page-link" href="#" onclick="loadExamCaseTable(${examId}, ${pg.page + 1}); return false;">下一页</a></li>`;
-            pagHtml += `<li class="page-item disabled"><span class="page-link">共${pg.total}条</span></li>`;
+            pagHtml += `<li class="page-item disabled"><span class="page-link text-muted">共 ${pg.total} 条</span></li>`;
             pagHtml += '</ul></nav>';
         }
-        $('#exam-case-pagination').html(pagHtml || '<small class="text-muted">共 ' + pg.total + ' 个案例</small>');
+        $('#exam-case-pagination').html(pagHtml || '<div class="text-center"><small class="text-muted">共 ' + pg.total + ' 个案例</small></div>');
+    });
+}
+
+function toggleStationDetail(caseId) {
+    $('#station-detail-' + caseId).toggle();
+    $('#toggle-icon-' + caseId).toggleClass('fa-chevron-down fa-chevron-up');
+}
+
+function showCasePreviewModal(caseId) {
+    // 使用模态框显示案例详情，不影响当前题目选择上下文
+    $.get('/admin/cases/' + caseId, function(res) {
+        if (!res.success) { showAlert(res.message || '加载失败', 'error'); return; }
+        const c = res.data.case;
+        const stations = res.data.stations || [];
+        const extendedKnowledge = res.data.extended_knowledge || [];
+        let stationsHtml = '';
+        stations.forEach(function(s, i) {
+            const answers = s.answers || [];
+            stationsHtml += `
+                <div class="border rounded p-2 mb-2">
+                    <div class="fw-bold small">站点 ${i+1}：${s.name}</div>
+                    ${s.assessment_task ? '<div class="small text-muted">考核任务：' + s.assessment_task + '</div>' : ''}
+                    <div class="small">题目：${s.question}</div>
+                    ${answers.length ? '<div class="mt-1">' + answers.map(function(a) {
+                        return '<span class="badge bg-light text-dark me-1">' + a.answer_item + ' (权重:' + a.score_weight + ')</span>';
+                    }).join('') + '</div>' : ''}
+                </div>`;
+        });
+
+        let knowledgeHtml = '';
+        if (extendedKnowledge.length) {
+            knowledgeHtml = '<h6 class="border-bottom pb-2 mb-3 mt-3">扩展知识</h6>' + extendedKnowledge.map(function(k) {
+                return '<div class="small mb-2"><strong>Q: ' + k.question + '</strong><br>A: ' + (k.answers || []).map(function(a) { return a.answer_item; }).join('；') + '</div>';
+            }).join('');
+        }
+
+        const modal = `
+            <div class="modal fade" id="casePreviewModal" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h6 class="modal-title"><i class="fas fa-book-medical me-2"></i>${c.title}</h6>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <span class="badge bg-secondary me-1">${c.category_name}</span>
+                                ${getDifficultyBadge(c.difficulty)}
+                                ${getCaseTypeBadge(c.case_type)}
+                            </div>
+                            ${c.case_guide ? '<div class="mb-3"><strong>案例指引：</strong><p class="small text-muted mt-1">' + c.case_guide + '</p></div>' : ''}
+                            <h6 class="border-bottom pb-2 mb-3">站点题目（共 ${stations.length} 题）</h6>
+                            ${stationsHtml || '<p class="text-muted small">暂无站点题目</p>'}
+                            ${knowledgeHtml}
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        $('#modal-container').html(modal);
+        $('#casePreviewModal').modal('show');
     });
 }
 
@@ -2656,45 +2829,37 @@ function refreshExistingCasesPanel(questions) {
     });
     const caseIds = Object.keys(caseMap);
     const examId = window._currentExamId || 0;
-    $('#existing-count').text(caseIds.length);
 
-    let panelHtml = '';
+    $('#existing-count').text(caseIds.length);
+    $('#existing-total-stations').text(questions.length);
+
     if (caseIds.length) {
-        panelHtml = caseIds.map(function(cid) {
+        const cardsHtml = caseIds.map(function(cid) {
             const c = caseMap[cid];
             const sidList = '[' + c.station_ids.join(',') + ']';
-            return `<div class="d-flex align-items-center justify-content-between border rounded p-2 mb-2">
-                <div style="min-width:0;">
-                    <div class="text-truncate fw-bold small">${c.title}</div>
-                    <span class="badge bg-info" style="font-size:0.7rem;">${c.count} 题</span>
-                </div>
-                <button class="btn btn-sm text-danger flex-shrink-0 ms-1" title="移除此案例" onclick="removeCaseFromExam(${examId}, ${cid}, ${sidList})" style="padding:0 4px;line-height:1;">
-                    <i class="fas fa-times" style="font-size:0.75rem;"></i>
-                </button>
-            </div>`;
+            return '<div class="d-flex align-items-center justify-content-between border rounded p-2 me-2 mb-2 bg-white" style="min-width:200px;max-width:260px;">' +
+                '<div style="min-width:0;">' +
+                    '<div class="text-truncate small fw-bold">' + c.title + '</div>' +
+                    '<span class="badge bg-info" style="font-size:0.7rem;">' + c.count + ' 题</span>' +
+                '</div>' +
+                '<button class="btn btn-sm text-danger flex-shrink-0 ms-2" title="移除" onclick="removeCaseFromExam(' + examId + ',' + cid + ',' + sidList + ')" style="padding:0 4px;line-height:1;">' +
+                    '<i class="fas fa-times" style="font-size:0.75rem;"></i>' +
+                '</button>' +
+            '</div>';
         }).join('');
-        // Update footer
-        let footerEl = $('#existing-questions-list').siblings('.card-footer');
-        if (footerEl.length === 0) {
-            $('#existing-questions-list').after(`<div class="card-footer bg-white border-top text-end">
-                <small class="text-muted">共 <strong id="existing-total-stations">${questions.length}</strong> 道题目</small>
-            </div>`);
-        } else {
-            footerEl.find('#existing-total-stations').text(questions.length);
+        $('#existing-questions-bar').html('<div class="d-flex flex-wrap align-items-start">' + cardsHtml + '</div>');
+
+        // 确保清空按钮可见
+        const headerRight = $('#existing-questions-bar').closest('.card').find('.card-header');
+        if (!headerRight.find('.btn-outline-danger').length) {
+            headerRight.append('<button class="btn btn-sm btn-outline-danger" onclick="clearExamCases(' + examId + ')"><i class="fas fa-trash-alt me-1"></i>清空全部</button>');
         }
     } else {
-        panelHtml = '<p class="text-muted small mb-0 text-center py-3">暂未选择案例<br>点击左侧「选择此案例」添加</p>';
-        $('#existing-questions-list').siblings('.card-footer').remove();
-    }
-    $('#existing-questions-list').html(panelHtml);
+        $('#existing-questions-bar').html('<p class="text-muted small mb-0 text-center w-100 py-2">暂未选择案例，从下方表格中选择案例添加</p>');
 
-    // Update clear button visibility
-    const headerRight = $('#existing-questions-list').closest('.card').find('.card-header');
-    const clearBtn = headerRight.find('.btn-outline-danger');
-    if (caseIds.length === 0 && clearBtn.length) {
-        clearBtn.remove();
-    } else if (caseIds.length > 0 && clearBtn.length === 0) {
-        headerRight.append('<button class="btn btn-sm btn-outline-danger" onclick="clearExamCases(' + examId + ')"><i class="fas fa-trash-alt me-1"></i>清空</button>');
+        // 移除清空按钮
+        const clearBtn = $('#existing-questions-bar').closest('.card').find('.card-header .btn-outline-danger');
+        if (clearBtn.length) clearBtn.remove();
     }
 }
 
@@ -2733,9 +2898,10 @@ function clearExamCases(examId) {
                 const activePage = $('.pagination .active .page-link').text() || 1;
                 loadExamCaseTable(examId, parseInt(activePage));
                 $('#existing-count').text('0');
-                $('#existing-questions-list').html('<p class="text-muted small mb-0 text-center py-3">暂未选择案例<br>点击左侧「选择此案例」添加</p>');
-                $('#existing-questions-list').siblings('.card-footer').remove();
-                $('#existing-questions-list').closest('.card').find('.card-header .btn-outline-danger').remove();
+                $('#existing-total-stations').text('0');
+                $('#existing-questions-bar').html('<p class="text-muted small mb-0 text-center w-100 py-2">暂未选择案例，从下方表格中选择案例添加</p>');
+                var clearBtn = $('#existing-questions-bar').closest('.card').find('.card-header .btn-outline-danger');
+                if (clearBtn.length) clearBtn.remove();
             } else { showAlert(res.message||'操作失败','error'); }
         }
     });
@@ -3037,12 +3203,21 @@ function submitUserXlsxImportPage() {
         success: function(res) {
             if (res.success) {
                 const users = res.users || [];
-                let userList = users.map(u => `<tr><td>${u.username}</td><td>${u.password}</td><td>${u.real_name}</td></tr>`).join('');
-                showAlert(`${res.message}<br><br>
-                    <table class="table table-sm table-bordered small" style="background:#fff">
-                        <thead><tr><th>工号</th><th>初始密码</th><th>姓名</th></tr></thead>
-                        <tbody>${userList}</tbody>
-                    </table>`, 'success', 0);
+                let userList = users.map(u => '<tr><td>' + sanitizeHTML(u.username) + '</td><td>' + sanitizeHTML(u.password) + '</td><td>' + sanitizeHTML(u.real_name) + '</td></tr>').join('');
+                showAlert(res.message || '导入成功', 'success', 3000);
+                if (users.length) {
+                    var modalHtml = '<div class="modal fade" id="importResultModal" tabindex="-1">' +
+                        '<div class="modal-dialog modal-lg"><div class="modal-content">' +
+                        '<div class="modal-header"><h6 class="modal-title">导入用户清单</h6>' +
+                        '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>' +
+                        '<div class="modal-body"><div class="table-responsive"><table class="table table-sm table-bordered small">' +
+                        '<thead><tr><th>工号</th><th>初始密码</th><th>姓名</th></tr></thead>' +
+                        '<tbody>' + userList + '</tbody></table></div></div>' +
+                        '<div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button></div>' +
+                        '</div></div></div>';
+                    $('#modal-container').html(modalHtml);
+                    $('#importResultModal').modal('show');
+                }
                 loadUsers();
             } else { showAlert(res.message || '导入失败', 'error'); }
         }

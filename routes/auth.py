@@ -1,27 +1,23 @@
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for, flash
 from flask_login import current_user, login_user, logout_user
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from utils.auth import login_or_jwt_required
 from utils.decorators import admin_required
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models import User, db
+from app import limiter
 import re
 
 auth_bp = Blueprint('auth', __name__)
 
 
-def _limiter():
-    from flask import current_app
-    return current_app.extensions.get('limiter')
+@auth_bp.route('/login', methods=['GET'])
+def login_page():
+    return render_template('auth/login.html')
 
 
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@auth_bp.route('/login', methods=['POST'])
+@limiter.limit("5 per minute", on_breach=lambda: (jsonify({'success': False, 'message': '登录尝试过于频繁，请1分钟后再试'}), 429))
 def login():
-    if request.method == 'GET':
-        return render_template('auth/login.html')
-
-    # 对 POST 登录请求做频率限制
     data = request.get_json() if request.is_json else request.form
     username = data.get('username')
     password = data.get('password')

@@ -114,11 +114,11 @@ def create_app():
     from routes.admin import admin_bp
     from routes.api import api_bp
 
-    # 豁免 CSRF 的蓝图 — 全部使用 JWT Bearer 认证，天然免疫 CSRF
-    csrf.exempt(auth_bp)
-    csrf.exempt(nurse_bp)
-    csrf.exempt(admin_bp)
+    # 豁免 CSRF 的蓝图
+    # api_bp: 纯 JWT Bearer 认证，无 session cookie，天然免疫 CSRF
+    # auth_bp: 登录/注册页面使用传统表单 POST，需要 CSRF 豁免（表单内嵌 csrf_token）
     csrf.exempt(api_bp)
+    csrf.exempt(auth_bp)
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(nurse_bp, url_prefix='/nurse')

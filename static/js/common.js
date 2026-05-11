@@ -1,5 +1,16 @@
 // 通用JavaScript函数
 
+// HTML 转义 — 防止 XSS
+function sanitizeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // CSRF Token 设置（SPA 模式下全局携带）
 $.ajaxSetup({
     beforeSend: function(xhr, settings) {
@@ -54,7 +65,7 @@ function showAlert(message, type = 'info', duration = 3000) {
             display:flex; align-items:center; gap:0.5rem;
         ">
             <i class="fas ${icon}"></i>
-            <span style="flex:1">${message}</span>
+            <span style="flex:1">${sanitizeHTML(message)}</span>
             <button type="button" class="btn-close btn-close-sm" style="flex-shrink:0" onclick="$(this).closest('#${alertId}').remove()"></button>
         </div>
     `);
@@ -68,17 +79,23 @@ function showAlert(message, type = 'info', duration = 3000) {
     }
 }
 
-// AJAX错误处理
+// AJAX 全局错误处理
 $(document).ajaxError(function(event, xhr, settings, thrownError) {
     if (xhr.status === 401) {
-        // Token过期，重新登录
         localStorage.removeItem('access_token');
         localStorage.removeItem('user_info');
         window.location.href = '/auth/login';
     } else if (xhr.status === 403) {
         showAlert('权限不足', 'error');
+    } else if (xhr.status === 404) {
+        showAlert('请求的资源不存在', 'error');
+    } else if (xhr.status === 429) {
+        showAlert('请求过于频繁，请稍后重试', 'warning');
     } else if (xhr.status >= 500) {
         showAlert('服务器错误，请稍后重试', 'error');
+    } else if (xhr.status === 0 || thrownError) {
+        // 网络连接失败或请求被中断
+        showAlert('网络连接失败，请检查网络后重试', 'error');
     }
 });
 

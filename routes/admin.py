@@ -13,6 +13,7 @@ import os
 import tempfile
 import shutil
 import zipfile
+import logging
 import rarfile
 from io import BytesIO
 import re
@@ -412,7 +413,11 @@ def manage_cases():
                     'name': s.name,
                     'question': s.question,
                     'assessment_task': s.assessment_task,
-                    'order_index': s.order_index
+                    'order_index': s.order_index,
+                    'standard_answers': [{
+                        'answer_item': a.answer_item,
+                        'score_weight': float(a.score_weight or 1.0)
+                    } for a in s.standard_answers]
                 } for s in case_stations]
             cases_data.append(case_item)
 
@@ -1564,11 +1569,17 @@ def get_exam_qr_code(exam_id):
 
     exam_url = f"{base}/nurse/exam-access?token={token}&exam_id={exam_id}"
 
-    img = qrcode.make(exam_url)
-    buf = BytesIO()
-    img.save(buf, format='PNG')
-    buf.seek(0)
-    return send_file(buf, mimetype='image/png')
+    try:
+        img = qrcode.make(exam_url)
+        buf = BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        resp = send_file(buf, mimetype='image/png')
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return resp
+    except Exception as e:
+        logging.getLogger(__name__).error('QR 二维码生成失败：%s', e)
+        return jsonify({'success': False, 'message': '二维码生成失败'}), 500
 
 
 # ---- Exam Update ----
