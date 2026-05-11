@@ -2785,20 +2785,8 @@ function loadAiSettings() {
                     <div id="ai-test-result" class="mt-3"></div>
                 </div></div>
             </div></div>
-            <div class="row mt-4"><div class="col-lg-7">
-                <div class="card"><div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h6 class="mb-0"><i class="fas fa-microphone me-2"></i>百度语音识别 Key</h6>
-                        <button class="btn btn-sm btn-primary" onclick="showAddBaiduKeyForm()"><i class="fas fa-plus me-1"></i>添加 Key</button>
-                    </div>
-                    <p class="text-muted small mb-3">多个 Key 自动轮转：当一个 Key 额度用完时自动切换下一个。免费额度 5万次/天/Key。</p>
-                    <div id="baidu-asr-key-list">${renderBaiduKeysLoading()}</div>
-                    <div id="baidu-asr-key-form" style="display:none"></div>
-                </div></div>
-            </div></div>
         `;
         $('#main-content').html(html);
-        loadBaiduAsrKeys();
     });
 }
 
@@ -2876,6 +2864,35 @@ function testAiConnection() {
             $('#ai-test-result').html('<div class="alert alert-danger py-2">请求失败，请检查网络</div>');
         }
     });
+}
+
+// ---- Voice Settings Page ----
+
+function loadVoiceSettings() {
+    setActiveNav('语音设置');
+
+    var html = `
+        <div class="page-header">
+            <div>
+                <h4><i class="fas fa-microphone me-2"></i>语音设置</h4>
+                <p class="text-muted mb-0">百度语音识别 Key 管理</p>
+            </div>
+        </div>
+        <div class="row"><div class="col-lg-7">
+            <div class="card"><div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">百度 ASR Key 列表</h6>
+                    <button class="btn btn-sm btn-primary" onclick="showAddBaiduKeyForm()"><i class="fas fa-plus me-1"></i>添加 Key</button>
+                </div>
+                <p class="text-muted small mb-3">多个 Key 自动轮转：当一个 Key 额度用完时自动切换下一个。每个 Key 免费额度 5 万次/天。<br>
+                注册地址：<a href="https://console.bce.baidu.com/ai/#/ai/speech/overview" target="_blank">百度 AI 开放平台 → 语音识别</a></p>
+                <div id="baidu-asr-key-list">${renderBaiduKeysLoading()}</div>
+                <div id="baidu-asr-key-form" style="display:none"></div>
+            </div></div>
+        </div></div>
+    `;
+    $('#main-content').html(html);
+    loadBaiduAsrKeys();
 }
 
 // ---- Baidu ASR Key Management ----

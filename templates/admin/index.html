@@ -37,6 +37,9 @@
         <a class="d-block nav-link-mobile" href="#" data-page="ai-settings" onclick="navigateTo('ai-settings')">
             <i class="fas fa-robot me-2"></i>AI 设置
         </a>
+        <a class="d-block nav-link-mobile" href="#" data-page="voice-settings" onclick="navigateTo('voice-settings')">
+            <i class="fas fa-microphone me-2"></i>语音设置
+        </a>
     </div>
 </div>
 {% endblock %}
@@ -78,6 +81,11 @@
 <li class="nav-item">
     <a class="nav-link" href="#" data-page="ai-settings" onclick="navigateTo('ai-settings')">
         <i class="fas fa-robot"></i>AI 设置
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="voice-settings" onclick="navigateTo('voice-settings')">
+        <i class="fas fa-microphone"></i>语音设置
     </a>
 </li>
 {% endblock %}
@@ -143,6 +151,7 @@
             case 'statistics': loadStatistics(); break;
             case 'group-analysis': loadGroupAnalysis(); break;
             case 'ai-settings': loadAiSettings(); break;
+        case 'voice-settings': loadVoiceSettings(); break;
         }
     }
 
