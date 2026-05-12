@@ -575,9 +575,21 @@ def run_weakness_analysis():
 @login_or_jwt_required
 @nurse_required
 def get_exams():
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # 获取当前用户参加过的考试 ID
+    participated_ids = [
+        r.exam_id for r in
+        ExamRecord.query.filter_by(user_id=current_user.id).all()
+    ]
+
+    # 已发布的考试：用户参加过的（不受时间限制）+ 还在有效期内的
     exams = Exam.query.filter(
         Exam.status == 'published',
-        Exam.end_time > datetime.now(timezone.utc).replace(tzinfo=None)
+        db.or_(
+            Exam.id.in_(participated_ids) if participated_ids else False,
+            db.or_(Exam.end_time == None, Exam.end_time > now)
+        )
     ).order_by(desc(Exam.created_at)).all()
 
     exams_data = []

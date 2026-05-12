@@ -2329,18 +2329,14 @@ function renderExamCreatePage() {
                     <label class="form-label">考试描述</label>
                     <textarea class="form-control" id="exam-description" rows="3"></textarea>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">考试时长（分钟）</label>
-                    <input type="number" class="form-control" id="exam-duration" value="60" min="1">
-                </div>
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
                         <label class="form-label">开始时间</label>
                         <input type="datetime-local" class="form-control" id="exam-start-time">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">结束时间</label>
-                        <input type="datetime-local" class="form-control" id="exam-end-time">
+                        <label class="form-label">时长（分钟）</label>
+                        <input type="number" class="form-control" id="exam-duration" value="60" min="10" max="480">
                     </div>
                 </div>
                 <div class="d-flex gap-2">
@@ -2358,8 +2354,7 @@ function submitCreateExam() {
         title: $('#exam-title').val(),
         description: $('#exam-description').val(),
         duration: parseInt($('#exam-duration').val()),
-        start_time: $('#exam-start-time').val() || null,
-        end_time: $('#exam-end-time').val() || null
+        start_time: $('#exam-start-time').val() || null
     };
 
     $.ajax({
@@ -2403,18 +2398,14 @@ function renderExamEditPage(examId) {
                         <label class="form-label">描述</label>
                         <textarea class="form-control" id="exam-edit-desc" rows="3">${exam.description || ''}</textarea>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">时长（分钟）</label>
-                        <input type="number" class="form-control" id="exam-edit-duration" value="${exam.duration}" min="1">
-                    </div>
                     <div class="row g-2 mb-3">
                         <div class="col-md-6">
                             <label class="form-label">开始时间</label>
                             <input type="datetime-local" class="form-control" id="exam-edit-start" value="${exam.start_time ? exam.start_time.substring(0,16) : ''}">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">结束时间</label>
-                            <input type="datetime-local" class="form-control" id="exam-edit-end" value="${exam.end_time ? exam.end_time.substring(0,16) : ''}">
+                            <label class="form-label">时长（分钟）</label>
+                            <input type="number" class="form-control" id="exam-edit-duration" value="${exam.duration}" min="10" max="480">
                         </div>
                     </div>
                     <div class="d-flex gap-2">
@@ -2433,8 +2424,7 @@ function submitExamEdit(examId) {
         title: ($('#exam-edit-title').val() || '').trim(),
         description: ($('#exam-edit-desc').val() || '').trim(),
         duration: parseInt($('#exam-edit-duration').val()),
-        start_time: $('#exam-edit-start').val() ? $('#exam-edit-start').val() + ':00' : null,
-        end_time: $('#exam-edit-end').val() ? $('#exam-edit-end').val() + ':00' : null
+        start_time: $('#exam-edit-start').val() ? $('#exam-edit-start').val() + ':00' : null
     };
     $.ajax({
         url: `/admin/exams/${examId}`,

@@ -9,7 +9,7 @@ from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRe
 from utils.docx_parser import DocxParser
 from utils.crypto import encrypt_value, decrypt_value
 from sqlalchemy import desc, func
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import os
 import tempfile
 import shutil
@@ -1000,19 +1000,21 @@ def manage_exams():
     description = data.get('description', '').strip()
     duration = data.get('duration', 60)
     start_time = data.get('start_time')
-    end_time = data.get('end_time')
 
     if not title:
         return jsonify({'success': False, 'message': '考试标题不能为空'})
 
     try:
+        start_dt = datetime.fromisoformat(start_time) if start_time else None
+        end_dt = start_dt + timedelta(minutes=duration) if start_dt else None
+
         exam = Exam(
             title=title,
             description=description,
             creator_id=current_user.id,
             duration=duration,
-            start_time=datetime.fromisoformat(start_time) if start_time else None,
-            end_time=datetime.fromisoformat(end_time) if end_time else None
+            start_time=start_dt,
+            end_time=end_dt
         )
 
         db.session.add(exam)
@@ -1800,9 +1802,11 @@ def update_exam(exam_id):
     for field in ['duration']:
         if field in data:
             setattr(exam, field, int(data[field]))
-    for field in ['start_time', 'end_time']:
+    for field in ['start_time']:
         if field in data and data[field]:
             setattr(exam, field, datetime.fromisoformat(data[field]))
+    if exam.start_time:
+        exam.end_time = exam.start_time + timedelta(minutes=exam.duration)
     db.session.commit()
     return jsonify({'success': True, 'message': '考试已更新'})
 
