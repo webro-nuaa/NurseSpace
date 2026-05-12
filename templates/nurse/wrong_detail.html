@@ -95,16 +95,16 @@
       </div>
       <div class="mb-3">
         <div class="fw-bold">我的最近一次作答：</div>
-        <div class="mb-2">${(data.my_record.user_answer||'').replace(/\n/g,'<br>') || '<span class="text-muted">暂无记录</span>'}</div>
+        <div class="mb-2 content-wrap">${(data.my_record.user_answer||'').replace(/\n/g,'<br>') || '<span class="text-muted">暂无记录</span>'}</div>
         <div>得分：<span class="badge ${getScoreBadgeClass(data.my_record.score)}">${(data.my_record.score ?? '—')}</span>
             ${data.my_record.completed_at ? `<small class='text-muted ms-2'>${formatDateTime(data.my_record.completed_at)}</small>` : ''}
         </div>
-        ${data.my_record.ai_feedback ? `<div class='mt-2'><div class='fw-bold'>AI反馈：</div><div>${data.my_record.ai_feedback}</div></div>` : ''}
-        ${data.my_record.reason ? `<div class='mt-2'><div class='fw-bold'>评分理由：</div><div>${data.my_record.reason}</div></div>` : ''}
+        ${data.my_record.ai_feedback ? `<div class='mt-2'><div class='fw-bold'>AI反馈：</div><div class="content-wrap">${data.my_record.ai_feedback}</div></div>` : ''}
+        ${data.my_record.reason ? `<div class='mt-2'><div class='fw-bold'>评分理由：</div><div class="content-wrap">${data.my_record.reason}</div></div>` : ''}
       </div>
       <div class="mb-2">
         <div class="fw-bold">标准答案：</div>
-        <ol>${data.standard_answers.map(a=>`<li>${a.answer_item}</li>`).join('')}</ol>
+        <ol>${data.standard_answers.map(a=>`<li style="word-break:break-word;">${a.answer_item}</li>`).join('')}</ol>
       </div>`;
     document.getElementById('wd-content').innerHTML = html;
   }

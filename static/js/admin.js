@@ -2454,7 +2454,7 @@ function showExamQrCode(examId) {
                             <p class="text-muted small mb-0">生成二维码中...</p>
                         </div>
                         <div id="qr-result" style="display:none;">
-                            <img id="qr-img" class="img-fluid border rounded" alt="QR Code">
+                            <img id="qr-img" class="img-fluid border rounded" alt="QR Code" onload="$('#qr-loading').hide();$('#qr-result').show();" onerror="$('#qr-loading').hide();$('#qr-error-msg').text('二维码加载失败，请确认已登录');$('#qr-error').show();">
                             <p class="text-muted small mt-2">用手机扫描进入考试</p>
                         </div>
                         <div id="qr-error" class="py-3 text-danger" style="display:none;">
@@ -2468,35 +2468,8 @@ function showExamQrCode(examId) {
     $('#modal-container').html(modal);
     $('#qrModal').modal('show');
 
-    const token = localStorage.getItem('access_token');
-    const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
-
-    fetch('/admin/exams/' + examId + '/qr-code', {
-        headers: headers,
-        credentials: 'same-origin'
-    })
-        .then(function(resp) {
-            if (!resp.ok) throw new Error('服务器返回 ' + resp.status);
-            return resp.blob();
-        })
-        .then(function(blob) {
-            if (blob.type.startsWith('image/')) {
-                $('#qr-loading').hide();
-                var oldUrl = $('#qr-img').attr('src');
-                if (oldUrl && oldUrl.startsWith('blob:')) {
-                    URL.revokeObjectURL(oldUrl);
-                }
-                $('#qr-img').attr('src', URL.createObjectURL(blob));
-                $('#qr-result').show();
-            } else {
-                throw new Error('返回格式不是图片（可能是登录页面）');
-            }
-        })
-        .catch(function(err) {
-            $('#qr-loading').hide();
-            $('#qr-error-msg').text('二维码加载失败：' + err.message);
-            $('#qr-error').show();
-        });
+    // 直接用 <img src> 加载，利用 session cookie 鉴权，避免 blob: CSP 问题
+    $('#qr-img').attr('src', '/admin/exams/' + examId + '/qr-code?t=' + Date.now());
 }
 
 function publishExam(examId) {
@@ -2953,14 +2926,14 @@ function reviewExam(examId) {
                                                 </div>
                                             </div>
                                             <div class="card-body py-2">
-                                                <div class="mb-2"><small class="text-muted">题目：</small>${a.question}</div>
-                                                <div class="mb-2"><small class="text-muted">考生作答：</small><div class="border rounded p-2 bg-white">${a.user_answer || '<span class="text-muted">(未作答)</span>'}</div></div>
-                                                ${a.ai_feedback ? '<div class="mb-2"><small class="text-muted">AI 反馈：</small><div class="border rounded p-2 bg-white">' + a.ai_feedback + '</div></div>' : ''}
+                                                <div class="mb-2 content-wrap"><small class="text-muted">题目：</small>${a.question}</div>
+                                                <div class="mb-2"><small class="text-muted">考生作答：</small><div class="border rounded p-2 bg-white content-wrap">${a.user_answer || '<span class="text-muted">(未作答)</span>'}</div></div>
+                                                ${a.ai_feedback ? '<div class="mb-2"><small class="text-muted">AI 反馈：</small><div class="border rounded p-2 bg-white content-wrap">' + a.ai_feedback + '</div></div>' : ''}
                                                 ${a.standard_answers && a.standard_answers.length ? `
                                                     <div class="mb-2"><small class="text-muted">标准答案：</small>
-                                                        <div class="border rounded p-2 bg-white">
+                                                        <div class="border rounded p-2 bg-white content-wrap">
                                                             ${a.standard_answers.map(function(sa) {
-                                                                return '<span class="badge bg-light text-dark me-1 mb-1">' + sa.answer_item + (sa.score_weight !== 1 ? ' (权重:' + sa.score_weight + ')' : '') + '</span>';
+                                                                return '<span class="badge bg-light text-dark me-1 mb-1" style="white-space:normal;word-break:break-word;">' + sa.answer_item + (sa.score_weight !== 1 ? ' (权重:' + sa.score_weight + ')' : '') + '</span>';
                                                             }).join('')}
                                                         </div>
                                                     </div>

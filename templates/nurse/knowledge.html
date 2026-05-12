@@ -125,15 +125,15 @@
       </div>
       <div class="feedback-container">
         <h6><i class="fas fa-comments me-2"></i>AI反馈：</h6>
-        <p>${result.feedback || ''}</p>
-        ${result.reason ? `<h6 class="mt-2"><i class='fas fa-info-circle me-2'></i>评分理由</h6><p>${result.reason}</p>`:''}
+        <p class="content-wrap">${result.feedback || ''}</p>
+        ${result.reason ? `<h6 class="mt-2"><i class='fas fa-info-circle me-2'></i>评分理由</h6><p class="content-wrap">${result.reason}</p>`:''}
         ${result.covered_points?.length ? `<h6 class="text-success mt-3"><i class="fas fa-check-circle me-2"></i>答对要点</h6><ul>${result.covered_points.map(p=>`<li class='text-success'><i class='fas fa-check me-2'></i>${p}</li>`).join('')}</ul>`:''}
         ${result.missed_points?.length ? `<h6 class="text-warning mt-3"><i class="fas fa-exclamation-triangle me-2"></i>遗漏要点</h6><ul>${result.missed_points.map(p=>`<li class='text-warning'><i class='fas fa-minus me-2'></i>${p}</li>`).join('')}</ul>`:''}
         ${result.suggestions ? `<h6 class="text-info mt-3"><i class="fas fa-lightbulb me-2"></i>改进建议</h6><p class="text-info">${result.suggestions}</p>`:''}
       </div>
       <div class="mt-3">
         <h6><i class="fas fa-clipboard-list me-2"></i>标准答案</h6>
-        <ol>${std.map(a=>`<li>${a}</li>`).join('')}</ol>
+        <ol>${std.map(a=>`<li style="word-break:break-word;">${a}</li>`).join('')}</ol>
       </div>`;
     $('#k-eval-body').html(html); $('#k-eval-card').removeClass('d-none');
   }
