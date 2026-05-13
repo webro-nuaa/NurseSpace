@@ -182,7 +182,7 @@
                             // 根据角色跳转（支持 next 参数）
                             setTimeout(() => {
                                 var target = nextUrl || (response.user.role === 'admin' ? '/admin' : '/nurse');
-                                window.location.href = target;
+                                window.location.replace(target);
                             }, 1000);
                         } else {
                             showAlert(response.message, 'error');

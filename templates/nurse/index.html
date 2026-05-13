@@ -108,10 +108,36 @@
             case 'points': navigateTo('points'); break;
             default: navigateTo('dashboard');
         }
+
+        // Push a guard state at dashboard to intercept back-button exit
+        // History after: [guard: dashboard] → [view: current]
+        (function() {
+            var u = new URL(window.location);
+            u.searchParams.set('tab', 'dashboard');
+            u.searchParams.delete('category_id');
+            u.searchParams.delete('case_id');
+            var guardUrl = u.toString();
+            window.history.replaceState({_spaGuard: true}, '', guardUrl);
+            window.history.pushState({}, '', window.location.href);
+        })();
     });
+
+    var _spaExiting = false;
 
     // Handle browser back/forward: restore SPA state from URL params
     window.addEventListener('popstate', function(event) {
+        // Intercept back-button at SPA boundary (dashboard guard): show exit confirmation
+        if (event.state && event.state._spaGuard) {
+            window.history.pushState({_spaGuard: true}, '', window.location.href);
+            if (!_spaExiting && confirm('确定要退出 NurseSpace 吗？')) {
+                _spaExiting = true;
+                window.history.go(-2);
+            } else {
+                loadDashboard();
+            }
+            return;
+        }
+
         _popstateInProgress = true;
         const qs = new URLSearchParams(location.search);
         const tab = qs.get('tab');
