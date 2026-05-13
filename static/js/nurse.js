@@ -394,87 +394,86 @@ function loadWeaknessAnalysis() {
                 priority_areas: Array.isArray(raw.priority_areas) ? raw.priority_areas : []
             };
             const html = `
-                <div class="page-title d-flex justify-content-between align-items-center">
+                <div class="page-title d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div>
                         <h2><i class="fas fa-chart-line me-2"></i>薄弱点分析</h2>
-                        <p class="text-muted mb-0">基于您的错题数据，AI为您生成个性化学习建议${generatedAt ? `（上次分析：${formatDateTime(generatedAt)}）` : '（尚未进行分析）'}</p>
+                        <p class="text-muted mb-0">基于您的错题数据，AI为您生成个性化学习建议${generatedAt ? `（上次分析：${formatDateTime(generatedAt)}）` : ''}</p>
                     </div>
-                    <div class="text-end">
-                        <button class="btn btn-primary btn-lg btn-glow shadow" id="btn-run-weakness" style="padding: 10px 22px;">
-                            <i class="fas fa-magic me-2"></i>${generatedAt ? '重新分析' : '开始分析'}
-                        </button>
-                        <div class="small text-muted mt-1">点击开始将调用AI生成分析</div>
-                    </div>
+                    <button class="btn btn-primary btn-glow" id="btn-run-weakness" title="${generatedAt ? '重新AI分析' : '开始AI分析'}">
+                        <i class="fas fa-magic"></i><span class="d-none d-md-inline ms-1">${generatedAt ? '重新分析' : '开始分析'}</span>
+                    </button>
                 </div>
-                
+
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="card">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
                             <div class="card-header">
-                                <h5><i class="fas fa-exclamation-circle me-2"></i>薄弱领域</h5>
+                                <h6 class="mb-0"><i class="fas fa-exclamation-circle me-2"></i>薄弱领域</h6>
                             </div>
                             <div class="card-body">
-                                ${analysis.weak_categories.length > 0 ? 
+                                ${analysis.weak_categories.length > 0 ?
                                     analysis.weak_categories.map(category => `
-                                        <span class="badge bg-warning me-2 mb-2">${category}</span>
-                                    `).join('') : 
+                                        <span class="badge bg-warning me-2 mb-2 content-wrap">${category}</span>
+                                    `).join('') :
                                     '<p class="text-muted">暂无薄弱领域数据</p>'
                                 }
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="col-md-6">
-                        <div class="card">
+
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
                             <div class="card-header">
-                                <h5><i class="fas fa-list me-2"></i>主要问题</h5>
+                                <h6 class="mb-0"><i class="fas fa-list me-2"></i>主要问题</h6>
                             </div>
                             <div class="card-body">
-                                <ul class="list-unstyled">
-                                    ${analysis.main_issues.map(issue => `
-                                        <li class="mb-2">
-                                            <i class="fas fa-caret-right text-warning me-2"></i>${issue}
-                                        </li>
-                                    `).join('')}
-                                </ul>
+                                ${analysis.main_issues.length > 0 ? `
+                                    <ul class="list-unstyled mb-0">
+                                        ${analysis.main_issues.map(issue => `
+                                            <li class="mb-2 content-wrap">
+                                                <i class="fas fa-caret-right text-warning me-2"></i>${issue}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                ` : '<p class="text-muted">暂无主要问题数据</p>'}
                             </div>
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="card">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
                             <div class="card-header">
-                                <h5><i class="fas fa-lightbulb me-2"></i>改进建议</h5>
+                                <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>改进建议</h6>
                             </div>
                             <div class="card-body">
-                                ${analysis.improvement_suggestions.length > 0 ? 
+                                ${analysis.improvement_suggestions.length > 0 ?
                                     analysis.improvement_suggestions.map(suggestion => `
-                                        <div class="mb-3">
+                                        <div class="mb-3 content-wrap">
                                             <h6 class="text-primary">${suggestion.category || '综合'}</h6>
-                                            <p class="small">${suggestion.suggestion || ''}</p>
+                                            <p class="small mb-0">${suggestion.suggestion || ''}</p>
                                         </div>
-                                    `).join('') : 
+                                    `).join('') :
                                     '<p class="text-muted">暂无具体建议</p>'
                                 }
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="col-md-6">
-                        <div class="card">
+
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
                             <div class="card-header">
-                                <h5><i class="fas fa-graduation-cap me-2"></i>学习计划</h5>
+                                <h6 class="mb-0"><i class="fas fa-graduation-cap me-2"></i>学习计划</h6>
                             </div>
                             <div class="card-body">
-                                <p>${analysis.study_plan}</p>
-                                
+                                <p class="content-wrap">${analysis.study_plan || '暂无学习计划'}</p>
+
                                 ${analysis.priority_areas.length > 0 ? `
                                     <div class="mt-3">
                                         <h6>优先加强领域：</h6>
                                         ${analysis.priority_areas.map(area => `
-                                            <span class="badge bg-danger me-2">${area}</span>
+                                            <span class="badge bg-danger me-2 mb-1 content-wrap">${area}</span>
                                         `).join('')}
                                     </div>
                                 ` : ''}
@@ -488,7 +487,7 @@ function loadWeaknessAnalysis() {
 
             // 绑定“开始/重新分析”按钮：调用保存接口
             $('#btn-run-weakness').on('click', function(){
-                $('#btn-run-weakness').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>分析中...');
+                $('#btn-run-weakness').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i><span class="d-none d-md-inline ms-1">分析中...</span>');
                 $.ajax({
                     url: '/nurse/weakness-analysis/run',
                     method: 'POST',
@@ -503,7 +502,7 @@ function loadWeaknessAnalysis() {
                         showAlert('分析失败，请稍后重试', 'error');
                     },
                     complete: function(){
-                        $('#btn-run-weakness').prop('disabled', false).html('<i class="fas fa-rotate-right me-1"></i>重新分析');
+                        $('#btn-run-weakness').prop('disabled', false).html('<i class="fas fa-rotate-right"></i><span class="d-none d-md-inline ms-1">重新分析</span>');
                     }
                 });
             });
