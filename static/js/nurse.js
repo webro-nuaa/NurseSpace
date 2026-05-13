@@ -107,6 +107,10 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                 return;
             }
 
+            // 从服务端数据补充类别名（页面刷新/deeplink 时 currentCategoryName 可能为空）
+            if (!currentCategoryName && data.cases && data.cases.length > 0 && data.cases[0].category) {
+                currentCategoryName = data.cases[0].category;
+            }
             const html = `
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
@@ -239,8 +243,12 @@ function viewCase(caseId) {
             caseKnowledgeMap = {};
             (data.extended_knowledge || []).forEach(k => caseKnowledgeMap[k.id] = k);
 
+            // 持久化类别信息，popstate 回退时可用
+            if (data.case.category_id) currentCategoryId = data.case.category_id;
+            if (data.case.category_name) currentCategoryName = data.case.category_name;
             const catId = data.case.category_id || currentCategoryId;
             const catName = data.case.category_name || currentCategoryName || '案例学习';
+            const catNameEsc = (catName || '').replace(/'/g, "\\'");
             const html = `
                 <div class="row">
                     <div class="col-12">
@@ -253,7 +261,7 @@ function viewCase(caseId) {
                                     <a href="#" onclick="loadCases(1, null)">案例学习</a>
                                 </li>
                                 <li class="breadcrumb-item">
-                                    <a href="#" onclick="loadCases(1, ${catId}, '${(catName || '').replace(/'/g, "\\'")}')">${catName}</a>
+                                    <a href="#" onclick="loadCases(1, ${catId}, '${catNameEsc}')">${catName}</a>
                                 </li>
                                 <li class="breadcrumb-item active">${data.case.title}</li>
                             </ol>
