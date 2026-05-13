@@ -944,17 +944,27 @@ function loadPointRecords(page = 1) {
 //  Standalone page helpers
 // ============================================================
 
-function initStandaloneNav(activeTab) {
+// 独立页面统一鉴权初始化：优先 checkLogin（SPA），fallback 从 URL/localStorage 提取 token
+function initStandalonePageAuth() {
+    if (typeof checkLogin === 'function') {
+        checkLogin();
+        return;
+    }
     let token = localStorage.getItem('access_token');
-    // Fallback: extract token from current URL (standalone pages get token via query param)
     if (!token) {
-        const qs = new URLSearchParams(location.search);
-        const urlToken = qs.get('token');
+        const urlToken = new URLSearchParams(location.search).get('token');
         if (urlToken) {
             token = urlToken;
             localStorage.setItem('access_token', token);
         }
     }
+    if (token) {
+        $.ajaxSetup({ headers: { 'Authorization': 'Bearer ' + token } });
+    }
+}
+
+function initStandaloneNav(activeTab) {
+    let token = localStorage.getItem('access_token');
     if (!token) return;
 
     $('.navbar-nav-horizontal .nav-link').each(function () {

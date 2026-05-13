@@ -221,20 +221,7 @@
 
   $(document).ready(function(){
 
-    // 统一与其他页面：检查登录并设置用户信息与token
-    if (typeof checkLogin === 'function') {
-      checkLogin();
-    } else {
-      const token = localStorage.getItem('access_token');
-      if (token) {
-        $.ajaxSetup({
-          headers: {
-            'Authorization': 'Bearer ' + token
-          }
-        });
-      }
-    }
-
+    initStandalonePageAuth();
     initStandaloneNav('cases');
 
     // Breadcrumb + back navigation from case info

@@ -140,9 +140,7 @@
   }
 
   $(function(){
-    const token = localStorage.getItem('access_token');
-    if (token){ $.ajaxSetup({ headers: { 'Authorization': 'Bearer ' + token }}); }
-
+    initStandalonePageAuth();
     initStandaloneNav('cases');
 
     // Breadcrumb from knowledge → case info

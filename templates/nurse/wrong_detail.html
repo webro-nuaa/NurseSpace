@@ -112,9 +112,7 @@
   }
 
   $(function(){
-    const token = localStorage.getItem('access_token');
-    if (token){ $.ajaxSetup({ headers: { 'Authorization': 'Bearer ' + token }}); }
-
+    initStandalonePageAuth();
     initStandaloneNav('wrongs');
     $('#breadcrumb-container').html(renderStandaloneBreadcrumb([
       {label: '错题集', href: hrefWithToken('/nurse?tab=wrongs')},
