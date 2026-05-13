@@ -110,8 +110,6 @@ class ExtendedKnowledge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     case_id = db.Column(db.Integer, db.ForeignKey('cases.id'), nullable=False)
     question = db.Column(db.Text, nullable=False)
-    answer = db.Column(db.Text, nullable=True)
-    score = db.Column(db.Numeric(5, 2), default=5.00)
     created_at = db.Column(db.DateTime, default=_utcnow)
 
     # 关系
