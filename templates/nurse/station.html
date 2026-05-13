@@ -127,6 +127,10 @@
 
   $(document).ready(function(){
     if (typeof checkLogin === 'function') { checkLogin(); }
+    else {
+        const token = localStorage.getItem('access_token');
+        if (token) { $.ajaxSetup({ headers: { 'Authorization': 'Bearer ' + token } }); }
+    }
     initStandaloneNav('cases');
 
     // Build breadcrumb + back navigation from case info
