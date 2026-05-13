@@ -84,6 +84,12 @@
     $(document).ready(function() {
         checkLogin();
 
+        // Save original URL params before replaceState overwrites location.search
+        const qs = new URLSearchParams(location.search);
+        const tab = qs.get('tab');
+        const categoryId = qs.get('category_id');
+        const caseId = qs.get('case_id');
+
         // Build dashboard URL for guard state
         var _guardUrl = (function() {
             var u = new URL(window.location);
@@ -95,11 +101,6 @@
 
         // Replace initial page load with exit guard at dashboard
         window.history.replaceState({_spaGuard: true}, '', _guardUrl);
-
-        const qs = new URLSearchParams(location.search);
-        const tab = qs.get('tab');
-        const categoryId = qs.get('category_id');
-        const caseId = qs.get('case_id');
 
         // For deep links: push dashboard first, so back returns there before exit confirm
         if (tab && tab !== 'dashboard') {

@@ -359,13 +359,25 @@ function viewCase(caseId) {
                                                 <div class="pe-2">
                                                     <div class="fw-semibold mb-1">${k.question}</div>
                                                 </div>
-                                                <div class="d-flex gap-1">
-                                                    <a class="btn btn-sm btn-outline-primary" href="${hrefWithToken('/nurse/knowledge?id=' + k.id)}" title="作答">
-                                                        <i class="fas fa-pen"></i><span class="d-none d-md-inline ms-1">作答</span>
-                                                    </a>
-                                                    <a class="btn btn-sm btn-outline-info" href="${hrefWithToken('/nurse/knowledge-answer-view?id=' + k.id)}" title="查看答案">
-                                                        <i class="fas fa-eye"></i><span class="d-none d-md-inline ms-1">查看答案</span>
-                                                    </a>
+                                                <div class="text-end">
+                                                    ${k.completed ?
+                                                        (() => {
+                                                            const s = (k.score === null || k.score === undefined) ? null : Number(k.score);
+                                                            const label = (s === null || isNaN(s)) ? '未评分' : `${s}分`;
+                                                            const cls = getScoreBadgeClass(s);
+                                                            return `<span class="badge ${cls}">${label}</span>`;
+                                                        })() :
+                                                        '<span class="badge bg-secondary">未完成</span>'
+                                                    }
+                                                    <br>
+                                                    <div class="d-flex gap-1">
+                                                        <a class="btn btn-sm btn-outline-primary" href="${hrefWithToken('/nurse/knowledge?id=' + k.id)}" title="${k.completed ? '重新作答' : '作答'}">
+                                                            <i class="fas fa-pen"></i><span class="d-none d-md-inline ms-1">${k.completed ? '重新作答' : '作答'}</span>
+                                                        </a>
+                                                        <a class="btn btn-sm btn-outline-info" href="${hrefWithToken('/nurse/knowledge-answer-view?id=' + k.id)}" title="查看答案">
+                                                            <i class="fas fa-eye"></i><span class="d-none d-md-inline ms-1">查看答案</span>
+                                                        </a>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -418,7 +430,7 @@ function loadWrongQuestions(page = 1) {
                                                         </div>
                                                         <div class="mb-1 small text-muted"><i class="fas fa-briefcase me-1"></i>${wrong.case_title}</div>
                                                         <div class="fw-semibold mb-2 line-clamp-2">${wrong.question}</div>
-                                                        <a href="${hrefWithToken('/nurse/wrong-detail?station=' + wrong.station_id)}" class="stretched-link" aria-label="查看错题详情"></a>
+                                                        <a href="${wrong.type === 'knowledge' ? hrefWithToken('/nurse/knowledge?id=' + wrong.knowledge_id) : hrefWithToken('/nurse/wrong-detail?station=' + wrong.station_id)}" class="stretched-link" aria-label="查看错题详情"></a>
                                                         <div class="mt-auto d-flex align-items-center pt-2">
                                                             <small class="text-muted"><i class="fas fa-clock me-1"></i>${formatDateTime(wrong.created_at)}</small>
                                                         </div>

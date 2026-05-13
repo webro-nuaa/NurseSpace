@@ -110,6 +110,8 @@ class ExtendedKnowledge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     case_id = db.Column(db.Integer, db.ForeignKey('cases.id'), nullable=False)
     question = db.Column(db.Text, nullable=False)
+    answer = db.Column(db.Text, nullable=True)
+    score = db.Column(db.Numeric(5, 2), default=5.00)
     created_at = db.Column(db.DateTime, default=_utcnow)
 
     # 关系
@@ -163,6 +165,18 @@ class LearningRecord(db.Model):
     ai_feedback = db.Column(db.Text)
     completed_at = db.Column(db.DateTime, default=_utcnow)
 
+class KnowledgeLearningRecord(db.Model):
+    __tablename__ = 'knowledge_learning_records'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    knowledge_id = db.Column(db.Integer, db.ForeignKey('extended_knowledge.id'), nullable=False)
+    user_answer = db.Column(db.Text)
+    score = db.Column(db.Numeric(5, 2))
+    max_score = db.Column(db.Numeric(5, 2), default=100.00)
+    ai_feedback = db.Column(db.Text)
+    completed_at = db.Column(db.DateTime, default=_utcnow)
+
 class WrongQuestion(db.Model):
     __tablename__ = 'wrong_questions'
     
@@ -173,6 +187,17 @@ class WrongQuestion(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow)
     
     __table_args__ = (db.UniqueConstraint('user_id', 'station_id', name='unique_user_station'),)
+
+class KnowledgeWrongQuestion(db.Model):
+    __tablename__ = 'knowledge_wrong_questions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    knowledge_id = db.Column(db.Integer, db.ForeignKey('extended_knowledge.id'), nullable=False)
+    score = db.Column(db.Numeric(5, 2))
+    created_at = db.Column(db.DateTime, default=_utcnow)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'knowledge_id', name='unique_user_knowledge'),)
 
 class Exam(db.Model):
     __tablename__ = 'exams'
@@ -238,7 +263,7 @@ class PointRecord(db.Model):
     points = db.Column(db.Integer, nullable=False)
     reason = db.Column(db.String(200))
     related_id = db.Column(db.Integer)
-    related_type = db.Column(db.Enum('learning', 'exam'))
+    related_type = db.Column(db.Enum('learning', 'exam', 'knowledge'))
     created_at = db.Column(db.DateTime, default=_utcnow)
 
 
