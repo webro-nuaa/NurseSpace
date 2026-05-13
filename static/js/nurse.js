@@ -72,24 +72,7 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                     </div>
                     ${categoryId ? `<button class="btn btn-outline-light btn-sm" onclick="loadCases(1, null)"><i class=\"fas fa-th-large me-1\"></i>返回类别</button>` : ''}
                 </div>
-                
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <div class="search-box">
-                            <i class="fas fa-search"></i>
-                            <input type="text" class="form-control" placeholder="搜索案例..." id="case-search">
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-select" id="category-filter" onchange="filterByCategory()">
-                            <option value="">所有类别</option>
-                            ${data.categories.map(cat => `
-                                <option value="${cat.id}" ${categoryId == cat.id ? 'selected' : ''}>${cat.name}</option>
-                            `).join('')}
-                        </select>
-                    </div>
-                </div>
-                
+
                 <div class="row">
                     ${data.cases.map((case_, index) => `
                         <div class="col-md-6 col-lg-4 mb-4">
@@ -133,13 +116,7 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                     $(this).css('animation-delay', (index * 0.1) + 's');
                 });
             }, 100);
-            
-            // 搜索功能
-            $('#case-search').on('input', debounce(function() {
-                const keyword = $(this).val();
-                searchCases(keyword);
-            }, 300));
-            
+
             // 添加卡片悬浮效果
             $('.card').hover(
                 function() {
@@ -154,23 +131,6 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
 }
 
 // 搜索案例（客户端过滤）
-function searchCases(keyword) {
-    const kw = (keyword || '').trim().toLowerCase();
-    const cards = document.querySelectorAll('#main-content .col-md-6.col-lg-4.mb-4');
-    cards.forEach(function(card) {
-        const title = (card.querySelector('.card-title')?.textContent || '').toLowerCase();
-        card.style.display = (!kw || title.includes(kw)) ? '' : 'none';
-    });
-}
-
-// 按类别筛选
-function filterByCategory() {
-    const categoryId = $('#category-filter').val();
-    const select = document.getElementById('category-filter');
-    const name = select && select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : null;
-    loadCases(1, categoryId || null, name);
-}
-
 // 查看案例详情
 function viewCase(caseId) {
     currentCaseId = caseId;
