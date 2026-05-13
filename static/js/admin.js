@@ -2891,7 +2891,7 @@ function reviewExam(examId) {
 
         let rows = '';
         if (participants.length === 0) {
-            rows = '<tr><td colspan="7" class="text-center text-muted py-4">暂无考生提交</td></tr>';
+            rows = '<tr><td colspan="5" class="text-center text-muted py-4">暂无考生提交</td></tr>';
         } else {
             participants.forEach(function(p) {
                 rows += `
@@ -2901,52 +2901,9 @@ function reviewExam(examId) {
                         <td><span class="fw-bold">${p.total_score.toFixed(0)}</span> / ${p.max_score.toFixed(0)}</td>
                         <td>${p.submit_time ? formatDateTime(p.submit_time) : '-'}</td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary" onclick="toggleParticipantAnswers(${p.record_id})" title="展开答题详情">
-                                <i class="fas fa-chevron-down" id="toggle-icon-${p.record_id}"></i>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewParticipantDetail(${examId}, ${p.record_id})" title="查看答题详情">
+                                <i class="fas fa-eye"></i>
                             </button>
-                        </td>
-                    </tr>
-                    <tr id="answers-row-${p.record_id}" style="display:none;">
-                        <td colspan="5" class="p-0">
-                            <div class="p-3 bg-light border-top">
-                                <div class="fw-bold mb-2">答题详情</div>
-                                ${p.answers.map(function(a, i) {
-                                    return `
-                                        <div class="card mb-2">
-                                            <div class="card-header py-2">
-                                                <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
-                                                    <div>
-                                                        <strong>#${i + 1}</strong> ${a.station_name}
-                                                        <small class="text-muted d-block d-md-inline-block ms-md-1">${a.case_title}</small>
-                                                    </div>
-                                                    <div class="d-flex align-items-center gap-2">
-                                                        <span class="fw-bold text-nowrap" id="score-display-${a.id}">${a.score.toFixed(0)} 分</span>
-                                                        <button class="btn btn-sm btn-outline-info" id="re-score-btn-${a.id}" onclick="reScoreAnswer(${examId}, ${a.id})" title="AI 重新评分">
-                                                            <i class="fas fa-robot"></i><span class="d-none d-md-inline ms-1">重新评分</span>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-warning" onclick="showScoreEdit(${examId}, ${a.id}, ${a.score})" title="调整分数">
-                                                            <i class="fas fa-pen"></i>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="card-body py-2">
-                                                <div class="mb-2 content-wrap"><small class="text-muted">题目：</small>${a.question}</div>
-                                                <div class="mb-2"><small class="text-muted">考生作答：</small><div class="border rounded p-2 bg-white content-wrap">${a.user_answer || '<span class="text-muted">(未作答)</span>'}</div></div>
-                                                ${a.ai_feedback ? '<div class="mb-2"><small class="text-muted">AI 反馈：</small><div class="border rounded p-2 bg-white content-wrap">' + a.ai_feedback + '</div></div>' : ''}
-                                                ${a.standard_answers && a.standard_answers.length ? `
-                                                    <div class="mb-2"><small class="text-muted">标准答案：</small>
-                                                        <div class="border rounded p-3 bg-white">
-                                                            <ol class="mb-0 ps-3">${a.standard_answers.map(function(sa, idx) {
-                                                                return '<li class="mb-1 content-wrap">' + sa.answer_item + (sa.score_weight !== 1 ? ' <span class="badge bg-info ms-1" style="font-size:0.65rem;">权重 ' + sa.score_weight + '</span>' : '') + '</li>';
-                                                            }).join('')}</ol>
-                                                        </div>
-                                                    </div>
-                                                ` : ''}
-                                            </div>
-                                        </div>`;
-                                }).join('')}
-                            </div>
                         </td>
                     </tr>`;
             });
@@ -2996,19 +2953,89 @@ function reviewExam(examId) {
     });
 }
 
-function toggleParticipantAnswers(recordId) {
-    const row = $('#answers-row-' + recordId);
-    const icon = $('#toggle-icon-' + recordId);
-    if (row.is(':visible')) {
-        row.hide();
-        icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
-    } else {
-        row.show();
-        icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
-    }
+function viewParticipantDetail(examId, recordId) {
+    setActiveNav('考试管理');
+    $.get(`/admin/exams/${examId}/review/${recordId}`, function(res) {
+        if (!res.success) { showAlert(res.message||'加载失败','error'); return; }
+        const p = res.data.participant;
+        const exam = res.data.exam;
+
+        let cards = '';
+        if (p.answers.length === 0) {
+            cards = '<p class="text-muted text-center py-4">暂无答题记录</p>';
+        } else {
+            cards = p.answers.map(function(a, i) {
+                return `
+                    <div class="card mb-3">
+                        <div class="card-header py-2">
+                            <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                                <div>
+                                    <strong>#${i + 1}</strong> ${a.station_name}
+                                    <small class="text-muted d-block d-md-inline-block ms-md-1">${a.case_title}</small>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="fw-bold text-nowrap" id="score-display-${a.id}">${a.score.toFixed(0)} 分</span>
+                                    <button class="btn btn-sm btn-outline-info" id="re-score-btn-${a.id}" onclick="reScoreAnswer(${examId}, ${a.id}, ${p.record_id})" title="AI 重新评分">
+                                        <i class="fas fa-robot"></i><span class="d-none d-md-inline ms-1">重新评分</span>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning" onclick="showScoreEdit(${examId}, ${a.id}, ${a.score}, ${p.record_id})" title="调整分数">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body py-2">
+                            <div class="mb-2 content-wrap"><small class="text-muted">题目：</small>${a.question}</div>
+                            <div class="mb-2"><small class="text-muted">考生作答：</small><div class="border rounded p-2 bg-white content-wrap">${a.user_answer || '<span class="text-muted">(未作答)</span>'}</div></div>
+                            ${a.ai_feedback ? '<div class="mb-2"><small class="text-muted">AI 反馈：</small><div class="border rounded p-2 bg-white content-wrap">' + a.ai_feedback + '</div></div>' : ''}
+                            ${a.standard_answers && a.standard_answers.length ? `
+                                <div class="mb-2"><small class="text-muted">标准答案：</small>
+                                    <div class="border rounded p-3 bg-white">
+                                        <ol class="mb-0 ps-3">${a.standard_answers.map(function(sa) {
+                                            return '<li class="mb-1 content-wrap">' + sa.answer_item + (sa.score_weight !== 1 ? ' <span class="badge bg-info ms-1" style="font-size:0.65rem;">权重 ' + sa.score_weight + '</span>' : '') + '</li>';
+                                        }).join('')}</ol>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        const html = `
+            <nav aria-label="breadcrumb"><ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="#" onclick="loadExams()">考试管理</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="reviewExam(${examId})">批阅：${exam.title}</a></li>
+                <li class="breadcrumb-item active">${p.real_name}</li>
+            </ol></nav>
+
+            <div class="page-header">
+                <div>
+                    <h4><i class="fas fa-user-check me-2"></i>${p.real_name} 的答题详情</h4>
+                    <p class="text-muted mb-0">
+                        ${p.department ? '<span class="me-3"><i class="fas fa-building me-1"></i>' + p.department + '</span>' : ''}
+                        <span class="me-3"><i class="fas fa-star me-1"></i>总分：${p.total_score.toFixed(0)} / ${p.max_score.toFixed(0)}</span>
+                        ${p.submit_time ? '<span><i class="fas fa-clock me-1"></i>提交：' + formatDateTime(p.submit_time) + '</span>' : ''}
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="#" class="btn btn-sm btn-outline-secondary" onclick="reviewExam(${examId}); return false;">
+                        <i class="fas fa-arrow-left me-1"></i>返回考生列表
+                    </a>
+                </div>
+            </div>
+
+            ${cards}`;
+
+        $('#main-content').html(html);
+    });
 }
 
-function showScoreEdit(examId, answerId, currentScore) {
+function toggleParticipantAnswers(recordId) {
+    // No longer used — replaced by viewParticipantDetail page navigation
+}
+
+function showScoreEdit(examId, answerId, currentScore, recordId) {
     const newScore = prompt('调整分数（当前：' + currentScore.toFixed(0) + '）：', currentScore.toFixed(0));
     if (newScore === null) return;
 
@@ -3025,16 +3052,18 @@ function showScoreEdit(examId, answerId, currentScore) {
         data: JSON.stringify({ score: scoreNum }),
         success: function(res) {
             if (res.success) {
-                $('#score-display-' + answerId).text(res.data.score.toFixed(0) + ' 分');
                 showAlert('分数已更新', 'success');
-                // Reload to update total
-                setTimeout(function() { reviewExam(examId); }, 500);
+                if (recordId) {
+                    setTimeout(function() { viewParticipantDetail(examId, recordId); }, 500);
+                } else {
+                    setTimeout(function() { reviewExam(examId); }, 500);
+                }
             } else { showAlert(res.message||'更新失败','error'); }
         }
     });
 }
 
-function reScoreAnswer(examId, answerId) {
+function reScoreAnswer(examId, answerId, recordId) {
     if (!confirm('确定用 AI 重新评分吗？这将覆盖当前分数和反馈。')) return;
     var $btn = $('#re-score-btn-' + answerId);
     $btn.prop('disabled', true).find('i').addClass('fa-spin');
@@ -3044,9 +3073,12 @@ function reScoreAnswer(examId, answerId) {
         contentType: 'application/json',
         success: function(res) {
             if (res.success) {
-                $('#score-display-' + answerId).text(res.data.score.toFixed(0) + ' 分');
                 showAlert('AI 重新评分完成', 'success');
-                setTimeout(function() { reviewExam(examId); }, 500);
+                if (recordId) {
+                    setTimeout(function() { viewParticipantDetail(examId, recordId); }, 500);
+                } else {
+                    setTimeout(function() { reviewExam(examId); }, 500);
+                }
             } else { showAlert(res.message || 'AI评分失败', 'error'); }
         },
         complete: function() {

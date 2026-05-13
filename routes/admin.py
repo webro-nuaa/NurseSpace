@@ -1194,6 +1194,66 @@ def get_exam_review(exam_id):
     })
 
 
+@admin_bp.route('/exams/<int:exam_id>/review/<int:record_id>', methods=['GET'])
+@login_or_jwt_required
+@admin_required
+def get_participant_detail(exam_id, record_id):
+    """Return a single participant's full answer details."""
+    exam = Exam.query.get_or_404(exam_id)
+    record = ExamRecord.query.filter_by(id=record_id, exam_id=exam_id).first_or_404()
+
+    user = db.session.get(User, record.user_id)
+    answers = ExamAnswer.query.filter_by(
+        exam_record_id=record.id
+    ).order_by(ExamAnswer.id).all()
+
+    answers_data = []
+    for ans in answers:
+        station = db.session.get(Station, ans.station_id) if ans.station_id else None
+        exam_question = db.session.get(ExamQuestion, ans.exam_question_id) if ans.exam_question_id else None
+        case = db.session.get(Case, exam_question.case_id) if exam_question else None
+
+        standard_answers_data = []
+        if station:
+            standard_answers_data = [
+                {'answer_item': sa.answer_item, 'score_weight': float(sa.score_weight)}
+                for sa in station.standard_answers.all()
+            ]
+
+        answers_data.append({
+            'id': ans.id,
+            'exam_question_id': ans.exam_question_id,
+            'station_id': ans.station_id,
+            'station_name': station.name if station else '',
+            'question': station.question if station else '',
+            'user_answer': ans.user_answer,
+            'score': float(ans.score) if ans.score else 0,
+            'ai_feedback': ans.ai_feedback,
+            'standard_answers': standard_answers_data,
+            'case_title': case.title if case else '',
+            'case_id': case.id if case else None
+        })
+
+    return jsonify({
+        'success': True,
+        'data': {
+            'exam': {'id': exam.id, 'title': exam.title, 'status': exam.status},
+            'participant': {
+                'record_id': record.id,
+                'user_id': user.id if user else record.user_id,
+                'real_name': user.real_name if user else '未知',
+                'username': user.username if user else '',
+                'department': user.department if user else '',
+                'total_score': float(record.total_score) if record.total_score else 0,
+                'max_score': float(record.max_score) if record.max_score else 0,
+                'start_time': record.start_time.isoformat() if record.start_time else None,
+                'submit_time': record.submit_time.isoformat() if record.submit_time else None,
+                'answers': answers_data
+            }
+        }
+    })
+
+
 @admin_bp.route('/exams/<int:exam_id>/review/<int:answer_id>/score', methods=['PUT'])
 @login_or_jwt_required
 @admin_required
