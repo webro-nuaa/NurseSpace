@@ -2931,10 +2931,10 @@ function reviewExam(examId) {
                                                 ${a.ai_feedback ? '<div class="mb-2"><small class="text-muted">AI 反馈：</small><div class="border rounded p-2 bg-white content-wrap">' + a.ai_feedback + '</div></div>' : ''}
                                                 ${a.standard_answers && a.standard_answers.length ? `
                                                     <div class="mb-2"><small class="text-muted">标准答案：</small>
-                                                        <div class="border rounded p-2 bg-white content-wrap">
-                                                            ${a.standard_answers.map(function(sa) {
-                                                                return '<span class="badge bg-light text-dark me-1 mb-1" style="white-space:normal;word-break:break-word;">' + sa.answer_item + (sa.score_weight !== 1 ? ' (权重:' + sa.score_weight + ')' : '') + '</span>';
-                                                            }).join('')}
+                                                        <div class="border rounded p-3 bg-white">
+                                                            <ol class="mb-0 ps-3">${a.standard_answers.map(function(sa, idx) {
+                                                                return '<li class="mb-1 content-wrap">' + sa.answer_item + (sa.score_weight !== 1 ? ' <span class="badge bg-info ms-1" style="font-size:0.65rem;">权重 ' + sa.score_weight + '</span>' : '') + '</li>';
+                                                            }).join('')}</ol>
                                                         </div>
                                                     </div>
                                                 ` : ''}
