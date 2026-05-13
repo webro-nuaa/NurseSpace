@@ -83,8 +83,7 @@ try:
         # 安全补枚举：point_records.related_type 加 knowledge（v3.0.3+）
         try:
             with db.engine.connect() as conn:
-                sql = 'ALTER TABLE point_records MODIFY COLUMN related_type ENUM(\'learning\',\'exam\',\'knowledge\')'
-                conn.execute(text(sql))
+                conn.execute(text(\"ALTER TABLE point_records MODIFY COLUMN related_type ENUM('learning','exam','knowledge')\"))
                 conn.commit()
                 print('[entrypoint] point_records.related_type 枚举已扩展')
         except BaseException:
