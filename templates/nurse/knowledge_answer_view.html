@@ -207,6 +207,34 @@
     document.getElementById('answers-content').innerHTML = html;
   }
 
+  // 禁止复制功能
+  function disableCopy() {
+    document.addEventListener('selectstart', function(e) {
+      e.preventDefault();
+      return false;
+    });
+    document.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      showAlert('为了保护学习效果，答案内容禁止复制', 'warning');
+      return false;
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.ctrlKey && (e.key === 'a' || e.key === 'c' || e.key === 'x')) {
+        e.preventDefault();
+        showAlert('为了保护学习效果，答案内容禁止复制', 'warning');
+        return false;
+      }
+    });
+    document.addEventListener('mousedown', function(e) {
+      if (e.target.closest('.standard-answers-list') ||
+          e.target.closest('.question-text') ||
+          e.target.closest('.assessment-text')) {
+        e.preventDefault();
+        return false;
+      }
+    });
+  }
+
   $(document).ready(function(){
     initStandalonePageAuth();
     initStandaloneNav('cases');
@@ -238,6 +266,8 @@
       } else {
         showAlert(res.message || '加载题目失败', 'error');
       }
+    }).fail(function(){
+      showAlert('网络错误，请重试', 'error');
     });
 
     // 禁止复制功能
