@@ -12,6 +12,11 @@ let currentCategoryName = null; // 当前选中的类别名称
 // 加载案例列表
 function loadCases(page = 1, categoryId = null, categoryName = null) {
     setActiveNav('案例学习');
+    // 分页点击时只有 page 参数，保持当前类别上下文
+    if (arguments.length === 1 && currentCategoryId) {
+        categoryId = currentCategoryId;
+        categoryName = currentCategoryName;
+    }
     currentPage = page;
     currentCategoryId = categoryId || null;
     if (categoryName !== undefined) currentCategoryName = categoryName;
@@ -33,16 +38,21 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                     </div>
                     <div class="row">
                         ${data.categories.map((cat, idx) => `
-                            <div class="col-md-4 mb-4">
-                                <div class="card h-100 fade-in" style="animation-delay: ${idx * 0.05}s; cursor: pointer;" onclick="loadCases(1, ${cat.id}, ${JSON.stringify(cat.name)})">
-                                    <div class="card-body d-flex flex-column justify-content-center text-center">
-                                        <div class="mb-2"><i class="fas fa-folder-open fa-2x text-primary"></i></div>
-                                        <h5 class="card-title mb-1">${cat.name}</h5>
-                                        <small class="text-muted">${cat.description || ''}</small>
+                            <div class="col-sm-6 col-lg-4 mb-3">
+                                <div class="card h-100 fade-in shadow-sm" style="animation-delay: ${idx * 0.05}s; cursor: pointer;" onclick="loadCases(1, ${cat.id}, '${(cat.name || '').replace(/'/g, "\\'")}')">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-start justify-content-between mb-2">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-folder-open fa-lg text-primary me-2"></i>
+                                                <h6 class="card-title mb-0">${cat.name}</h6>
+                                            </div>
+                                            <span class="badge bg-primary rounded-pill">${cat.case_count || 0} 案例</span>
+                                        </div>
+                                        ${cat.description ? '<p class="text-muted small mb-0">' + cat.description + '</p>' : ''}
                                     </div>
-                                    <div class="card-footer text-center bg-transparent border-0">
-                                        <button class="btn btn-primary btn-glow">
-                                            <i class="fas fa-arrow-right me-1"></i>查看该类别
+                                    <div class="card-footer bg-transparent border-top-0 pt-0">
+                                        <button type="button" class="btn btn-outline-primary btn-sm w-100">
+                                            <i class="fas fa-arrow-right me-1"></i>查看
                                         </button>
                                     </div>
                                 </div>
@@ -103,7 +113,7 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                                     </div>
                                 </div>
                                 <div class="card-footer bg-transparent border-0">
-                                    <button class="btn btn-primary btn-glow w-100" onclick="viewCase(${case_.id})">
+                                    <button type="button" class="btn btn-primary btn-glow w-100" onclick="viewCase(${case_.id})">
                                         <i class="fas fa-play me-2"></i>开始学习
                                     </button>
                                 </div>

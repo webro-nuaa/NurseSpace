@@ -145,8 +145,16 @@ def get_cases():
         })
 
     categories = CaseCategory.query.all()
+    case_counts = dict(
+        db.session.query(Case.category_id, func.count(Case.id))
+        .filter(Case.case_type == 'learning')
+        .group_by(Case.category_id).all()
+    )
     categories_data = [
-        {'id': cat.id, 'name': cat.name, 'description': cat.description}
+        {
+            'id': cat.id, 'name': cat.name, 'description': cat.description,
+            'case_count': case_counts.get(cat.id, 0)
+        }
         for cat in categories
     ]
 
