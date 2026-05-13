@@ -1781,10 +1781,8 @@ def test_ai_connection():
         start = time.time()
         if provider == 'openai':
             import openai
-            openai.api_key = api_key
-            if base_url:
-                openai.api_base = base_url
-            openai.ChatCompletion.create(
+            openai_client = openai.OpenAI(api_key=api_key, base_url=base_url or None)
+            openai_client.chat.completions.create(
                 model=model or 'gpt-4o-mini',
                 messages=[{'role': 'user', 'content': 'ping'}],
                 max_tokens=5

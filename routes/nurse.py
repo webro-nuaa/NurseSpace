@@ -12,6 +12,94 @@ from datetime import datetime, timezone
 nurse_bp = Blueprint('nurse', __name__)
 ai_evaluator = AIEvaluator()
 
+# 评分与积分阈值
+WRONG_THRESHOLD = 60       # 低于此分记入错题
+GOOD_THRESHOLD = 80        # 高于等于此分获得积分奖励
+EXCELLENT_THRESHOLD = 90   # 高于等于此分获得更高积分
+GOOD_POINTS = 10           # 良好奖励积分
+EXCELLENT_POINTS = 20      # 优秀奖励积分
+
+
+def _process_submission(user, ref_id, user_answer, question, standard_data,
+                        record_model, wrong_model, ref_field, related_type, point_reason_prefix,
+                        answers_for_response):
+    """共享的答案提交处理逻辑，供站点作答和扩展知识作答复用。"""
+    evaluation = ai_evaluator.evaluate_answer(question, user_answer, standard_data)
+
+    feedback_json = json.dumps({
+        'feedback': evaluation.get('feedback', ''),
+        'reason': evaluation.get('reason', '')
+    }, ensure_ascii=False)
+
+    existing_record = record_model.query.filter_by(
+        user_id=user.id, **{ref_field: ref_id}
+    ).first()
+
+    if existing_record:
+        existing_record.user_answer = user_answer
+        existing_record.score = evaluation['score']
+        existing_record.ai_feedback = feedback_json
+        existing_record.completed_at = datetime.now(timezone.utc)
+        learning_record = existing_record
+    else:
+        learning_record = record_model(
+            user_id=user.id,
+            user_answer=user_answer,
+            score=evaluation['score'],
+            max_score=evaluation['max_score'],
+            ai_feedback=feedback_json,
+            **{ref_field: ref_id}
+        )
+        db.session.add(learning_record)
+
+    # 错题处理
+    if evaluation['score'] < WRONG_THRESHOLD:
+        existing_wrong = wrong_model.query.filter_by(
+            user_id=user.id, **{ref_field: ref_id}
+        ).first()
+        if existing_wrong:
+            existing_wrong.score = evaluation['score']
+        else:
+            db.session.add(wrong_model(
+                user_id=user.id, score=evaluation['score'], **{ref_field: ref_id}
+            ))
+    else:
+        wrong_model.query.filter_by(
+            user_id=user.id, **{ref_field: ref_id}
+        ).delete()
+
+    # 积分奖励
+    if evaluation['score'] >= GOOD_THRESHOLD:
+        points_to_add = EXCELLENT_POINTS if evaluation['score'] >= EXCELLENT_THRESHOLD else GOOD_POINTS
+        User.query.filter_by(id=user.id).update(
+            {'points': User.points + points_to_add},
+            synchronize_session=False
+        )
+        db.session.add(PointRecord(
+            user_id=user.id,
+            points=points_to_add,
+            reason=f"{point_reason_prefix} (得分: {evaluation['score']})",
+            related_id=learning_record.id,
+            related_type=related_type
+        ))
+
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': '答案提交成功',
+        'evaluation': {
+            'score': evaluation['score'],
+            'max_score': evaluation['max_score'],
+            'feedback': evaluation['feedback'],
+            'covered_points': evaluation.get('covered_points', []),
+            'missed_points': evaluation.get('missed_points', []),
+            'suggestions': evaluation.get('suggestions', ''),
+            'reason': evaluation.get('reason', '')
+        },
+        'standard_answers': answers_for_response
+    })
+
 
 def _build_my_record(record):
     """从学习记录构建详细信息字典"""
@@ -266,98 +354,15 @@ def submit_knowledge_answer(knowledge_id):
     if not standard_data:
         return jsonify({'success': False, 'message': '该题暂无标准答案'})
 
-    evaluation = ai_evaluator.evaluate_answer(
-        knowledge.question,
-        user_answer,
-        standard_data
-    )
-
     try:
-        existing_record = KnowledgeLearningRecord.query.filter_by(
-            user_id=current_user.id,
-            knowledge_id=knowledge_id
-        ).first()
-
-        feedback_json = json.dumps({
-            'feedback': evaluation.get('feedback', ''),
-            'reason': evaluation.get('reason', '')
-        }, ensure_ascii=False)
-
-        if existing_record:
-            existing_record.user_answer = user_answer
-            existing_record.score = evaluation['score']
-            existing_record.ai_feedback = feedback_json
-            existing_record.completed_at = datetime.now(timezone.utc)
-            learning_record = existing_record
-        else:
-            learning_record = KnowledgeLearningRecord(
-                user_id=current_user.id,
-                knowledge_id=knowledge_id,
-                user_answer=user_answer,
-                score=evaluation['score'],
-                max_score=evaluation['max_score'],
-                ai_feedback=feedback_json
-            )
-            db.session.add(learning_record)
-
-        if evaluation['score'] < 60:
-            existing_wrong = KnowledgeWrongQuestion.query.filter_by(
-                user_id=current_user.id,
-                knowledge_id=knowledge_id
-            ).first()
-
-            if existing_wrong:
-                existing_wrong.score = evaluation['score']
-            else:
-                wrong_question = KnowledgeWrongQuestion(
-                    user_id=current_user.id,
-                    knowledge_id=knowledge_id,
-                    score=evaluation['score']
-                )
-                db.session.add(wrong_question)
-        else:
-            KnowledgeWrongQuestion.query.filter_by(
-                user_id=current_user.id,
-                knowledge_id=knowledge_id
-            ).delete()
-
-        if evaluation['score'] >= 80:
-            points_to_add = 20 if evaluation['score'] >= 90 else 10
-
-            User.query.filter_by(id=user.id).update(
-                {'points': User.points + points_to_add},
-                synchronize_session=False
-            )
-
-            point_record = PointRecord(
-                user_id=current_user.id,
-                points=points_to_add,
-                reason=f"扩展知识高分奖励 (得分: {evaluation['score']})",
-                related_id=learning_record.id,
-                related_type='knowledge'
-            )
-            db.session.add(point_record)
-
-        db.session.commit()
-
-        return jsonify({
-            'success': True,
-            'message': '答案提交成功',
-            'evaluation': {
-                'score': evaluation['score'],
-                'max_score': evaluation['max_score'],
-                'feedback': evaluation['feedback'],
-                'covered_points': evaluation.get('covered_points', []),
-                'missed_points': evaluation.get('missed_points', []),
-                'suggestions': evaluation.get('suggestions', ''),
-                'reason': evaluation.get('reason', '')
-            },
-            'standard_answers': [
-                {'answer_item': a.answer_item, 'order_index': a.order_index}
-                for a in answers
-            ]
-        })
-
+        return _process_submission(
+            user=user, ref_id=knowledge_id, user_answer=user_answer,
+            question=knowledge.question, standard_data=standard_data,
+            record_model=KnowledgeLearningRecord, wrong_model=KnowledgeWrongQuestion,
+            ref_field='knowledge_id', related_type='knowledge',
+            point_reason_prefix='扩展知识高分奖励',
+            answers_for_response=[{'answer_item': a.answer_item, 'order_index': a.order_index} for a in answers]
+        )
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"知识答案提交失败: {e}", exc_info=True)
@@ -369,7 +374,6 @@ def submit_knowledge_answer(knowledge_id):
 @nurse_required
 def submit_answer(station_id):
     user = current_user
-
     station = Station.query.get_or_404(station_id)
     data = request.get_json()
     user_answer = data.get('answer', '').strip()
@@ -388,100 +392,15 @@ def submit_answer(station_id):
         for ans in standard_answers
     ]
 
-    evaluation = ai_evaluator.evaluate_answer(
-        station.question,
-        user_answer,
-        standard_data
-    )
-
     try:
-        existing_record = LearningRecord.query.filter_by(
-            user_id=current_user.id,
-            station_id=station_id
-        ).first()
-
-        feedback_json = json.dumps({
-            'feedback': evaluation.get('feedback', ''),
-            'reason': evaluation.get('reason', '')
-        }, ensure_ascii=False)
-
-        if existing_record:
-            existing_record.user_answer = user_answer
-            existing_record.score = evaluation['score']
-            existing_record.ai_feedback = feedback_json
-            existing_record.completed_at = datetime.now(timezone.utc)
-            learning_record = existing_record
-        else:
-            learning_record = LearningRecord(
-                user_id=current_user.id,
-                station_id=station_id,
-                user_answer=user_answer,
-                score=evaluation['score'],
-                max_score=evaluation['max_score'],
-                ai_feedback=feedback_json
-            )
-            db.session.add(learning_record)
-
-        # 错题处理
-        if evaluation['score'] < 60:
-            existing_wrong = WrongQuestion.query.filter_by(
-                user_id=current_user.id,
-                station_id=station_id
-            ).first()
-
-            if existing_wrong:
-                existing_wrong.score = evaluation['score']
-            else:
-                wrong_question = WrongQuestion(
-                    user_id=current_user.id,
-                    station_id=station_id,
-                    score=evaluation['score']
-                )
-                db.session.add(wrong_question)
-        else:
-            WrongQuestion.query.filter_by(
-                user_id=current_user.id,
-                station_id=station_id
-            ).delete()
-
-        # 积分奖励（原子更新，避免竞态条件）
-        if evaluation['score'] >= 80:
-            points_to_add = 20 if evaluation['score'] >= 90 else 10
-
-            User.query.filter_by(id=user.id).update(
-                {'points': User.points + points_to_add},
-                synchronize_session=False
-            )
-
-            point_record = PointRecord(
-                user_id=current_user.id,
-                points=points_to_add,
-                reason=f"案例学习高分奖励 (得分: {evaluation['score']})",
-                related_id=learning_record.id,
-                related_type='learning'
-            )
-            db.session.add(point_record)
-
-        db.session.commit()
-
-        return jsonify({
-            'success': True,
-            'message': '答案提交成功',
-            'evaluation': {
-                'score': evaluation['score'],
-                'max_score': evaluation['max_score'],
-                'feedback': evaluation['feedback'],
-                'covered_points': evaluation.get('covered_points', []),
-                'missed_points': evaluation.get('missed_points', []),
-                'suggestions': evaluation.get('suggestions', ''),
-                'reason': evaluation.get('reason', '')
-            },
-            'standard_answers': [
-                {'answer_item': ans.answer_item, 'order_index': ans.order_index}
-                for ans in standard_answers
-            ]
-        })
-
+        return _process_submission(
+            user=user, ref_id=station_id, user_answer=user_answer,
+            question=station.question, standard_data=standard_data,
+            record_model=LearningRecord, wrong_model=WrongQuestion,
+            ref_field='station_id', related_type='learning',
+            point_reason_prefix='案例学习高分奖励',
+            answers_for_response=[{'answer_item': ans.answer_item, 'order_index': ans.order_index} for ans in standard_answers]
+        )
     except Exception as e:
         db.session.rollback()
         current_app.logger.error(f"答案提交失败: {e}", exc_info=True)

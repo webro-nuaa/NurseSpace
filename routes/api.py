@@ -23,9 +23,9 @@ def get_categories():
         result = cached.get('api_categories')
         if result:
             return jsonify(result)
+
     categories = CaseCategory.query.all()
     categories_data = []
-
     for category in categories:
         case_count = Case.query.filter_by(category_id=category.id).count()
         categories_data.append({
@@ -35,14 +35,11 @@ def get_categories():
             'case_count': case_count
         })
 
-    cache_data = {
-        'success': True,
-        'data': categories_data
-    }
-    cached = _cache()
+    cache_data = {'success': True, 'data': categories_data}
     if cached:
         cached.set('api_categories', cache_data, timeout=300)
     return jsonify(cache_data)
+
 
 @api_bp.route('/stations/<int:station_id>')
 @jwt_required()

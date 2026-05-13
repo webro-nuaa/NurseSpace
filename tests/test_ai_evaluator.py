@@ -97,7 +97,7 @@ class TestSimpleTextMatching:
             '问题？', '答案',
             []
         )
-        assert result['score'] == 50  # default when no weight
+        assert result['score'] == 0  # no weights → no credit
 
 
 class TestJsonParsingHelpers:
