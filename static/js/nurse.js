@@ -30,8 +30,8 @@ function hrefWithToken(baseUrl) {
 // 加载案例列表
 function loadCases(page = 1, categoryId = null, categoryName = null) {
     setActiveNav('案例学习');
-    // 分页点击时只有 page 参数，保持当前类别上下文
-    if (arguments.length === 1 && currentCategoryId) {
+    // 分页点击时只有 page 参数，保持当前类别上下文（popstate 期间跳过，由 URL 决定）
+    if (!_popstateInProgress && arguments.length === 1 && currentCategoryId) {
         categoryId = currentCategoryId;
         categoryName = currentCategoryName;
     }
@@ -76,7 +76,7 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                         </ol>
                     </nav>
                     <div class="page-title">
-                        <h2><i class="fas fa-th-large me-2"></i>选择类别</h2>
+                        <h2><i class="fas fa-th-large me-2"></i>案例学习</h2>
                         <p>点击类别查看该类别的案例</p>
                     </div>
                     <div class="row">

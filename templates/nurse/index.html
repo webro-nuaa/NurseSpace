@@ -122,7 +122,11 @@
             case 'cases':
                 if (caseId) viewCase(parseInt(caseId));
                 else if (categoryId) loadCases(1, parseInt(categoryId));
-                else loadCases(1);
+                else {
+                    currentCategoryId = null;
+                    currentCategoryName = null;
+                    loadCases(1);
+                }
                 break;
             case 'wrongs': loadWrongQuestions(); break;
             case 'weakness': loadWeaknessAnalysis(); break;
