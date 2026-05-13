@@ -1,0 +1,10 @@
+# 本地测试用 compose 文件 —— 不带 nginx/SSL，app 直接暴露端口
+services:
+  app:
+    ports:
+      - "5000:8000"
+
+  nginx:
+    # 本地测试不需要 nginx
+    profiles:
+      - production

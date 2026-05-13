@@ -132,6 +132,8 @@ def create_app():
     # auth_bp: 登录/注册页面使用传统表单 POST，需要 CSRF 豁免（表单内嵌 csrf_token）
     csrf.exempt(api_bp)
     csrf.exempt(auth_bp)
+    csrf.exempt(nurse_bp)
+    csrf.exempt(admin_bp)
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(nurse_bp, url_prefix='/nurse')

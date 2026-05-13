@@ -68,8 +68,8 @@ def _process_submission(user, ref_id, user_answer, question, standard_data,
             user_id=user.id, **{ref_field: ref_id}
         ).delete()
 
-    # 积分奖励
-    if evaluation['score'] >= GOOD_THRESHOLD:
+    # 积分奖励（仅首次提交时发放，防止重复刷分）
+    if not existing_record and evaluation['score'] >= GOOD_THRESHOLD:
         points_to_add = EXCELLENT_POINTS if evaluation['score'] >= EXCELLENT_THRESHOLD else GOOD_POINTS
         User.query.filter_by(id=user.id).update(
             {'points': User.points + points_to_add},
@@ -137,7 +137,10 @@ def dashboard():
 
     total_cases = Case.query.count()
     completed_stations = LearningRecord.query.filter_by(user_id=current_user.id).count()
-    wrong_questions_count = WrongQuestion.query.filter_by(user_id=current_user.id).count()
+    wrong_questions_count = (
+        WrongQuestion.query.filter_by(user_id=current_user.id).count()
+        + KnowledgeWrongQuestion.query.filter_by(user_id=current_user.id).count()
+    )
     exam_count = ExamRecord.query.filter_by(user_id=current_user.id).count()
 
     recent_records = db.session.query(LearningRecord, Station, Case)\
@@ -748,8 +751,8 @@ def start_exam(exam_id):
     questions_data = []
     total_max = 0
     for eq, case in exam_questions:
-        total_max += float(eq.score)
         stations = Station.query.filter_by(case_id=case.id).order_by(Station.order_index).all()
+        total_max += len(stations) * 100  # AI 每站独立评分 0-100
         stations_data = []
         for station in stations:
             standard_answers = [
