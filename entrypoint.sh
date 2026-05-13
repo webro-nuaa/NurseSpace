@@ -34,91 +34,109 @@ echo "[entrypoint] MySQL 已就绪"
 
 echo "[entrypoint] 初始化数据库..."
 python3 -c "
+import sys
 from app import create_app
 from models import db
 from flask_migrate import upgrade, stamp
 from sqlalchemy import inspect, text
 
-app = create_app()
-with app.app_context():
-    inspector = inspect(db.engine)
-    existing_tables = inspector.get_table_names()
-    if not existing_tables:
-        db.create_all()
-        try:
-            stamp()
-        except Exception:
-            pass
-        print('[entrypoint] 数据库表已创建（全新安装）')
-    else:
-        try:
-            upgrade()
-            print('[entrypoint] 数据库迁移完成')
-        except Exception as e:
-            print(f'[entrypoint] 迁移失败: {e}，回退到 create_all')
+try:
+    app = create_app()
+    with app.app_context():
+        inspector = inspect(db.engine)
+        existing_tables = inspector.get_table_names()
+        if not existing_tables:
             db.create_all()
             try:
                 stamp()
-            except Exception:
+            except BaseException:
                 pass
-    # 安全补列：token_version（v2.0.0+）
-    try:
-        with db.engine.connect() as conn:
-            conn.execute(text('ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0'))
-            conn.commit()
-            print('[entrypoint] token_version 列已添加')
-    except Exception:
-        print('[entrypoint] token_version 列已存在，跳过')
-    # 安全补表：baidu_asr_keys（v2.0.0+）
-    try:
-        db.create_all()
-        print('[entrypoint] 新表检查完成')
-    except Exception:
-        print('[entrypoint] 新表检查跳过')
+            print('[entrypoint] 数据库表已创建（全新安装）')
+        else:
+            try:
+                upgrade()
+                print('[entrypoint] 数据库迁移完成')
+            except BaseException as e:
+                print(f'[entrypoint] 迁移失败: {e}，回退到 create_all')
+                try:
+                    db.create_all()
+                except BaseException:
+                    pass
+                try:
+                    stamp()
+                except BaseException:
+                    pass
+        # 安全补列：token_version（v2.0.0+）
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0'))
+                conn.commit()
+                print('[entrypoint] token_version 列已添加')
+        except BaseException:
+            print('[entrypoint] token_version 列已存在，跳过')
+        # 安全补表：baidu_asr_keys（v2.0.0+）
+        try:
+            db.create_all()
+            print('[entrypoint] 新表检查完成')
+        except BaseException:
+            print('[entrypoint] 新表检查跳过')
+except BaseException as e:
+    print(f'[entrypoint] 数据库初始化遇到错误: {e}，继续启动')
+    sys.exit(0)
 "
 
 echo "[entrypoint] 创建初始管理员账号..."
 python3 -c "
-import os
-from app import create_app
-from models import db, User
+import sys
+try:
+    import os
+    from app import create_app
+    from models import db, User
 
-app = create_app()
-with app.app_context():
-    admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
-    admin_password = os.environ.get('ADMIN_PASSWORD')
-    if not admin_password:
-        print('[entrypoint] 警告: ADMIN_PASSWORD 未设置，跳过管理员创建')
-        exit(0)
-    existing = User.query.filter_by(username=admin_username).first()
-    if existing is None:
-        admin = User(
-            username=admin_username,
-            real_name='系统管理员',
-            role='admin',
-            status='active',
-            email=os.environ.get('ADMIN_EMAIL', 'admin@hospital.com')
-        )
-        admin.set_password(admin_password)
-        db.session.add(admin)
-        db.session.commit()
-        print(f'[entrypoint] 管理员账号已创建: {admin_username}')
-    else:
-        print(f'[entrypoint] 管理员账号已存在: {admin_username}')
+    app = create_app()
+    with app.app_context():
+        admin_username = os.environ.get('ADMIN_USERNAME', 'admin')
+        admin_password = os.environ.get('ADMIN_PASSWORD')
+        if not admin_password:
+            print('[entrypoint] 警告: ADMIN_PASSWORD 未设置，跳过管理员创建')
+            sys.exit(0)
+        existing = User.query.filter_by(username=admin_username).first()
+        if existing is None:
+            admin = User(
+                username=admin_username,
+                real_name='系统管理员',
+                role='admin',
+                status='active',
+                email=os.environ.get('ADMIN_EMAIL', 'admin@hospital.com')
+            )
+            admin.set_password(admin_password)
+            db.session.add(admin)
+            db.session.commit()
+            print(f'[entrypoint] 管理员账号已创建: {admin_username}')
+        else:
+            print(f'[entrypoint] 管理员账号已存在: {admin_username}')
+except BaseException as e:
+    print(f'[entrypoint] 管理员创建遇到错误: {e}，继续启动')
+    sys.exit(0)
 "
 
 echo "[entrypoint] 初始化默认配置..."
 python3 -c "
-from app import create_app
-from models import db, AiSetting
-app = create_app()
-with app.app_context():
-    if db.session.get(AiSetting, 1) is None:
-        db.session.add(AiSetting(id=1, provider='local'))
-        db.session.commit()
-        print('[entrypoint] 默认 AI 设置已创建')
-    else:
-        print('[entrypoint] AI 设置已存在')
+import sys
+try:
+    from app import create_app
+    from models import db, AiSetting
+    app = create_app()
+    with app.app_context():
+        if db.session.get(AiSetting, 1) is None:
+            db.session.add(AiSetting(id=1, provider='local'))
+            db.session.commit()
+            print('[entrypoint] 默认 AI 设置已创建')
+        else:
+            print('[entrypoint] AI 设置已存在')
+except BaseException as e:
+    print(f'[entrypoint] 默认配置初始化遇到错误: {e}，继续启动')
+    sys.exit(0)
 "
 
 echo "[entrypoint] 启动应用..."
