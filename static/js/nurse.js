@@ -985,6 +985,16 @@ function initStandalonePageAuth() {
         return;
     }
     let token = localStorage.getItem('access_token');
+
+    // 显示用户名（独立页面没有 checkLogin，需自行设置）
+    const userInfo = localStorage.getItem('user_info');
+    if (userInfo) {
+        try {
+            const user = JSON.parse(userInfo);
+            if (user.real_name) $('#user-name').text(user.real_name);
+        } catch(e) {}
+    }
+
     if (!token) {
         const urlToken = new URLSearchParams(location.search).get('token');
         if (urlToken) {
