@@ -196,12 +196,12 @@ function viewCase(caseId) {
                                                     '<span class="badge bg-secondary">未完成</span>'
                                                 }
                                                 <br>
-                                                <div class="btn-group-vertical" role="group">
-                                                    <a class="btn btn-sm btn-outline-primary mb-1" href="/nurse/station?id=${station.id}&case=${currentCaseId}">
-                                                        ${station.completed ? '重新答题' : '开始答题'}
+                                                <div class="d-flex gap-1">
+                                                    <a class="btn btn-sm btn-outline-primary" href="/nurse/station?id=${station.id}&case=${currentCaseId}" title="${station.completed ? '重新答题' : '开始答题'}">
+                                                        <i class="fas fa-play"></i><span class="d-none d-md-inline ms-1">${station.completed ? '重新答题' : '开始答题'}</span>
                                                     </a>
-                                                    <a class="btn btn-sm btn-outline-info" href="/nurse/answer-view?id=${station.id}&case=${currentCaseId}">
-                                                        <i class="fas fa-eye me-1"></i>查看答案
+                                                    <a class="btn btn-sm btn-outline-info" href="/nurse/answer-view?id=${station.id}&case=${currentCaseId}" title="查看答案">
+                                                        <i class="fas fa-eye"></i><span class="d-none d-md-inline ms-1">查看答案</span>
                                                     </a>
                                                 </div>
                                             </div>
@@ -246,15 +246,13 @@ function viewCase(caseId) {
                                                 <div class="pe-2">
                                                     <div class="fw-semibold mb-1">${k.question}</div>
                                                 </div>
-                                                <div class="text-nowrap">
-                                                    <div class="btn-group" role="group">
-                                                        <a class="btn btn-sm btn-outline-primary" href="/nurse/knowledge?id=${k.id}">
-                                                            <i class="fas fa-pen me-1"></i>作答
-                                                        </a>
-                                                        <a class="btn btn-sm btn-outline-info" href="/nurse/knowledge-answer-view?id=${k.id}">
-                                                            <i class="fas fa-eye me-1"></i>查看答案
-                                                        </a>
-                                                    </div>
+                                                <div class="d-flex gap-1">
+                                                    <a class="btn btn-sm btn-outline-primary" href="/nurse/knowledge?id=${k.id}" title="作答">
+                                                        <i class="fas fa-pen"></i><span class="d-none d-md-inline ms-1">作答</span>
+                                                    </a>
+                                                    <a class="btn btn-sm btn-outline-info" href="/nurse/knowledge-answer-view?id=${k.id}" title="查看答案">
+                                                        <i class="fas fa-eye"></i><span class="d-none d-md-inline ms-1">查看答案</span>
+                                                    </a>
                                                 </div>
                                             </div>
                                         </div>
