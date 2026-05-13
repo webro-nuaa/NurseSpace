@@ -227,6 +227,7 @@ def get_case_detail(case_id):
                 'case_guide': case.case_guide,
                 'difficulty': case.difficulty or 'intermediate',
                 'case_type': case.case_type or 'learning',
+                'category_id': case.category_id,
                 'category_name': case.category.name
             },
             'stations': stations_data,

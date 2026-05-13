@@ -12,13 +12,13 @@
 {% endblock %}
 
 {% block navbar_toggle %}
-<button class="sidebar-toggle d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#nurseNavMobile" aria-expanded="false" aria-controls="nurseNavMobile">
+<button class="sidebar-toggle d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#nurseNavCollapse" aria-expanded="false" aria-controls="nurseNavCollapse">
     <i class="fas fa-bars"></i>
 </button>
 {% endblock %}
 
 {% block nav_mobile %}
-<div class="collapse d-lg-none nurse-mobile-nav" id="nurseNavMobile">
+<div class="collapse d-lg-none mobile-nav-collapse" id="nurseNavCollapse">
     <div class="p-2">
         <a class="d-block nav-link-mobile" href="/nurse?tab=dashboard"><i class="fas fa-tachometer-alt me-2"></i>首页概览</a>
         <a class="d-block nav-link-mobile active" href="/nurse?tab=cases"><i class="fas fa-book-medical me-2"></i>案例学习</a>
@@ -35,32 +35,34 @@
 
 {% block content %}
 <div class="fade-in">
+  <div id="breadcrumb-container"></div>
+
   <div class="page-title">
     <h2><i class="fas fa-clipboard-check me-2"></i>扩展知识 - 标准答案</h2>
     <p>查看扩展知识题目的标准答案要点</p>
   </div>
-  
+
   <!-- 禁止复制提示 -->
   <div class="alert alert-warning alert-dismissible fade show" role="alert">
     <i class="fas fa-exclamation-triangle me-2"></i>
     <strong>重要提示：</strong>为了保护学习效果，答案内容禁止复制、截图等操作。请认真阅读并理解答案要点。
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
-  
+
   <div class="answer-container">
     <div id="knowledge-content" class="mb-4">
       <div class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</div>
     </div>
-    
+
     <div id="answers-content" class="mb-4">
       <div class="loading"><i class="fas fa-spinner fa-spin"></i> 加载答案中...</div>
     </div>
-    
+
     <div class="d-flex gap-3">
-      <button class="btn btn-outline-secondary btn-lg" onclick="history.back()">
+      <button class="btn btn-outline-secondary btn-lg" id="btn-back-knowledge-answer">
         <i class="fas fa-arrow-left me-2"></i>返回
       </button>
-      <a href="/nurse/knowledge?id={{ knowledge_id }}" class="btn btn-primary btn-lg btn-glow">
+      <a id="link-go-knowledge" class="btn btn-primary btn-lg btn-glow">
         <i class="fas fa-edit me-2"></i>去答题
       </a>
     </div>
@@ -206,33 +208,48 @@
   }
 
   $(document).ready(function(){
-    // 统一与其他页面：检查登录并设置用户信息与token
-    if (typeof checkLogin === 'function') { 
-      checkLogin(); 
+    if (typeof checkLogin === 'function') {
+      checkLogin();
     } else {
-      // 如果checkLogin函数不存在，手动设置JWT token
       const token = localStorage.getItem('access_token');
       if (token) {
-        $.ajaxSetup({
-          headers: {
-            'Authorization': 'Bearer ' + token
-          }
-        });
-      } else {
+        $.ajaxSetup({ headers: { 'Authorization': 'Bearer ' + token } });
       }
     }
 
-    // 禁止复制功能
-    disableCopy();
-    
-    // 加载题目内容
+    initStandaloneNav('cases');
+
+    // Breadcrumb from knowledge → case info
     $.get(`/api/knowledge/${knowledgeId}`, function(res){
-      if (res.success){ 
+      if (res.success){
         renderQuestion(res.data);
-      } else { 
-        showAlert(res.message || '加载题目失败', 'error'); 
+        var caseId = res.data.case_id;
+        if (caseId) {
+          $.get(`/nurse/cases/${caseId}`, function(cr) {
+            if (cr.success) {
+              var c = cr.data.case;
+              var catId = c.category_id || 0;
+              var catName = c.category_name || '案例学习';
+              var catEsc = catName.replace(/'/g, "\\'");
+              $('#breadcrumb-container').html(renderStandaloneBreadcrumb([
+                {label: '案例学习', onclick: 'loadCases(1, null)'},
+                {label: catName, onclick: 'loadCases(1, ' + catId + ", '" + catEsc + "')"},
+                {label: c.title, onclick: 'viewCase(' + caseId + ')'},
+                {label: '扩展知识答案'}
+              ]));
+              $('#btn-back-knowledge-answer').attr('onclick', 'viewCase(' + caseId + ')');
+            }
+          });
+        }
+        // Set links with token
+        $('#link-go-knowledge').attr('href', hrefWithToken('/nurse/knowledge?id=' + knowledgeId));
+      } else {
+        showAlert(res.message || '加载题目失败', 'error');
       }
     });
+
+    // 禁止复制功能
+    disableCopy();
 
     // 加载标准答案
     $.get(`/api/knowledge/${knowledgeId}/answers`, function(res){

@@ -505,6 +505,7 @@ def get_knowledge_detail(knowledge_id: int):
         'data': {
             'id': ek.id,
             'question': ek.question,
+            'case_id': ek.case_id,
             'answers': [a.answer_item for a in answers]
         }
     })

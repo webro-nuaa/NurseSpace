@@ -8,6 +8,14 @@ let caseKnowledgeMap = {}; // 缓存当前案例的扩展知识题目
 let currentCategoryId = null; // 当前选中的类别
 let currentCategoryName = null; // 当前选中的类别名称
 
+// 为独立页面链接附加 JWT token，避免 session 过期后跳登录页
+function hrefWithToken(baseUrl) {
+    const token = localStorage.getItem('access_token');
+    if (!token) return baseUrl;
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    return baseUrl + sep + 'token=' + encodeURIComponent(token);
+}
+
 
 // 加载案例列表
 function loadCases(page = 1, categoryId = null, categoryName = null) {
@@ -20,12 +28,12 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
     currentPage = page;
     currentCategoryId = categoryId || null;
     if (categoryName !== undefined) currentCategoryName = categoryName;
-    
+
     let url = `/nurse/cases?page=${page}&per_page=10`;
     if (categoryId) {
         url += `&category_id=${categoryId}`;
     }
-    
+
     $.get(url, function(response) {
         if (response.success) {
             const data = response.data;
@@ -73,9 +81,25 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                     ${categoryId ? `<button class="btn btn-outline-light btn-sm" onclick="loadCases(1, null)"><i class=\"fas fa-th-large me-1\"></i>返回类别</button>` : ''}
                 </div>
 
+                ${categoryId ? `
+                <div class="row mb-3">
+                    <div class="col-md-6 col-lg-4">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="nurse-case-search"
+                                   placeholder="搜索案例标题..."
+                                   oninput="filterCasesClientSide()">
+                            <button class="btn btn-outline-secondary" type="button" id="btn-clear-search" style="display:none"
+                                    onclick="$('#nurse-case-search').val('');filterCasesClientSide();">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>` : ''}
+
                 <div class="row">
                     ${data.cases.map((case_, index) => `
-                        <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="col-md-6 col-lg-4 mb-4 case-card-item" data-case-title="${case_.title.replace(/"/g, '&quot;')}">
                             <div class="card h-100 fade-in" style="animation-delay: ${index * 0.1}s;">
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-3">
@@ -104,12 +128,12 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                         </div>
                     `).join('')}
                 </div>
-                
+
                 ${generatePagination(data.pagination, 'loadCases')}
             `;
-            
+
             $('#main-content').html(html);
-            
+
             // 添加动画效果
             setTimeout(() => {
                 $('.card').each(function(index) {
@@ -130,11 +154,34 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
     });
 }
 
+// 客户端案例搜索过滤
+function filterCasesClientSide() {
+    const query = ($('#nurse-case-search').val() || '').trim().toLowerCase();
+    let visibleCount = 0;
+    $('.case-card-item').each(function() {
+        const title = ($(this).attr('data-case-title') || '').toLowerCase();
+        const match = !query || title.includes(query);
+        $(this).toggle(match);
+        if (match) visibleCount++;
+    });
+    $('#btn-clear-search').toggle(query.length > 0);
+    // Show/hide no-results message
+    if (query && visibleCount === 0) {
+        if (!$('#no-case-results').length) {
+            $('.case-card-item').first().closest('.row').after(
+                '<div id="no-case-results" class="text-center py-4 text-muted">' +
+                '<i class="fas fa-search fa-2x mb-2"></i><p>没有匹配的案例</p></div>');
+        }
+    } else {
+        $('#no-case-results').remove();
+    }
+}
+
 // 搜索案例（客户端过滤）
 // 查看案例详情
 function viewCase(caseId) {
     currentCaseId = caseId;
-    
+
     $.get(`/nurse/cases/${caseId}`, function(response) {
         if (response.success) {
             const data = response.data;
@@ -142,18 +189,23 @@ function viewCase(caseId) {
             caseKnowledgeMap = {};
             (data.extended_knowledge || []).forEach(k => caseKnowledgeMap[k.id] = k);
 
+            const catId = data.case.category_id || currentCategoryId;
+            const catName = data.case.category_name || currentCategoryName || '案例学习';
             const html = `
                 <div class="row">
                     <div class="col-12">
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb">
                                 <li class="breadcrumb-item">
-                                    <a href="#" onclick="loadCases()">案例学习</a>
+                                    <a href="#" onclick="loadCases(1, null)">案例学习</a>
+                                </li>
+                                <li class="breadcrumb-item">
+                                    <a href="#" onclick="loadCases(1, ${catId}, '${(catName || '').replace(/'/g, "\\'")}')">${catName}</a>
                                 </li>
                                 <li class="breadcrumb-item active">${data.case.title}</li>
                             </ol>
                         </nav>
-                        
+
                         <h2>${data.case.title}</h2>
                         <p class="text-muted">
                             <i class="fas fa-tag me-1"></i>${data.case.category_name}
@@ -161,7 +213,7 @@ function viewCase(caseId) {
                         </p>
                     </div>
                 </div>
-                
+
                 <div class="row">
                     <div class="col-md-8">
                         <div class="card">
@@ -172,7 +224,7 @@ function viewCase(caseId) {
                                 <p>${data.case.case_guide || '暂无案例指引'}</p>
                             </div>
                         </div>
-                        
+
                         <div class="card">
                             <div class="card-header">
                                 <h5><i class="fas fa-tasks me-2"></i>学习站点</h5>
@@ -186,21 +238,21 @@ function viewCase(caseId) {
                                                 <p class="mb-1 text-muted">${station.question.substring(0, 100)}...</p>
                                             </div>
                                             <div class="text-end">
-                                                ${station.completed ? 
+                                                ${station.completed ?
                                                     (() => {
                                                         const s = (station.score === null || station.score === undefined) ? null : Number(station.score);
                                                         const label = (s === null || isNaN(s)) ? '未评分' : `${s}分`;
                                                         const cls = getScoreBadgeClass(s);
                                                         return `<span class="badge ${cls}">${label}</span>`;
-                                                    })() : 
+                                                    })() :
                                                     '<span class="badge bg-secondary">未完成</span>'
                                                 }
                                                 <br>
                                                 <div class="d-flex gap-1">
-                                                    <a class="btn btn-sm btn-outline-primary" href="/nurse/station?id=${station.id}&case=${currentCaseId}" title="${station.completed ? '重新答题' : '开始答题'}">
+                                                    <a class="btn btn-sm btn-outline-primary" href="${hrefWithToken('/nurse/station?id=' + station.id + '&case=' + currentCaseId)}" title="${station.completed ? '重新答题' : '开始答题'}">
                                                         <i class="fas fa-play"></i><span class="d-none d-md-inline ms-1">${station.completed ? '重新答题' : '开始答题'}</span>
                                                     </a>
-                                                    <a class="btn btn-sm btn-outline-info" href="/nurse/answer-view?id=${station.id}&case=${currentCaseId}" title="查看答案">
+                                                    <a class="btn btn-sm btn-outline-info" href="${hrefWithToken('/nurse/answer-view?id=' + station.id + '&case=' + currentCaseId)}" title="查看答案">
                                                         <i class="fas fa-eye"></i><span class="d-none d-md-inline ms-1">查看答案</span>
                                                     </a>
                                                 </div>
@@ -211,7 +263,7 @@ function viewCase(caseId) {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="col-md-4">
                         ${(data.videos && data.videos.length) ? `
                         <div class="card mb-3">
@@ -247,10 +299,10 @@ function viewCase(caseId) {
                                                     <div class="fw-semibold mb-1">${k.question}</div>
                                                 </div>
                                                 <div class="d-flex gap-1">
-                                                    <a class="btn btn-sm btn-outline-primary" href="/nurse/knowledge?id=${k.id}" title="作答">
+                                                    <a class="btn btn-sm btn-outline-primary" href="${hrefWithToken('/nurse/knowledge?id=' + k.id)}" title="作答">
                                                         <i class="fas fa-pen"></i><span class="d-none d-md-inline ms-1">作答</span>
                                                     </a>
-                                                    <a class="btn btn-sm btn-outline-info" href="/nurse/knowledge-answer-view?id=${k.id}" title="查看答案">
+                                                    <a class="btn btn-sm btn-outline-info" href="${hrefWithToken('/nurse/knowledge-answer-view?id=' + k.id)}" title="查看答案">
                                                         <i class="fas fa-eye"></i><span class="d-none d-md-inline ms-1">查看答案</span>
                                                     </a>
                                                 </div>
@@ -264,7 +316,7 @@ function viewCase(caseId) {
                     </div>
                 </div>
             `;
-            
+
             $('#main-content').html(html);
         }
     });
@@ -272,14 +324,14 @@ function viewCase(caseId) {
 
 // 跳转到新页面答题（兼容其他入口仍调用 startStation 的情况）
 function startStation(stationId) {
-    const queryCase = currentCaseId ? `&case=${currentCaseId}` : '';
-    window.location.href = `/nurse/station?id=${stationId}${queryCase}`;
+    const queryCase = currentCaseId ? '&case=' + currentCaseId : '';
+    window.location.href = hrefWithToken('/nurse/station?id=' + stationId + queryCase);
 }
 
 // 加载错题集
 function loadWrongQuestions(page = 1) {
     setActiveNav('错题集');
-    
+
     $.get(`/nurse/wrong-questions?page=${page}`, function(response) {
         if (response.success) {
             const data = response.data;
@@ -288,7 +340,7 @@ function loadWrongQuestions(page = 1) {
                     <h2><i class="fas fa-exclamation-triangle me-2"></i>错题集</h2>
                     <p>回顾和重做错题，提升学习效果</p>
                 </div>
-                
+
                 <div class="row">
                     <div class="col-12">
                         <div class="card">
@@ -305,7 +357,7 @@ function loadWrongQuestions(page = 1) {
                                                         </div>
                                                         <div class="mb-1 small text-muted"><i class="fas fa-briefcase me-1"></i>${wrong.case_title}</div>
                                                         <div class="fw-semibold mb-2 line-clamp-2">${wrong.question}</div>
-                                                        <a href="/nurse/wrong-detail?station=${wrong.station_id}" class="stretched-link" aria-label="查看错题详情"></a>
+                                                        <a href="${hrefWithToken('/nurse/wrong-detail?station=' + wrong.station_id)}" class="stretched-link" aria-label="查看错题详情"></a>
                                                         <div class="mt-auto d-flex align-items-center pt-2">
                                                             <small class="text-muted"><i class="fas fa-clock me-1"></i>${formatDateTime(wrong.created_at)}</small>
                                                         </div>
@@ -327,7 +379,7 @@ function loadWrongQuestions(page = 1) {
                     </div>
                 </div>
             `;
-            
+
             $('#main-content').html(html);
         }
     });
@@ -440,10 +492,10 @@ function loadWeaknessAnalysis() {
                     </div>
                 </div>
             `;
-            
+
             $('#main-content').html(html);
 
-            // 绑定“开始/重新分析”按钮：调用保存接口
+            // 绑定"开始/重新分析"按钮：调用保存接口
             $('#btn-run-weakness').on('click', function(){
                 $('#btn-run-weakness').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i><span class="d-none d-md-inline ms-1">分析中...</span>');
                 $.ajax({
@@ -475,7 +527,7 @@ function loadWeaknessAnalysis() {
 // 加载考试列表
 function loadExams() {
     setActiveNav('考试中心');
-    
+
     $.get('/nurse/exams', function(response) {
         if (response.success) {
             const data = response.data;
@@ -484,9 +536,9 @@ function loadExams() {
                     <h2><i class="fas fa-file-alt me-2"></i>考试中心</h2>
                     <p>参加管理员发布的考试</p>
                 </div>
-                
+
                 <div class="row">
-                    ${data.exams.length > 0 ? 
+                    ${data.exams.length > 0 ?
                         data.exams.map(exam => `
                             <div class="col-md-6 col-lg-4 mb-4">
                                 <div class="card h-100">
@@ -504,7 +556,7 @@ function loadExams() {
                                                 </small>
                                             ` : ''}
                                         </p>
-                                        
+
                                         ${exam.participated ? `
                                             <div class="alert alert-info">
                                                 <i class="fas fa-check-circle me-2"></i>
@@ -537,7 +589,7 @@ function loadExams() {
                     }
                 </div>
             `;
-            
+
             $('#main-content').html(html);
         }
     });
@@ -795,7 +847,7 @@ function _doSubmit(examId) {
 // 加载积分记录
 function loadPointRecords(page = 1) {
     setActiveNav('积分记录');
-    
+
     $.get(`/nurse/point-records?page=${page}`, function(response) {
         if (response.success) {
             const data = response.data;
@@ -804,7 +856,7 @@ function loadPointRecords(page = 1) {
                     <h2><i class="fas fa-coins me-2"></i>积分记录</h2>
                     <p>当前积分：<span class="badge bg-primary fs-6">${data.current_points}</span></p>
                 </div>
-                
+
                 <div class="row">
                     <div class="col-12">
                         <div class="card">
@@ -840,7 +892,7 @@ function loadPointRecords(page = 1) {
                                             </tbody>
                                         </table>
                                     </div>
-                                    
+
                                     ${generatePagination(data.pagination, 'loadPointRecords')}
                                 ` : `
                                     <div class="text-center py-5">
@@ -854,8 +906,64 @@ function loadPointRecords(page = 1) {
                     </div>
                 </div>
             `;
-            
+
             $('#main-content').html(html);
         }
     });
+}
+
+// ============================================================
+//  Standalone page helpers
+// ============================================================
+
+function initStandaloneNav(activeTab) {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+
+    $('.navbar-nav-horizontal .nav-link').each(function () {
+        var href = $(this).attr('href');
+        if (href && href.indexOf('/nurse?') !== -1 && href.indexOf('token=') === -1) {
+            $(this).attr('href', href + '&token=' + encodeURIComponent(token));
+        }
+    });
+
+    $('#nurseNavCollapse .nav-link-mobile').each(function () {
+        var href = $(this).attr('href');
+        if (href && href.indexOf('/nurse?') !== -1 && href.indexOf('token=') === -1) {
+            $(this).attr('href', href + '&token=' + encodeURIComponent(token));
+        }
+    });
+
+    if (activeTab) {
+        $('.navbar-nav-horizontal .nav-link').removeClass('active');
+        $('#nurseNavCollapse .nav-link-mobile').removeClass('active');
+        $('.navbar-nav-horizontal .nav-link[href*="tab=' + activeTab + '"]').addClass('active');
+        $('#nurseNavCollapse .nav-link-mobile[href*="tab=' + activeTab + '"]').addClass('active');
+    }
+
+    $('a[href^="/nurse/station"], a[href^="/nurse/knowledge"], a[href^="/nurse/answer-view"], a[href^="/nurse/knowledge-answer-view"], a[href^="/nurse/wrong-detail"]').each(function () {
+        var href = $(this).attr('href');
+        if (href && href.indexOf('token=') === -1) {
+            $(this).attr('href', hrefWithToken(href));
+        }
+    });
+}
+
+function renderStandaloneBreadcrumb(items) {
+    var html = '<nav aria-label="breadcrumb"><ol class="breadcrumb">';
+    items.forEach(function (item, i) {
+        if (i === items.length - 1) {
+            html += '<li class="breadcrumb-item active">' + item.label + '</li>';
+        } else {
+            var attrs = '';
+            if (item.href) {
+                attrs = ' href="' + item.href + '"';
+            } else if (item.onclick) {
+                attrs = ' href="#" onclick="' + item.onclick + '"';
+            }
+            html += '<li class="breadcrumb-item"><a' + attrs + '>' + item.label + '</a></li>';
+        }
+    });
+    html += '</ol></nav>';
+    return html;
 }

@@ -614,16 +614,17 @@ body {
   border-left: 3px solid var(--gray-500);
 }
 
-/* ----- Nurse Mobile Nav (Bootstrap Offcanvas) ----- */
-.nurse-mobile-nav .offcanvas-header {
-  border-bottom: 1px solid var(--gray-200);
-}
-
-.nurse-mobile-nav .offcanvas-body {
+/* ----- Mobile Nav (Bootstrap Collapse dropdown below top bar) ----- */
+.mobile-nav-collapse {
   background: #fff;
+  border-bottom: 2px solid var(--gray-200);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  position: sticky;
+  top: var(--topbar-height);
+  z-index: 1025;
 }
 
-.nurse-mobile-nav .nav-link-mobile {
+.mobile-nav-collapse .nav-link-mobile {
   color: var(--gray-700);
   padding: 0.65rem 1rem;
   border-radius: 8px;
@@ -633,16 +634,16 @@ body {
   align-items: center;
 }
 
-.nurse-mobile-nav .nav-link-mobile:hover {
+.mobile-nav-collapse .nav-link-mobile:hover {
   background: var(--gray-100);
 }
 
-.nurse-mobile-nav .nav-link-mobile.active {
+.mobile-nav-collapse .nav-link-mobile.active {
   background: var(--brand-gradient);
   color: #fff;
 }
 
-.nurse-mobile-nav .nav-section-title {
+.mobile-nav-collapse .nav-section-title {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -784,6 +785,8 @@ body {
   .d-flex.gap-2.flex-wrap {
     gap: 0.5rem !important;
   }
+
+  .answer-textarea { min-height: 150px; }
 }
 
 /* ----- Selection ----- */

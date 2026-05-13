@@ -5,43 +5,39 @@
 {% block nav_items %}{% endblock %}
 
 {% block navbar_toggle %}
-<button class="sidebar-toggle d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminNavMobile" aria-controls="adminNavMobile">
+<button class="sidebar-toggle d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse" aria-expanded="false" aria-controls="adminNavCollapse">
     <i class="fas fa-bars"></i>
 </button>
 {% endblock %}
 
 {% block nav_mobile %}
-<div class="offcanvas offcanvas-start d-lg-none nurse-mobile-nav" tabindex="-1" id="adminNavMobile" aria-labelledby="adminNavMobileLabel">
-    <div class="offcanvas-header">
-        <h6 class="offcanvas-title" id="adminNavMobileLabel">导航菜单</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-    </div>
-    <div class="offcanvas-body p-2">
+<div class="collapse d-lg-none mobile-nav-collapse" id="adminNavCollapse">
+    <div class="p-2">
         <div class="nav-section-title">主菜单</div>
-        <a class="d-block nav-link-mobile active" href="#" data-page="dashboard" onclick="navigateTo('dashboard')" data-bs-dismiss="offcanvas">
+        <a class="d-block nav-link-mobile active" href="#" data-page="dashboard" onclick="navigateTo('dashboard')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-tachometer-alt me-2"></i>数据看板
         </a>
-        <a class="d-block nav-link-mobile" href="#" data-page="users" onclick="navigateTo('users')" data-bs-dismiss="offcanvas">
+        <a class="d-block nav-link-mobile" href="#" data-page="users" onclick="navigateTo('users')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-users me-2"></i>用户管理
         </a>
-        <a class="d-block nav-link-mobile" href="#" data-page="cases" onclick="navigateTo('cases')" data-bs-dismiss="offcanvas">
+        <a class="d-block nav-link-mobile" href="#" data-page="cases" onclick="navigateTo('cases')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-book-medical me-2"></i>案例管理
         </a>
-        <a class="d-block nav-link-mobile" href="#" data-page="exams" onclick="navigateTo('exams')" data-bs-dismiss="offcanvas">
+        <a class="d-block nav-link-mobile" href="#" data-page="exams" onclick="navigateTo('exams')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-file-alt me-2"></i>考试管理
         </a>
         <div class="nav-section-title">分析</div>
-        <a class="d-block nav-link-mobile" href="#" data-page="statistics" onclick="navigateTo('statistics')" data-bs-dismiss="offcanvas">
+        <a class="d-block nav-link-mobile" href="#" data-page="statistics" onclick="navigateTo('statistics')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-chart-bar me-2"></i>学习统计
         </a>
-        <a class="d-block nav-link-mobile" href="#" data-page="group-analysis" onclick="navigateTo('group-analysis')" data-bs-dismiss="offcanvas">
+        <a class="d-block nav-link-mobile" href="#" data-page="group-analysis" onclick="navigateTo('group-analysis')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-users-cog me-2"></i>群体分析
         </a>
         <div class="nav-section-title">系统</div>
-        <a class="d-block nav-link-mobile" href="#" data-page="ai-settings" onclick="navigateTo('ai-settings')" data-bs-dismiss="offcanvas">
+        <a class="d-block nav-link-mobile" href="#" data-page="ai-settings" onclick="navigateTo('ai-settings')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-robot me-2"></i>AI 设置
         </a>
-        <a class="d-block nav-link-mobile" href="#" data-page="voice-settings" onclick="navigateTo('voice-settings')" data-bs-dismiss="offcanvas">
+        <a class="d-block nav-link-mobile" href="#" data-page="voice-settings" onclick="navigateTo('voice-settings')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-microphone me-2"></i>语音设置
         </a>
     </div>
@@ -139,12 +135,15 @@
         $('#sidebar .nav-link[data-page="' + page + '"]').addClass('active');
 
         // Update mobile nav active state
-        $('#adminNavMobile .nav-link-mobile').removeClass('active');
-        $('#adminNavMobile .nav-link-mobile[data-page="' + page + '"]').addClass('active');
+        $('#adminNavCollapse .nav-link-mobile').removeClass('active');
+        $('#adminNavCollapse .nav-link-mobile[data-page="' + page + '"]').addClass('active');
 
         // Collapse mobile nav
-        var offcanvas = bootstrap.Offcanvas.getInstance(document.getElementById('adminNavMobile'));
-        if (offcanvas) offcanvas.hide();
+        var collapseEl = document.getElementById('adminNavCollapse');
+        if (collapseEl) {
+            var bsCollapse = bootstrap.Collapse.getInstance(collapseEl);
+            if (bsCollapse) bsCollapse.hide();
+        }
 
         // Route to the correct loader
         switch(page) {

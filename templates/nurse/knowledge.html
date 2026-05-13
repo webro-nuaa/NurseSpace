@@ -36,13 +36,13 @@
 {% endblock %}
 
 {% block navbar_toggle %}
-<button class="sidebar-toggle d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#nurseNavMobile" aria-expanded="false" aria-controls="nurseNavMobile">
+<button class="sidebar-toggle d-lg-none" type="button" data-bs-toggle="collapse" data-bs-target="#nurseNavCollapse" aria-expanded="false" aria-controls="nurseNavCollapse">
     <i class="fas fa-bars"></i>
 </button>
 {% endblock %}
 
 {% block nav_mobile %}
-<div class="collapse d-lg-none nurse-mobile-nav" id="nurseNavMobile">
+<div class="collapse d-lg-none mobile-nav-collapse" id="nurseNavCollapse">
     <div class="p-2">
         <a class="d-block nav-link-mobile" href="/nurse?tab=dashboard"><i class="fas fa-tachometer-alt me-2"></i>首页概览</a>
         <a class="d-block nav-link-mobile active" href="/nurse?tab=cases"><i class="fas fa-book-medical me-2"></i>案例学习</a>
@@ -59,14 +59,15 @@
 
 {% block content %}
 <div class="fade-in">
-  <!-- 传递参数给Jinja2模板 -->
   {% set knowledge_id = request.args.get('id') %}
-  
+
+  <div id="breadcrumb-container"></div>
+
   <div class="page-title">
     <h2><i class="fas fa-lightbulb me-2"></i>扩展知识作答</h2>
     <p>深度学习，拓展知识边界</p>
   </div>
-  
+
   <div class="question-container">
     <div id="k-content" class="mb-4">
       <div class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</div>
@@ -82,10 +83,10 @@
       </button>
     </div>
     <div class="d-flex gap-3">
-      <button class="btn btn-outline-secondary btn-lg" onclick="history.back()">
+      <button class="btn btn-outline-secondary btn-lg" id="btn-back-knowledge">
         <i class="fas fa-arrow-left me-2"></i>返回
       </button>
-      <a href="/nurse/knowledge-answer-view?id={{ knowledge_id }}" class="btn btn-info btn-lg">
+      <a id="link-knowledge-answer" class="btn btn-info btn-lg">
         <i class="fas fa-eye me-2"></i>查看答案
       </a>
       <button class="btn btn-primary btn-lg btn-glow flex-grow-1" id="k-btn">
@@ -133,7 +134,7 @@
       </div>
       <div class="mt-3">
         <h6><i class="fas fa-clipboard-list me-2"></i>标准答案</h6>
-        <ol>${std.map(a=>`<li style="word-break:break-word;">${a}</li>`).join('')}</ol>
+        <ol>${std.map(a=>`<li class="content-wrap">${a}</li>`).join('')}</ol>
       </div>`;
     $('#k-eval-body').html(html); $('#k-eval-card').removeClass('d-none');
   }
@@ -142,8 +143,33 @@
     const token = localStorage.getItem('access_token');
     if (token){ $.ajaxSetup({ headers: { 'Authorization': 'Bearer ' + token }}); }
 
+    initStandaloneNav('cases');
+
+    // Breadcrumb from knowledge → case info
     $.get(`/api/knowledge/${knowledgeId}`, function(r){
-      if (r.success){ renderQuestion(r.data); }
+      if (r.success){
+        renderQuestion(r.data);
+        var caseId = r.data.case_id;
+        if (caseId) {
+          $.get(`/nurse/cases/${caseId}`, function(cr) {
+            if (cr.success) {
+              var c = cr.data.case;
+              var catId = c.category_id || 0;
+              var catName = c.category_name || '案例学习';
+              var catEsc = catName.replace(/'/g, "\\'");
+              $('#breadcrumb-container').html(renderStandaloneBreadcrumb([
+                {label: '案例学习', onclick: 'loadCases(1, null)'},
+                {label: catName, onclick: 'loadCases(1, ' + catId + ", '" + catEsc + "')"},
+                {label: c.title, onclick: 'viewCase(' + caseId + ')'},
+                {label: '扩展知识作答'}
+              ]));
+              $('#btn-back-knowledge').attr('onclick', 'viewCase(' + caseId + ')');
+            }
+          });
+        }
+        // Set links with token
+        $('#link-knowledge-answer').attr('href', hrefWithToken('/nurse/knowledge-answer-view?id=' + knowledgeId));
+      }
       else { showAlert(r.message || '加载失败', 'error'); }
     });
 
