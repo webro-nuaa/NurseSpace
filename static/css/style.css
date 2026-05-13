@@ -614,16 +614,13 @@ body {
   border-left: 3px solid var(--gray-500);
 }
 
-/* ----- Nurse Mobile Nav ----- */
-.nurse-mobile-nav {
-  position: fixed;
-  top: var(--topbar-height);
-  left: 0;
-  right: 0;
-  z-index: 1025;
-  background: #fff;
+/* ----- Nurse Mobile Nav (Bootstrap Offcanvas) ----- */
+.nurse-mobile-nav .offcanvas-header {
   border-bottom: 1px solid var(--gray-200);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.nurse-mobile-nav .offcanvas-body {
+  background: #fff;
 }
 
 .nurse-mobile-nav .nav-link-mobile {
