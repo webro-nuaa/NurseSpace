@@ -501,8 +501,9 @@ function loadWeaknessAnalysis() {
                                 ${analysis.main_issues.length > 0 ? `
                                     <ul class="list-unstyled mb-0">
                                         ${analysis.main_issues.map(issue => `
-                                            <li class="mb-2 content-wrap">
-                                                <i class="fas fa-caret-right text-warning me-2"></i>${issue}
+                                            <li class="mb-3">
+                                                <i class="fas fa-caret-right text-warning me-2"></i>
+                                                <span class="content-wrap">${issue.replace(/\n/g, '<br>')}</span>
                                             </li>
                                         `).join('')}
                                     </ul>
@@ -521,9 +522,9 @@ function loadWeaknessAnalysis() {
                             <div class="card-body">
                                 ${analysis.improvement_suggestions.length > 0 ?
                                     analysis.improvement_suggestions.map(suggestion => `
-                                        <div class="mb-3 content-wrap">
+                                        <div class="mb-3">
                                             <h6 class="text-primary">${suggestion.category || '综合'}</h6>
-                                            <p class="small mb-0">${suggestion.suggestion || ''}</p>
+                                            <p class="small mb-0 content-wrap">${(suggestion.suggestion || '').replace(/\n/g, '<br>')}</p>
                                         </div>
                                     `).join('') :
                                     '<p class="text-muted">暂无具体建议</p>'
@@ -538,7 +539,7 @@ function loadWeaknessAnalysis() {
                                 <h6 class="mb-0"><i class="fas fa-graduation-cap me-2"></i>学习计划</h6>
                             </div>
                             <div class="card-body">
-                                <p class="content-wrap">${analysis.study_plan || '暂无学习计划'}</p>
+                                <p class="content-wrap">${(analysis.study_plan || '暂无学习计划').replace(/\n/g, '<br>')}</p>
 
                                 ${analysis.priority_areas.length > 0 ? `
                                     <div class="mt-3">
