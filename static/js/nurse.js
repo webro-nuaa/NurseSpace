@@ -69,6 +69,12 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
             // 如果未选择类别，则先展示类别块
             if (!categoryId) {
                 const catHtml = `
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="#" onclick="navigateTo('dashboard')">首页</a></li>
+                            <li class="breadcrumb-item active">案例学习</li>
+                        </ol>
+                    </nav>
                     <div class="page-title">
                         <h2><i class="fas fa-th-large me-2"></i>选择类别</h2>
                         <p>点击类别查看该类别的案例</p>
@@ -102,12 +108,18 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
             }
 
             const html = `
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="#" onclick="navigateTo('dashboard')">首页</a></li>
+                        <li class="breadcrumb-item"><a href="#" onclick="loadCases(1, null)">案例学习</a></li>
+                        <li class="breadcrumb-item active">${currentCategoryName || '案例学习'}</li>
+                    </ol>
+                </nav>
                 <div class="page-title d-flex justify-content-between align-items-center">
                     <div>
-                        <h2><i class="fas fa-book-medical me-2"></i>${categoryId ? (currentCategoryName || '案例学习') : '案例学习'}</h2>
-                        <p>${categoryId ? '点击案例卡片开始学习' : '选择案例开始学习，提升专业技能'}</p>
+                        <h2><i class="fas fa-book-medical me-2"></i>${currentCategoryName || '案例学习'}</h2>
+                        <p>点击案例卡片开始学习</p>
                     </div>
-                    ${categoryId ? `<button class="btn btn-outline-light btn-sm" onclick="loadCases(1, null)"><i class=\"fas fa-th-large me-1\"></i>返回类别</button>` : ''}
                 </div>
 
                 ${categoryId ? `
@@ -234,6 +246,9 @@ function viewCase(caseId) {
                     <div class="col-12">
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb">
+                                <li class="breadcrumb-item">
+                                    <a href="#" onclick="navigateTo('dashboard')">首页</a>
+                                </li>
                                 <li class="breadcrumb-item">
                                     <a href="#" onclick="loadCases(1, null)">案例学习</a>
                                 </li>
