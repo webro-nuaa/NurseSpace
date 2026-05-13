@@ -837,11 +837,21 @@ def get_exam_result(exam_id):
 
     answers = ExamAnswer.query.filter_by(exam_record_id=record.id).order_by(ExamAnswer.id).all()
 
-    answers_data = []
+    # Group answers by case (using dict to maintain insertion order, Python 3.7+)
+    cases_dict = {}
     for ans in answers:
         station = db.session.get(Station, ans.station_id) if ans.station_id else None
         exam_question = db.session.get(ExamQuestion, ans.exam_question_id) if ans.exam_question_id else None
         case = db.session.get(Case, exam_question.case_id) if exam_question else None
+
+        case_key = exam_question.case_id if exam_question else 0
+
+        if case_key not in cases_dict:
+            cases_dict[case_key] = {
+                'case_id': case.id if case else None,
+                'case_title': case.title if case else '未知案例',
+                'stations': []
+            }
 
         standard_answers_data = []
         if station:
@@ -850,16 +860,17 @@ def get_exam_result(exam_id):
                 for sa in station.standard_answers.order_by(StandardAnswer.order_index).all()
             ]
 
-        answers_data.append({
+        cases_dict[case_key]['stations'].append({
             'id': ans.id,
             'station_name': station.name if station else '',
             'question': station.question if station else '',
-            'case_title': case.title if case else '',
             'user_answer': ans.user_answer or '',
             'score': float(ans.score) if ans.score else 0,
             'ai_feedback': ans.ai_feedback or '',
             'standard_answers': standard_answers_data
         })
+
+    cases_data = list(cases_dict.values())
 
     exam = db.session.get(Exam, exam_id)
 
@@ -876,7 +887,7 @@ def get_exam_result(exam_id):
             'max_score': float(record.max_score) if record.max_score else 0,
             'status': record.status,
             'submit_time': record.submit_time.isoformat() if record.submit_time else None,
-            'answers': answers_data
+            'cases': cases_data
         }
     })
 

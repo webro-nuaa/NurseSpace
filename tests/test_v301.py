@@ -207,7 +207,7 @@ class TestNurseExamResult:
         result = resp.get_json()
         assert result['success']
         data = result.get('data', result)
-        assert 'answers' in data
+        assert 'cases' in data
         assert 'total_score' in data
 
     def test_get_result_no_record(self, client, nurse_token, admin_token, app):
@@ -229,9 +229,11 @@ class TestNurseExamResult:
                          headers={'Authorization': f'Bearer {nurse_token}'})
         data = resp.get_json()
         assert data['success']
-        if data.get('answers'):
-            ans = data['answers'][0]
-            assert 'station_name' in ans or 'station_id' in ans
+        if data.get('cases'):
+            case = data['cases'][0]
+            assert 'stations' in case
+            ans = case['stations'][0]
+            assert 'station_name' in ans
             assert 'score' in ans
             assert 'ai_feedback' in ans
 

@@ -726,6 +726,8 @@ function viewExamResult(examId) {
     $.get('/nurse/exams/' + examId + '/result', function(res) {
         if (!res.success) { showAlert(res.message || '加载失败', 'error'); return; }
         var d = res.data;
+        var totalStations = 0;
+        (d.cases || []).forEach(function(c) { totalStations += c.stations.length; });
         var html = `
             <nav aria-label="breadcrumb"><ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="#" onclick="loadTab('exams')">考试中心</a></li>
@@ -733,36 +735,43 @@ function viewExamResult(examId) {
             </ol></nav>
             <div class="page-title">
                 <h2><i class="fas fa-poll me-2"></i>${d.exam ? d.exam.title : '考试结果'}</h2>
-                <p>总分 <span class="fw-bold fs-4 text-primary">${d.total_score.toFixed(0)}</span> / ${d.max_score.toFixed(0)}</p>
+                <p>总分 <span class="fw-bold fs-4 text-primary">${d.total_score.toFixed(0)}</span> / ${d.max_score.toFixed(0)} — 共 ${(d.cases || []).length} 个案例，${totalStations} 个站点</p>
             </div>
-            <div class="row">
-                <div class="col-12">
-                    ${d.answers.map(function(a, i) {
-                        var badgeClass = a.score >= 80 ? 'bg-success' : (a.score >= 60 ? 'bg-warning text-dark' : 'bg-danger');
-                        return `
-                            <div class="card mb-3">
-                                <div class="card-header d-flex justify-content-between align-items-center py-2">
-                                    <span><strong>#${i + 1}</strong> ${a.station_name} <span class="text-muted small">(${a.case_title})</span></span>
-                                    <span class="badge ${badgeClass} fs-6">${a.score.toFixed(0)} 分</span>
-                                </div>
-                                <div class="card-body py-2">
-                                    <div class="mb-2"><small class="text-muted">题目：</small>${a.question}</div>
-                                    <div class="mb-2"><small class="text-muted">你的作答：</small><div class="border rounded p-2 bg-white">${a.user_answer || '<span class="text-muted">(未作答)</span>'}</div></div>
-                                    ${a.ai_feedback ? '<div class="mb-2"><small class="text-muted">AI 反馈：</small><div class="border rounded p-2 bg-light">' + a.ai_feedback + '</div></div>' : ''}
-                                    ${a.standard_answers && a.standard_answers.length ? `
-                                        <div class="mb-2"><small class="text-muted">标准答案：</small>
-                                            <div class="border rounded p-2 bg-white">
-                                                ${a.standard_answers.map(function(sa) {
-                                                    return '<span class="badge bg-light text-dark me-1 mb-1">' + sa.answer_item + '</span>';
-                                                }).join('')}
+
+            ${(d.cases || []).map(function(c, ci) {
+                return `
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-folder-open me-2 text-primary"></i>案例 #${ci + 1}：${c.case_title}</h6>
+                    </div>
+                    <div class="card-body py-2">
+                        ${c.stations.map(function(a, i) {
+                            var badgeClass = a.score >= 80 ? 'bg-success' : (a.score >= 60 ? 'bg-warning text-dark' : 'bg-danger');
+                            return `
+                                <div class="card mb-2 ${i === c.stations.length - 1 ? '' : ''}">
+                                    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+                                        <span><strong>#${i + 1}</strong> ${a.station_name}</span>
+                                        <span class="badge ${badgeClass}">${a.score.toFixed(0)} 分</span>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="mb-2 content-wrap"><small class="text-muted">题目：</small>${a.question}</div>
+                                        <div class="mb-2"><small class="text-muted">你的作答：</small><div class="border rounded p-2 bg-white content-wrap">${a.user_answer || '<span class="text-muted">(未作答)</span>'}</div></div>
+                                        ${a.ai_feedback ? '<div class="mb-2"><small class="text-muted">AI 反馈：</small><div class="border rounded p-2 bg-light content-wrap">' + a.ai_feedback + '</div></div>' : ''}
+                                        ${a.standard_answers && a.standard_answers.length ? `
+                                            <div class="mb-2"><small class="text-muted">标准答案：</small>
+                                                <div class="border rounded p-3 bg-white">
+                                                    <ol class="mb-0 ps-3">${a.standard_answers.map(function(sa) {
+                                                        return '<li class="mb-1 content-wrap">' + sa.answer_item + (sa.score_weight !== 1 ? ' <span class="badge bg-info ms-1" style="font-size:0.65rem;">权重 ' + sa.score_weight + '</span>' : '') + '</li>';
+                                                    }).join('')}</ol>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </div>`;
-                    }).join('')}
-                </div>
-            </div>`;
+                                        ` : ''}
+                                    </div>
+                                </div>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+            }).join('')}`;
         $('#main-content').html(html);
     });
 }
