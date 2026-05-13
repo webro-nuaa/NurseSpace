@@ -110,6 +110,29 @@
         }
     });
 
+    // Handle browser back/forward: restore SPA state from URL params
+    window.addEventListener('popstate', function(event) {
+        _popstateInProgress = true;
+        const qs = new URLSearchParams(location.search);
+        const tab = qs.get('tab');
+        const categoryId = qs.get('category_id');
+        const caseId = qs.get('case_id');
+
+        switch(tab) {
+            case 'cases':
+                if (caseId) viewCase(parseInt(caseId));
+                else if (categoryId) loadCases(1, parseInt(categoryId));
+                else loadCases(1);
+                break;
+            case 'wrongs': loadWrongQuestions(); break;
+            case 'weakness': loadWeaknessAnalysis(); break;
+            case 'exams': loadExams(); break;
+            case 'points': loadPointRecords(); break;
+            default: loadDashboard();
+        }
+        setTimeout(function() { _popstateInProgress = false; }, 0);
+    });
+
     function checkLogin() {
         const token = localStorage.getItem('access_token');
         const userInfo = localStorage.getItem('user_info');

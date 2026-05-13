@@ -7,6 +7,7 @@ let currentKnowledgeId = null;
 let caseKnowledgeMap = {}; // 缓存当前案例的扩展知识题目
 let currentCategoryId = null; // 当前选中的类别
 let currentCategoryName = null; // 当前选中的类别名称
+let _popstateInProgress = false; // suppress history manipulation during popstate
 
 // 全局 AJAX 401 处理：token 过期自动跳转登录
 $(document).ajaxError(function(event, jqXHR) {
@@ -48,7 +49,14 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
         navUrl.searchParams.delete('category_id');
         navUrl.searchParams.delete('case_id');
     }
-    window.history.replaceState({}, '', navUrl);
+    // pushState for explicit drill-down, replaceState for pagination / top-level
+    if (!_popstateInProgress) {
+        if (arguments.length >= 2 && categoryId) {
+            window.history.pushState({}, '', navUrl);
+        } else {
+            window.history.replaceState({}, '', navUrl);
+        }
+    }
 
     let url = `/nurse/cases?page=${page}&per_page=10`;
     if (categoryId) {
@@ -208,7 +216,9 @@ function viewCase(caseId) {
     navUrl.searchParams.set('tab', 'cases');
     navUrl.searchParams.set('case_id', caseId);
     navUrl.searchParams.delete('category_id');
-    window.history.replaceState({}, '', navUrl);
+    if (!_popstateInProgress) {
+        window.history.pushState({}, '', navUrl);
+    }
 
     $.get(`/nurse/cases/${caseId}`, function(response) {
         if (response.success) {
