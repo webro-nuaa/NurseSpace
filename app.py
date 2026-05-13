@@ -112,6 +112,15 @@ def create_app():
         logging.getLogger(__name__).exception("Internal server error")
         return jsonify({'success': False, 'message': '服务器内部错误'}), 500
 
+    @app.after_request
+    def add_cache_headers(response):
+        """HTML 页面添加 no-cache 头，防止浏览器缓存旧版页面导致加载旧 JS/CSS。
+        JSON 接口不添加，让客户端自行控制缓存策略。"""
+        if response.content_type and 'text/html' in response.content_type:
+            response.headers['Cache-Control'] = 'no-cache, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'  # HTTP/1.0 兼容
+        return response
+
     # 注册蓝图
     from routes.auth import auth_bp
     from routes.nurse import nurse_bp
