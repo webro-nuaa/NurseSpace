@@ -2901,8 +2901,8 @@ function reviewExam(examId) {
                         <td><span class="fw-bold">${p.total_score.toFixed(0)}</span> / ${p.max_score.toFixed(0)}</td>
                         <td>${p.submit_time ? formatDateTime(p.submit_time) : '-'}</td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary" onclick="toggleParticipantAnswers(${p.record_id})">
-                                <i class="fas fa-chevron-down" id="toggle-icon-${p.record_id}"></i> 展开
+                            <button class="btn btn-sm btn-outline-primary" onclick="toggleParticipantAnswers(${p.record_id})" title="展开答题详情">
+                                <i class="fas fa-chevron-down" id="toggle-icon-${p.record_id}"></i>
                             </button>
                         </td>
                     </tr>
@@ -2913,16 +2913,21 @@ function reviewExam(examId) {
                                 ${p.answers.map(function(a, i) {
                                     return `
                                         <div class="card mb-2">
-                                            <div class="card-header d-flex justify-content-between align-items-center py-2">
-                                                <span><strong>#${i + 1}</strong> ${a.station_name} <span class="text-muted small">(${a.case_title})</span></span>
-                                                <div class="d-flex align-items-center gap-2">
-                                                    <span class="fw-bold" id="score-display-${a.id}">${a.score.toFixed(0)} 分</span>
-                                                    <button class="btn btn-sm btn-outline-info re-score-btn" id="re-score-btn-${a.id}" onclick="reScoreAnswer(${examId}, ${a.id})" title="AI 重新评分">
-                                                        <i class="fas fa-robot"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-outline-warning" onclick="showScoreEdit(${examId}, ${a.id}, ${a.score})" title="手动调整分数">
-                                                        <i class="fas fa-pen"></i>
-                                                    </button>
+                                            <div class="card-header py-2">
+                                                <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                                                    <div>
+                                                        <strong>#${i + 1}</strong> ${a.station_name}
+                                                        <small class="text-muted d-block d-md-inline-block ms-md-1">${a.case_title}</small>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span class="fw-bold text-nowrap" id="score-display-${a.id}">${a.score.toFixed(0)} 分</span>
+                                                        <button class="btn btn-sm btn-outline-info" id="re-score-btn-${a.id}" onclick="reScoreAnswer(${examId}, ${a.id})" title="AI 重新评分">
+                                                            <i class="fas fa-robot"></i><span class="d-none d-md-inline ms-1">重新评分</span>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-outline-warning" onclick="showScoreEdit(${examId}, ${a.id}, ${a.score})" title="调整分数">
+                                                            <i class="fas fa-pen"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div class="card-body py-2">
