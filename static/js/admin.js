@@ -1,5 +1,14 @@
 // 管理员端JavaScript功能
 
+// 全局 AJAX 401 处理：token 过期自动跳转登录
+$(document).ajaxError(function(event, jqXHR) {
+    if (jqXHR.status === 401) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user_info');
+        window.location.href = '/auth/login';
+    }
+});
+
 let currentPage = 1;
 let caseCategoryFilter = '';
 let caseSearch = '';

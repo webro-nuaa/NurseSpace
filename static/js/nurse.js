@@ -8,6 +8,15 @@ let caseKnowledgeMap = {}; // 缓存当前案例的扩展知识题目
 let currentCategoryId = null; // 当前选中的类别
 let currentCategoryName = null; // 当前选中的类别名称
 
+// 全局 AJAX 401 处理：token 过期自动跳转登录
+$(document).ajaxError(function(event, jqXHR) {
+    if (jqXHR.status === 401) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user_info');
+        window.location.href = '/auth/login';
+    }
+});
+
 // 为独立页面链接附加 JWT token，避免 session 过期后跳登录页
 function hrefWithToken(baseUrl) {
     const token = localStorage.getItem('access_token');
@@ -936,7 +945,16 @@ function loadPointRecords(page = 1) {
 // ============================================================
 
 function initStandaloneNav(activeTab) {
-    const token = localStorage.getItem('access_token');
+    let token = localStorage.getItem('access_token');
+    // Fallback: extract token from current URL (standalone pages get token via query param)
+    if (!token) {
+        const qs = new URLSearchParams(location.search);
+        const urlToken = qs.get('token');
+        if (urlToken) {
+            token = urlToken;
+            localStorage.setItem('access_token', token);
+        }
+    }
     if (!token) return;
 
     $('.navbar-nav-horizontal .nav-link').each(function () {
