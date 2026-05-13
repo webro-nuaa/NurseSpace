@@ -614,14 +614,18 @@ body {
   border-left: 3px solid var(--gray-500);
 }
 
-/* ----- Mobile Nav (Bootstrap Collapse dropdown below top bar) ----- */
+/* ----- Mobile Nav (Bootstrap Collapse overlay below top bar) ----- */
 .mobile-nav-collapse {
   background: #fff;
   border-bottom: 2px solid var(--gray-200);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  position: sticky;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  position: fixed;
   top: var(--topbar-height);
+  left: 0;
+  right: 0;
   z-index: 1025;
+  max-height: calc(100vh - var(--topbar-height));
+  overflow-y: auto;
 }
 
 .mobile-nav-collapse .nav-link-mobile {

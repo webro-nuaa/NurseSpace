@@ -158,12 +158,12 @@
               var catName = c.category_name || '案例学习';
               var catEsc = catName.replace(/'/g, "\\'");
               $('#breadcrumb-container').html(renderStandaloneBreadcrumb([
-                {label: '案例学习', onclick: 'loadCases(1, null)'},
-                {label: catName, onclick: 'loadCases(1, ' + catId + ", '" + catEsc + "')"},
-                {label: c.title, onclick: 'viewCase(' + caseId + ')'},
+                {label: '案例学习', href: hrefWithToken('/nurse?tab=cases')},
+                {label: catName, href: hrefWithToken('/nurse?tab=cases&category_id=' + catId)},
+                {label: c.title, href: hrefWithToken('/nurse?tab=cases&case_id=' + caseId)},
                 {label: '扩展知识作答'}
               ]));
-              $('#btn-back-knowledge').attr('onclick', 'viewCase(' + caseId + ')');
+              $('#btn-back-knowledge').attr('onclick', 'window.location.href=hrefWithToken("/nurse?tab=cases&case_id=' + caseId + '")');
             }
           });
         }

@@ -244,14 +244,13 @@
           var c = r.data.case;
           var catId = c.category_id || 0;
           var catName = c.category_name || '案例学习';
-          var catNameEsc = catName.replace(/'/g, "\\'");
           $('#breadcrumb-container').html(renderStandaloneBreadcrumb([
-            {label: '案例学习', onclick: 'loadCases(1, null)'},
-            {label: catName, onclick: 'loadCases(1, ' + catId + ", '" + catNameEsc + "')"},
-            {label: c.title, onclick: 'viewCase(' + caseId + ')'},
+            {label: '案例学习', href: hrefWithToken('/nurse?tab=cases')},
+            {label: catName, href: hrefWithToken('/nurse?tab=cases&category_id=' + catId)},
+            {label: c.title, href: hrefWithToken('/nurse?tab=cases&case_id=' + caseId)},
             {label: '查看答案'}
           ]));
-          $('#btn-back-answer-view').attr('onclick', 'viewCase(' + caseId + ')');
+          $('#btn-back-answer-view').attr('onclick', 'window.location.href=hrefWithToken("/nurse?tab=cases&case_id=' + caseId + '")');
         }
       });
     }

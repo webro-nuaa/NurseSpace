@@ -29,6 +29,18 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
     currentCategoryId = categoryId || null;
     if (categoryName !== undefined) currentCategoryName = categoryName;
 
+    // Update URL to reflect navigation state
+    var navUrl = new URL(window.location);
+    navUrl.searchParams.set('tab', 'cases');
+    if (categoryId) {
+        navUrl.searchParams.set('category_id', categoryId);
+        navUrl.searchParams.delete('case_id');
+    } else {
+        navUrl.searchParams.delete('category_id');
+        navUrl.searchParams.delete('case_id');
+    }
+    window.history.replaceState({}, '', navUrl);
+
     let url = `/nurse/cases?page=${page}&per_page=10`;
     if (categoryId) {
         url += `&category_id=${categoryId}`;
@@ -181,6 +193,13 @@ function filterCasesClientSide() {
 // 查看案例详情
 function viewCase(caseId) {
     currentCaseId = caseId;
+
+    // Update URL to reflect case state
+    var navUrl = new URL(window.location);
+    navUrl.searchParams.set('tab', 'cases');
+    navUrl.searchParams.set('case_id', caseId);
+    navUrl.searchParams.delete('category_id');
+    window.history.replaceState({}, '', navUrl);
 
     $.get(`/nurse/cases/${caseId}`, function(response) {
         if (response.success) {

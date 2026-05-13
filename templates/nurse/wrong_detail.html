@@ -117,7 +117,7 @@
 
     initStandaloneNav('wrongs');
     $('#breadcrumb-container').html(renderStandaloneBreadcrumb([
-      {label: '错题集', onclick: 'loadWrongQuestions()'},
+      {label: '错题集', href: hrefWithToken('/nurse?tab=wrongs')},
       {label: '错题详情'}
     ]));
     $('#link-back-wrongs').attr('href', hrefWithToken('/nurse?tab=wrongs'));

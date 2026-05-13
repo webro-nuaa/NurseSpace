@@ -86,8 +86,22 @@
 
         const qs = new URLSearchParams(location.search);
         const tab = qs.get('tab');
+        const categoryId = qs.get('category_id');
+        const caseId = qs.get('case_id');
+
         switch(tab){
-            case 'cases': navigateTo('cases'); break;
+            case 'cases':
+                if (caseId) {
+                    // Deep link: open specific case — viewCase fetches category info
+                    navigateTo('cases');
+                    viewCase(parseInt(caseId));
+                } else if (categoryId) {
+                    navigateTo('cases');
+                    loadCases(1, parseInt(categoryId));
+                } else {
+                    navigateTo('cases');
+                }
+                break;
             case 'wrongs': navigateTo('wrongs'); break;
             case 'weakness': navigateTo('weakness'); break;
             case 'exams': navigateTo('exams'); break;
@@ -142,9 +156,11 @@
             if (bsCollapse) bsCollapse.hide();
         }
 
-        // Update URL
+        // Update URL — remove case/category params when switching tabs
         const url = new URL(window.location);
         url.searchParams.set('tab', tab);
+        url.searchParams.delete('category_id');
+        url.searchParams.delete('case_id');
         window.history.replaceState({}, '', url);
 
         // Route
