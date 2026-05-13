@@ -40,6 +40,10 @@
         <a class="d-block nav-link-mobile" href="#" data-page="voice-settings" onclick="navigateTo('voice-settings')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-microphone me-2"></i>语音设置
         </a>
+        <div class="nav-section-title">其他</div>
+        <a class="d-block nav-link-mobile" href="#" data-page="help" onclick="navigateTo('help')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
+            <i class="fas fa-question-circle me-2"></i>使用帮助
+        </a>
     </div>
 </div>
 {% endblock %}
@@ -86,6 +90,12 @@
 <li class="nav-item">
     <a class="nav-link" href="#" data-page="voice-settings" onclick="navigateTo('voice-settings')">
         <i class="fas fa-microphone"></i>语音设置
+    </a>
+</li>
+<li class="nav-section-title">其他</li>
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="help" onclick="navigateTo('help')">
+        <i class="fas fa-question-circle"></i>使用帮助
     </a>
 </li>
 {% endblock %}
@@ -155,6 +165,7 @@
             case 'group-analysis': loadGroupAnalysis(); break;
             case 'ai-settings': loadAiSettings(); break;
         case 'voice-settings': loadVoiceSettings(); break;
+            case 'help': loadHelp(); break;
         }
     }
 
