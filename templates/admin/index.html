@@ -112,25 +112,101 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/admin.js', v=config.VERSION) }}"></script>
 <script>
-    $(document).ready(function() {
-        checkLogin();
+    // ======================================================================
+    // Admin SPA Router — history management primitives
+    // Defined globally so admin.js navTo* shims can reference them at runtime.
+    // ======================================================================
 
-        // 浏览器前进/后退时恢复对应页面
-        window.addEventListener('popstate', function(event) {
-            const qs = new URLSearchParams(location.search);
-            const tab = qs.get('tab') || 'dashboard';
-            navigateTo(tab, true);
-        });
-
-        // 初始加载：从 URL 参数恢复页面，否则默认仪表盘
-        const qs = new URLSearchParams(location.search);
-        const initialTab = qs.get('tab');
-        if (initialTab) {
-            navigateTo(initialTab, true);
-        } else {
-            loadDashboard();
+    function updateSidebarActive(page) {
+        $('#sidebar .nav-link').removeClass('active');
+        $('#sidebar .nav-link[data-page="' + page + '"]').addClass('active');
+        $('#adminNavCollapse .nav-link-mobile').removeClass('active');
+        $('#adminNavCollapse .nav-link-mobile[data-page="' + page + '"]').addClass('active');
+        var collapseEl = document.getElementById('adminNavCollapse');
+        if (collapseEl) {
+            var bsCollapse = bootstrap.Collapse.getInstance(collapseEl);
+            if (bsCollapse) bsCollapse.hide();
         }
-    });
+    }
+
+    function adminPushView(params) {
+        var url = new URL(window.location);
+        url.search = '';
+        for (var key in params) {
+            if (params.hasOwnProperty(key) && params[key] !== undefined && params[key] !== null && params[key] !== '') {
+                url.searchParams.set(key, String(params[key]));
+            }
+        }
+        window.history.pushState({}, '', url);
+        if (params.tab) updateSidebarActive(params.tab);
+    }
+
+    function adminReplaceView(params) {
+        var url = new URL(window.location);
+        url.search = '';
+        for (var key in params) {
+            if (params.hasOwnProperty(key) && params[key] !== undefined && params[key] !== null && params[key] !== '') {
+                url.searchParams.set(key, String(params[key]));
+            }
+        }
+        window.history.replaceState({}, '', url);
+        if (params.tab) updateSidebarActive(params.tab);
+    }
+
+    function restoreView() {
+        var qs = new URLSearchParams(location.search);
+        var tab = qs.get('tab') || 'dashboard';
+        updateSidebarActive(tab);
+
+        switch (tab) {
+            case 'dashboard':
+                loadDashboard();
+                break;
+            case 'users':
+                var uid = qs.get('user_id');
+                var uv = qs.get('view');
+                if (uid && uv === 'edit') { renderUserEditPage(parseInt(uid)); }
+                else if (uid) { renderUserDetailPage(parseInt(uid)); }
+                else if (uv === 'create') { renderUserCreatePage(); }
+                else if (uv === 'import') { renderUserImportPage(); }
+                else { loadUsers(parseInt(qs.get('page')) || 1); }
+                break;
+            case 'cases':
+                var cid = qs.get('case_id');
+                var sid = qs.get('station_id');
+                if (cid && sid) { renderStationEditPage(parseInt(cid), parseInt(sid)); }
+                else if (cid) { renderCaseDetailPage(parseInt(cid)); }
+                else if (qs.get('view') === 'create') { renderCaseCreatePage(); }
+                else { loadCases(parseInt(qs.get('page')) || 1); }
+                break;
+            case 'exams':
+                var eid = qs.get('exam_id');
+                var rid = qs.get('record_id');
+                var ev = qs.get('view');
+                if (eid && rid) { viewParticipantDetail(parseInt(eid), parseInt(rid)); }
+                else if (eid && ev === 'edit') { renderExamEditPage(parseInt(eid)); }
+                else if (eid && ev === 'questions') { manageExamQuestions(parseInt(eid)); }
+                else if (eid && ev === 'review') { reviewExam(parseInt(eid)); }
+                else if (ev === 'create') { renderExamCreatePage(); }
+                else { loadExams(); }
+                break;
+            case 'statistics':   loadStatistics(); break;
+            case 'group-analysis': loadGroupAnalysis(); break;
+            case 'ai-settings':   loadAiSettings(); break;
+            case 'voice-settings': loadVoiceSettings(); break;
+            case 'help':          loadHelp(); break;
+        }
+    }
+
+    // Sidebar tab navigation — pushes clean top-level state
+    function navigateTo(page) {
+        adminPushView({tab: page});
+        restoreView();
+    }
+
+    // ======================================================================
+    // Bootstrap
+    // ======================================================================
 
     function checkLogin() {
         const token = localStorage.getItem('access_token');
@@ -154,52 +230,27 @@
         });
     }
 
-    function navigateTo(page, skipPush) {
-        // Update sidebar active state
-        $('#sidebar .nav-link').removeClass('active');
-        $('#sidebar .nav-link[data-page="' + page + '"]').addClass('active');
-
-        // Update mobile nav active state
-        $('#adminNavCollapse .nav-link-mobile').removeClass('active');
-        $('#adminNavCollapse .nav-link-mobile[data-page="' + page + '"]').addClass('active');
-
-        // Collapse mobile nav
-        var collapseEl = document.getElementById('adminNavCollapse');
-        if (collapseEl) {
-            var bsCollapse = bootstrap.Collapse.getInstance(collapseEl);
-            if (bsCollapse) bsCollapse.hide();
-        }
-
-        // Push state to browser history (skip during popstate restoration)
-        if (!skipPush) {
-            var navUrl = new URL(window.location);
-            navUrl.searchParams.set('tab', page);
-            window.history.pushState({}, '', navUrl);
-        }
-
-        // Route to the correct loader
-        switch(page) {
-            case 'dashboard': loadDashboard(); break;
-            case 'users': loadUsers(); break;
-            case 'cases': loadCases(); break;
-            case 'exams': loadExams(); break;
-            case 'statistics': loadStatistics(); break;
-            case 'group-analysis': loadGroupAnalysis(); break;
-            case 'ai-settings': loadAiSettings(); break;
-            case 'voice-settings': loadVoiceSettings(); break;
-            case 'help': loadHelp(); break;
-        }
-    }
-
     function setActiveNav(title) {
-        // Legacy support — update sidebar by text match
-        $('#sidebar .nav-link').removeClass('active');
-        $('#sidebar .nav-link').each(function() {
-            if ($(this).text().trim().includes(title)) {
-                $(this).addClass('active');
-            }
-        });
+        // Deprecated — now handled by updateSidebarActive.
+        // Kept as no-op so existing loader functions that call it don't error.
     }
+
+    $(document).ready(function() {
+        checkLogin();
+
+        // Browser back/forward: restore full view from URL params
+        window.addEventListener('popstate', function(event) {
+            restoreView();
+        });
+
+        // Initial load: restore from URL or default to dashboard
+        var qs = new URLSearchParams(location.search);
+        if (qs.get('tab')) {
+            restoreView();
+        } else {
+            loadDashboard();
+        }
+    });
 
 </script>
 {% endblock %}

@@ -13,6 +13,92 @@ let currentPage = 1;
 let caseCategoryFilter = '';
 let caseSearch = '';
 
+// ============================================================================
+// Navigation shims — push history state, then call the loader function.
+// adminPushView / adminReplaceView are defined in the inline script in
+// templates/admin/index.html.  They are not available at parse time (admin.js
+// loads first), but they will be at runtime when a user clicks a link.
+// The typeof guard ensures graceful degradation if the inline script fails.
+// ============================================================================
+
+function navToCases() {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'cases'});
+    loadCases();
+}
+function navToCaseCreate() {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'cases', view: 'create'});
+    renderCaseCreatePage();
+}
+function navToCaseDetail(caseId) {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'cases', case_id: String(caseId)});
+    renderCaseDetailPage(caseId);
+}
+function navToStationEdit(caseId, stationId) {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'cases', case_id: String(caseId), station_id: String(stationId)});
+    renderStationEditPage(caseId, stationId);
+}
+function navToUsers() {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'users'});
+    loadUsers();
+}
+function navToUserDetail(userId) {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'users', user_id: String(userId)});
+    renderUserDetailPage(userId);
+}
+function navToUserEdit(userId) {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'users', user_id: String(userId), view: 'edit'});
+    renderUserEditPage(userId);
+}
+function navToUserCreate() {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'users', view: 'create'});
+    renderUserCreatePage();
+}
+function navToUserImport() {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'users', view: 'import'});
+    renderUserImportPage();
+}
+function navToExams() {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'exams'});
+    loadExams();
+}
+function navToExamCreate() {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'exams', view: 'create'});
+    renderExamCreatePage();
+}
+function navToExamEdit(examId) {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'exams', exam_id: String(examId), view: 'edit'});
+    renderExamEditPage(examId);
+}
+function navToExamQuestions(examId) {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'exams', exam_id: String(examId), view: 'questions'});
+    manageExamQuestions(examId);
+}
+function navToExamReview(examId) {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'exams', exam_id: String(examId), view: 'review'});
+    reviewExam(examId);
+}
+function navToParticipantDetail(examId, recordId) {
+    if (typeof adminPushView === 'function') adminPushView({tab: 'exams', exam_id: String(examId), record_id: String(recordId)});
+    viewParticipantDetail(examId, recordId);
+}
+
+// Pagination helpers — use replaceState to avoid history pollution
+function navToUsersPage(page) {
+    if (typeof adminReplaceView === 'function') adminReplaceView({tab: 'users', page: String(page)});
+    loadUsers(page);
+}
+function navToCasesPage(page) {
+    var params = {tab: 'cases', page: String(page)};
+    if (caseCategoryFilter) params.category_id = String(caseCategoryFilter);
+    if (caseSearch) params.search = caseSearch;
+    var typeFilter = $('#case-type-filter').val();
+    if (typeFilter) params.case_type = typeFilter;
+    if (typeof adminReplaceView === 'function') adminReplaceView(params);
+    loadCases(page);
+}
+
+// ============================================================================
+
 // 加载数据看板
 function loadDashboard() {
     setActiveNav('数据看板');
@@ -106,10 +192,10 @@ function loadUsers(page = 1, role = 'nurse') {
                         <p class="text-muted mb-0">管理护士账号和权限</p>
                     </div>
                     <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-primary btn-sm" onclick="renderUserCreatePage()">
+                        <button class="btn btn-primary btn-sm" onclick="navToUserCreate()">
                             <i class="fas fa-plus me-1"></i>添加用户
                         </button>
-                        <button class="btn btn-outline-success btn-sm" onclick="renderUserImportPage()">
+                        <button class="btn btn-outline-success btn-sm" onclick="navToUserImport()">
                             <i class="fas fa-file-excel me-1"></i>批量导入
                         </button>
                         <a class="btn btn-outline-secondary btn-sm" href="/admin/users/xlsx-template">
@@ -166,10 +252,10 @@ function loadUsers(page = 1, role = 'nurse') {
                                                     <td class="d-none d-md-table-cell">${formatDateTime(user.created_at)}</td>
                                                     <td>
                                                         <div class="btn-action-group">
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="renderUserDetailPage(${user.id})">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="navToUserDetail(${user.id})">
                                                             <i class="fas fa-eye"></i>
                                                         </button>
-                                                        <button class="btn btn-sm btn-outline-warning" onclick="renderUserEditPage(${user.id})">
+                                                        <button class="btn btn-sm btn-outline-warning" onclick="navToUserEdit(${user.id})">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
                                                         <button class="btn btn-sm ${user.status === 'active' ? 'btn-outline-danger' : 'btn-outline-success'}"
@@ -184,7 +270,7 @@ function loadUsers(page = 1, role = 'nurse') {
                                     </table>
                                 </div>
                                 
-                                ${generatePagination(data.pagination, 'loadUsers')}
+                                ${generatePagination(data.pagination, 'navToUsersPage')}
                             </div>
                         </div>
                     </div>
@@ -217,7 +303,7 @@ function submitAddUser() {
             if (response.success) {
                 showAlert('用户添加成功', 'success');
                 $('#addUserModal').modal('hide');
-                loadUsers(); // 刷新列表
+                navToUsers(); // 返回列表
             } else {
                 showAlert(response.message, 'error');
             }
@@ -265,7 +351,7 @@ function loadCases(page = 1) {
                         <p class="text-muted mb-0">管理医疗案例和内容</p>
                     </div>
                     <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-primary btn-sm" onclick="renderCaseCreatePage()">
+                        <button class="btn btn-primary btn-sm" onclick="navToCaseCreate()">
                             <i class="fas fa-plus me-1"></i>创建案例
                         </button>
                         <button class="btn btn-outline-primary btn-sm" onclick="showUploadModal()">
@@ -345,7 +431,7 @@ function loadCases(page = 1) {
                                                     <td class="d-none d-lg-table-cell">${formatDateTime(case_.created_at)}</td>
                                                     <td>
                                                         <div class="btn-action-group">
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="renderCaseDetailPage(${case_.id})">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="navToCaseDetail(${case_.id})">
                                                             <i class="fas fa-eye me-1"></i>详情
                                                         </button>
                                                         <button class="btn btn-sm btn-outline-danger" onclick="deleteCase(${case_.id})">
@@ -359,7 +445,7 @@ function loadCases(page = 1) {
                                     </table>
                                 </div>
                                 
-                                ${generatePagination(data.pagination, 'loadCases')}
+                                ${generatePagination(data.pagination, 'navToCasesPage')}
                             </div>
                         </div>
                     </div>
@@ -983,7 +1069,7 @@ function renderCaseCreatePage() {
 
         const html = `
             <nav aria-label="breadcrumb"><ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="#" onclick="loadCases()">案例管理</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToCases(); return false;">案例管理</a></li>
                 <li class="breadcrumb-item active">创建案例</li>
             </ol></nav>
             <div class="page-header">
@@ -1074,7 +1160,7 @@ function renderCaseCreatePage() {
             <!-- 提交 -->
             <div class="d-flex gap-2 mb-4">
                 <button class="btn btn-primary btn-lg" onclick="submitCreateCase()"><i class="fas fa-save me-1"></i>创建完整案例</button>
-                <button class="btn btn-outline-secondary btn-lg" onclick="loadCases()">取消</button>
+                <button class="btn btn-outline-secondary btn-lg" onclick="navToCases()">取消</button>
             </div>
         `;
         $('#main-content').html(html);
@@ -1364,7 +1450,7 @@ function submitCreateCase() {
             success: function(res) {
                 if (res.success) {
                     showAlert(res.message || '创建成功', 'success');
-                    setTimeout(function() { loadCases(); }, 800);
+                    setTimeout(function() { navToCases(); }, 800);
                 } else {
                     showAlert(res.message || '创建失败', 'error');
                 }
@@ -1414,7 +1500,7 @@ function renderCaseDetailPage(caseId) {
         const html = `
             <div class="row"><div class="col-12">
                 <nav aria-label="breadcrumb"><ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="#" onclick="loadCases()">案例管理</a></li>
+                    <li class="breadcrumb-item"><a href="#" onclick="navToCases(); return false;">案例管理</a></li>
                     <li class="breadcrumb-item active">${c.title}</li>
                 </ol></nav>
             </div></div>
@@ -1535,7 +1621,7 @@ function renderStationCard(caseId, s) {
                         </div>
                     </div>
                     <div class="ms-2">
-                        <button class="btn btn-sm btn-outline-primary d-block mb-1" onclick="renderStationEditPage(${caseId}, ${s.id})">
+                        <button class="btn btn-sm btn-outline-primary d-block mb-1" onclick="navToStationEdit(${caseId}, ${s.id})">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="btn btn-sm btn-outline-danger d-block" onclick="deleteStation(${caseId}, ${s.id})">
@@ -1588,7 +1674,7 @@ function toggleCaseMetaEdit(caseId) {
                 </div>
                 <div class="d-flex gap-2">
                     <button class="btn btn-primary btn-sm" onclick="submitCaseMetaEdit(${caseId})">保存</button>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="renderCaseDetailPage(${caseId})">取消</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="navToCaseDetail(${caseId})">取消</button>
                 </div>
             `;
             $('#case-meta-view').hide();
@@ -1631,7 +1717,7 @@ function showAddStationForm(caseId) {
                 <div class="mb-2"><textarea class="form-control form-control-sm" id="new-station-question" placeholder="题目 *" rows="2"></textarea></div>
                 <div class="d-flex gap-2">
                     <button class="btn btn-success btn-sm" onclick="submitAddStation(${caseId})">添加</button>
-                    <button class="btn btn-outline-secondary btn-sm" onclick="renderCaseDetailPage(${caseId})">取消</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="navToCaseDetail(${caseId})">取消</button>
                 </div>
             </div>
         </div>`;
@@ -1691,7 +1777,7 @@ function showAddVideoInline(caseId) {
             <input type="text" class="form-control form-control-sm mb-2" id="new-video-desc" placeholder="描述（可选）">
             <div class="d-flex gap-2">
                 <button class="btn btn-success btn-sm" onclick="submitAddVideoInline(${caseId})">添加</button>
-                <button class="btn btn-outline-secondary btn-sm" onclick="renderCaseDetailPage(${caseId})">取消</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="navToCaseDetail(${caseId})">取消</button>
             </div>
         </div>`;
     $('#videos-area').prepend(html);
@@ -1761,7 +1847,7 @@ function showAddLinkForm(caseId) {
             <input type="text" class="form-control form-control-sm mb-2" id="new-link-desc" placeholder="描述（可选）">
             <div class="d-flex gap-2">
                 <button class="btn btn-success btn-sm" onclick="submitAddLink(${caseId})">添加</button>
-                <button class="btn btn-outline-secondary btn-sm" onclick="renderCaseDetailPage(${caseId})">取消</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="navToCaseDetail(${caseId})">取消</button>
             </div>
         </div>`;
     $('#links-area').prepend(html);
@@ -1823,7 +1909,7 @@ function showAddKnowledgeInline(caseId) {
             </div>
             <div class="d-flex gap-2">
                 <button class="btn btn-success btn-sm" onclick="submitAddKnowledgeInline(${caseId})">添加</button>
-                <button class="btn btn-outline-secondary btn-sm" onclick="renderCaseDetailPage(${caseId})">取消</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="navToCaseDetail(${caseId})">取消</button>
             </div>
         </div>`;
     $('#knowledge-area').prepend(html);
@@ -1886,8 +1972,8 @@ function renderStationEditPage(caseId, stationId) {
         const c = caseRes[0].data.case;
         const html = `
             <nav aria-label="breadcrumb"><ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="#" onclick="loadCases()">案例管理</a></li>
-                <li class="breadcrumb-item"><a href="#" onclick="renderCaseDetailPage(${caseId})">${c.title}</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToCases(); return false;">案例管理</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToCaseDetail(${caseId}); return false;">${c.title}</a></li>
                 <li class="breadcrumb-item active">${s.name}</li>
             </ol></nav>
             <div class="page-header">
@@ -1996,7 +2082,7 @@ function renderUserDetailPage(userId) {
         const p = progRes[0].success ? progRes[0].data : {};
         const html = `
             <nav aria-label="breadcrumb"><ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="#" onclick="loadUsers()">用户管理</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToUsers(); return false;">用户管理</a></li>
                 <li class="breadcrumb-item active">${u.real_name}</li>
             </ol></nav>
             <div class="row g-3">
@@ -2015,7 +2101,7 @@ function renderUserDetailPage(userId) {
                             <div><strong>积分：</strong>${u.points}</div>
                         </div>
                         <div class="d-grid gap-2 mt-3">
-                            <button class="btn btn-outline-primary btn-sm" onclick="renderUserEditPage(${u.id})"><i class="fas fa-edit me-1"></i>编辑信息</button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="navToUserEdit(${u.id})"><i class="fas fa-edit me-1"></i>编辑信息</button>
                             <button class="btn btn-outline-warning btn-sm" onclick="resetUserPassword(${u.id})"><i class="fas fa-key me-1"></i>重置密码</button>
                         </div>
                     </div></div>
@@ -2078,8 +2164,8 @@ function renderUserEditPage(userId) {
         const u = res.data;
         const html = `
             <nav aria-label="breadcrumb"><ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="#" onclick="loadUsers()">用户管理</a></li>
-                <li class="breadcrumb-item"><a href="#" onclick="renderUserDetailPage(${u.id})">${u.real_name}</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToUsers(); return false;">用户管理</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToUserDetail(${u.id}); return false;">${u.real_name}</a></li>
                 <li class="breadcrumb-item active">编辑</li>
             </ol></nav>
             <div class="page-header">
@@ -2127,7 +2213,7 @@ function renderUserEditPage(userId) {
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-primary" onclick="submitEditUserPage(${u.id})">保存</button>
-                        <button class="btn btn-outline-secondary" onclick="renderUserDetailPage(${u.id})">取消</button>
+                        <button class="btn btn-outline-secondary" onclick="navToUserDetail(${u.id})">取消</button>
                     </div>
                 </div></div>
             </div></div>
@@ -2173,7 +2259,7 @@ function resetUserPassword(userId) {
 function renderUserCreatePage() {
     const html = `
         <nav aria-label="breadcrumb"><ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#" onclick="loadUsers()">用户管理</a></li>
+            <li class="breadcrumb-item"><a href="#" onclick="navToUsers(); return false;">用户管理</a></li>
             <li class="breadcrumb-item active">添加用户</li>
         </ol></nav>
         <div class="page-header">
@@ -2218,7 +2304,7 @@ function renderUserCreatePage() {
                 </div>
                 <div class="d-flex gap-2">
                     <button class="btn btn-primary" onclick="submitAddUser()">添加</button>
-                    <button class="btn btn-outline-secondary" onclick="loadUsers()">取消</button>
+                    <button class="btn btn-outline-secondary" onclick="navToUsers()">取消</button>
                 </div>
             </div></div>
         </div></div>
@@ -2243,7 +2329,7 @@ function loadExams() {
 
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <button class="btn btn-primary" onclick="renderExamCreatePage()">
+                        <button class="btn btn-primary" onclick="navToExamCreate()">
                             <i class="fas fa-plus me-1"></i>创建考试
                         </button>
                     </div>
@@ -2281,7 +2367,7 @@ function loadExams() {
                                                     <td class="d-none d-md-table-cell">${formatDateTime(exam.created_at)}</td>
                                                     <td>
                                                         <div class="btn-action-group">
-                                                        <button class="btn btn-sm btn-outline-primary" onclick="manageExamQuestions(${exam.id})">
+                                                        <button class="btn btn-sm btn-outline-primary" onclick="navToExamQuestions(${exam.id})">
                                                             <i class="fas fa-list"></i><span class="d-none d-md-inline ms-1">题目</span>
                                                         </button>
                                                         <button class="btn btn-sm btn-outline-warning" onclick="showExamQrCode(${exam.id})">
@@ -2292,11 +2378,11 @@ function loadExams() {
                                                                 <i class="fas fa-paper-plane"></i>
                                                             </button>
                                                         ` : `
-                                                            <button class="btn btn-sm btn-outline-success" onclick="reviewExam(${exam.id})">
+                                                            <button class="btn btn-sm btn-outline-success" onclick="navToExamReview(${exam.id})">
                                                                 <i class="fas fa-check-double"></i><span class="d-none d-md-inline ms-1">批阅</span>
                                                             </button>
                                                         `}
-                                                        <button class="btn btn-sm btn-outline-info" onclick="renderExamEditPage(${exam.id})">
+                                                        <button class="btn btn-sm btn-outline-info" onclick="navToExamEdit(${exam.id})">
                                                             <i class="fas fa-edit"></i>
                                                         </button>
                                                         </div>
@@ -2320,7 +2406,7 @@ function loadExams() {
 function renderExamCreatePage() {
     const html = `
         <nav aria-label="breadcrumb"><ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#" onclick="loadExams()">考试管理</a></li>
+            <li class="breadcrumb-item"><a href="#" onclick="navToExams(); return false;">考试管理</a></li>
             <li class="breadcrumb-item active">创建考试</li>
         </ol></nav>
         <div class="page-header">
@@ -2350,7 +2436,7 @@ function renderExamCreatePage() {
                 </div>
                 <div class="d-flex gap-2">
                     <button class="btn btn-primary" onclick="submitCreateExam()">创建</button>
-                    <button class="btn btn-outline-secondary" onclick="loadExams()">取消</button>
+                    <button class="btn btn-outline-secondary" onclick="navToExams()">取消</button>
                 </div>
             </div></div>
         </div></div>
@@ -2389,7 +2475,7 @@ function renderExamEditPage(examId) {
         if (!exam) { showAlert('考试不存在','error'); return; }
         const html = `
             <nav aria-label="breadcrumb"><ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="#" onclick="loadExams()">考试管理</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToExams(); return false;">考试管理</a></li>
                 <li class="breadcrumb-item active">编辑：${exam.title}</li>
             </ol></nav>
             <div class="page-header">
@@ -2419,7 +2505,7 @@ function renderExamEditPage(examId) {
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-primary" onclick="submitExamEdit(${examId})">保存</button>
-                        <button class="btn btn-outline-secondary" onclick="loadExams()">取消</button>
+                        <button class="btn btn-outline-secondary" onclick="navToExams()">取消</button>
                     </div>
                 </div></div>
             </div></div>
@@ -2534,7 +2620,7 @@ function buildExamQuestionPage(examId, exam, existingCaseMap) {
 
     const html = `
         <nav aria-label="breadcrumb"><ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#" onclick="loadExams()">考试管理</a></li>
+            <li class="breadcrumb-item"><a href="#" onclick="navToExams(); return false;">考试管理</a></li>
             <li class="breadcrumb-item active">${exam.title} - 添加题目</li>
         </ol></nav>
 
@@ -2910,7 +2996,7 @@ function reviewExam(examId) {
                         <td><span class="fw-bold">${p.total_score.toFixed(0)}</span> / ${p.max_score.toFixed(0)}</td>
                         <td>${p.submit_time ? formatDateTime(p.submit_time) : '-'}</td>
                         <td>
-                            <button class="btn btn-sm btn-outline-primary" onclick="viewParticipantDetail(${examId}, ${p.record_id})" title="查看答题详情">
+                            <button class="btn btn-sm btn-outline-primary" onclick="navToParticipantDetail(${examId}, ${p.record_id})" title="查看答题详情">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </td>
@@ -2920,7 +3006,7 @@ function reviewExam(examId) {
 
         const html = `
             <nav aria-label="breadcrumb"><ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="#" onclick="loadExams()">考试管理</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToExams(); return false;">考试管理</a></li>
                 <li class="breadcrumb-item active">批阅：${exam.title}</li>
             </ol></nav>
 
@@ -3013,8 +3099,8 @@ function viewParticipantDetail(examId, recordId) {
 
         const html = `
             <nav aria-label="breadcrumb"><ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="#" onclick="loadExams()">考试管理</a></li>
-                <li class="breadcrumb-item"><a href="#" onclick="reviewExam(${examId})">批阅：${exam.title}</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToExams(); return false;">考试管理</a></li>
+                <li class="breadcrumb-item"><a href="#" onclick="navToExamReview(${examId}); return false;">批阅：${exam.title}</a></li>
                 <li class="breadcrumb-item active">${p.real_name}</li>
             </ol></nav>
 
@@ -3028,7 +3114,7 @@ function viewParticipantDetail(examId, recordId) {
                     </p>
                 </div>
                 <div class="d-flex gap-2">
-                    <a href="#" class="btn btn-sm btn-outline-secondary" onclick="reviewExam(${examId}); return false;">
+                    <a href="#" class="btn btn-sm btn-outline-secondary" onclick="navToExamReview(${examId}); return false;">
                         <i class="fas fa-arrow-left me-1"></i>返回考生列表
                     </a>
                 </div>
@@ -3347,7 +3433,7 @@ function deleteBaiduKey(id) {
 function renderUserImportPage() {
     const html = `
         <nav aria-label="breadcrumb"><ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="#" onclick="loadUsers()">用户管理</a></li>
+            <li class="breadcrumb-item"><a href="#" onclick="navToUsers(); return false;">用户管理</a></li>
             <li class="breadcrumb-item active">批量导入</li>
         </ol></nav>
         <div class="page-header">
@@ -3370,7 +3456,7 @@ function renderUserImportPage() {
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-primary" onclick="submitUserXlsxImportPage()">导入</button>
                     <a class="btn btn-outline-secondary" href="/admin/users/xlsx-template"><i class="fas fa-download me-1"></i>下载模板</a>
-                    <button class="btn btn-outline-secondary" onclick="loadUsers()">返回</button>
+                    <button class="btn btn-outline-secondary" onclick="navToUsers()">返回</button>
                 </div>
             </div></div>
         </div></div>
@@ -3407,7 +3493,7 @@ function submitUserXlsxImportPage() {
                     $('#modal-container').html(modalHtml);
                     $('#importResultModal').modal('show');
                 }
-                loadUsers();
+                navToUsers();
             } else { showAlert(res.message || '导入失败', 'error'); }
         }
     });
