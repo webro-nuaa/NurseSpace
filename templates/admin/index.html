@@ -114,7 +114,22 @@
 <script>
     $(document).ready(function() {
         checkLogin();
-        loadDashboard();
+
+        // 浏览器前进/后退时恢复对应页面
+        window.addEventListener('popstate', function(event) {
+            const qs = new URLSearchParams(location.search);
+            const tab = qs.get('tab') || 'dashboard';
+            navigateTo(tab, true);
+        });
+
+        // 初始加载：从 URL 参数恢复页面，否则默认仪表盘
+        const qs = new URLSearchParams(location.search);
+        const initialTab = qs.get('tab');
+        if (initialTab) {
+            navigateTo(initialTab, true);
+        } else {
+            loadDashboard();
+        }
     });
 
     function checkLogin() {
@@ -139,7 +154,7 @@
         });
     }
 
-    function navigateTo(page) {
+    function navigateTo(page, skipPush) {
         // Update sidebar active state
         $('#sidebar .nav-link').removeClass('active');
         $('#sidebar .nav-link[data-page="' + page + '"]').addClass('active');
@@ -155,6 +170,13 @@
             if (bsCollapse) bsCollapse.hide();
         }
 
+        // Push state to browser history (skip during popstate restoration)
+        if (!skipPush) {
+            var navUrl = new URL(window.location);
+            navUrl.searchParams.set('tab', page);
+            window.history.pushState({}, '', navUrl);
+        }
+
         // Route to the correct loader
         switch(page) {
             case 'dashboard': loadDashboard(); break;
@@ -164,7 +186,7 @@
             case 'statistics': loadStatistics(); break;
             case 'group-analysis': loadGroupAnalysis(); break;
             case 'ai-settings': loadAiSettings(); break;
-        case 'voice-settings': loadVoiceSettings(); break;
+            case 'voice-settings': loadVoiceSettings(); break;
             case 'help': loadHelp(); break;
         }
     }
