@@ -11,6 +11,17 @@ function sanitizeHTML(str) {
         .replace(/'/g, '&#39;');
 }
 
+function sanitizeURL(value) {
+    if (!value) return '#';
+    try {
+        const url = new URL(String(value), window.location.origin);
+        if (url.protocol === 'http:' || url.protocol === 'https:') {
+            return sanitizeHTML(url.href);
+        }
+    } catch (e) {}
+    return '#';
+}
+
 // CSRF Token 设置（SPA 模式下全局携带）
 $.ajaxSetup({
     beforeSend: function(xhr, settings) {

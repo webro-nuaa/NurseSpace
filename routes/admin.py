@@ -1,12 +1,12 @@
 from flask import Blueprint, request, jsonify, render_template, send_file, current_app
 from flask_login import current_user
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app import csrf
 from utils.auth import login_or_jwt_required
 from utils.ai_evaluator import AIEvaluator
 from utils.decorators import admin_required
-from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, Exam, ExamQuestion, ExamAnswer, ExamRecord, PointRecord, ExtendedKnowledge, KnowledgeAnswer, ExtensionVideo, ExtensionLink, AiSetting, BaiduAsrKey, db
+from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, Exam, ExamQuestion, ExamAnswer, ExamRecord, PointRecord, ExtensionVideo, ExtensionLink, AiSetting, BaiduAsrKey, db
 from utils.docx_parser import DocxParser
+from utils.rag import KnowledgeStore, DocumentParser
 from utils.crypto import encrypt_value, decrypt_value
 from sqlalchemy import desc, func
 from datetime import datetime, timezone, timedelta
@@ -183,8 +183,12 @@ def get_users():
             'email': user.email,
             'phone': user.phone,
             'department': user.department,
+            'school': user.school,
+            'serial_number': user.serial_number,
             'status': user.status,
             'points': user.points,
+            'consent_accepted': user.consent_accepted,
+            'consent_accepted_at': user.consent_accepted_at.isoformat() if user.consent_accepted_at else None,
             'learning_count': learning_count,
             'wrong_count': wrong_count,
             'created_at': user.created_at.isoformat()
@@ -222,12 +226,16 @@ def admin_user_detail(user_id: int):
             'email': user.email,
             'phone': user.phone,
             'department': user.department,
+            'school': user.school,
+            'serial_number': user.serial_number,
             'role': user.role,
-            'status': user.status
+            'status': user.status,
+            'points': user.points,
+            'created_at': user.created_at.isoformat()
         }})
 
     data = request.get_json() or {}
-    for field in ['real_name', 'email', 'phone', 'department', 'role', 'status']:
+    for field in ['real_name', 'email', 'phone', 'department', 'school', 'serial_number', 'role', 'status']:
         if field in data:
             setattr(user, field, (data.get(field) or None))
 
@@ -254,10 +262,10 @@ def users_xlsx_template():
         wb = Workbook()
         ws = wb.active
         ws.title = 'users'
-        headers = ['真实姓名', '科室', '邮箱', '手机号', '角色', '状态']
+        headers = ['真实姓名', '科室', '学校', '学号', '邮箱', '手机号', '角色', '状态']
         ws.append(headers)
-        ws.append(['张三', '内科', 'zhangsan@example.com', '13800001111', 'nurse', 'active'])
-        ws.append(['李四', '教学部', 'lisi@example.com', '13900002222', 'nurse', 'active'])
+        ws.append(['张三', '内科', '某某护理学院', '2024001', 'zhangsan@example.com', '13800001111', 'nurse', 'active'])
+        ws.append(['李四', '教学部', '某某卫生学校', '2024002', 'lisi@example.com', '13900002222', 'nurse', 'active'])
         bio = BytesIO()
         wb.save(bio)
         bio.seek(0)
@@ -271,7 +279,6 @@ def users_xlsx_template():
 @admin_bp.route('/users/batch-import-xlsx', methods=['POST'])
 @login_or_jwt_required
 @admin_required
-@csrf.exempt
 def users_batch_import_xlsx():
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '未选择文件'})
@@ -323,6 +330,8 @@ def users_batch_import_xlsx():
             email = get(row, '邮箱')
             phone = get(row, '手机号')
             department = get(row, '科室')
+            school = get(row, '学校')
+            serial_number = get(row, '学号')
             role = get(row, '角色', 'nurse') or 'nurse'
             status = get(row, '状态', 'active') or 'active'
             if email and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
@@ -340,7 +349,9 @@ def users_batch_import_xlsx():
                 username = _generate_username()
                 password = _generate_password(username)
                 user = User(username=username, real_name=real_name, email=email or None,
-                            phone=phone or None, department=department or None, role=role, status=status)
+                            phone=phone or None, department=department or None,
+                            school=school or None, serial_number=serial_number or None,
+                            role=role, status=status)
                 user.set_password(password)
                 db.session.add(user)
                 new_users.append({'username': username, 'password': password, 'real_name': real_name})
@@ -362,7 +373,6 @@ def users_batch_import_xlsx():
 @admin_bp.route('/cases', methods=['GET', 'POST'])
 @login_or_jwt_required
 @admin_required
-@csrf.exempt  # POST is file upload (multipart/form-data)
 def manage_cases():
     if request.method == 'GET':
         page = request.args.get('page', 1, type=int)
@@ -524,17 +534,19 @@ def manage_cases():
             )
             db.session.add(link)
 
-        # 创建扩展知识
+        # 创建扩展知识（作为 knowledge 类型的 Station）
         for k_data in data.get('extended_knowledge') or []:
-            ek = ExtendedKnowledge(
+            sk = Station(
                 case_id=case.id,
-                question=(k_data.get('question') or '').strip()
+                question=(k_data.get('question') or '').strip(),
+                station_type='knowledge',
+                order_index=0
             )
-            db.session.add(ek)
-            db.session.flush()  # 获取 ek.id
+            db.session.add(sk)
+            db.session.flush()
             for idx, a_data in enumerate(k_data.get('answers') or []):
-                db.session.add(KnowledgeAnswer(
-                    knowledge_id=ek.id,
+                db.session.add(StandardAnswer(
+                    station_id=sk.id,
                     answer_item=(a_data.get('answer_item') or '').strip(),
                     score_weight=float(a_data.get('score_weight', 1)),
                     order_index=idx
@@ -665,7 +677,6 @@ def batch_delete_cases():
 @admin_bp.route('/cases/batch-upload', methods=['POST'])
 @login_or_jwt_required
 @admin_required
-@csrf.exempt
 def batch_upload_cases():
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '请选择压缩包文件'})
@@ -783,7 +794,6 @@ def download_cases_xlsx_template():
 @admin_bp.route('/cases/batch-import-xlsx', methods=['POST'])
 @login_or_jwt_required
 @admin_required
-@csrf.exempt
 def batch_import_cases_xlsx():
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '未选择文件'})
@@ -857,11 +867,11 @@ def batch_import_cases_xlsx():
                 qv = get(row, qc)
                 av = get(row, ac)
                 if qv:
-                    ek = ExtendedKnowledge(case_id=case.id, question=qv)
-                    db.session.add(ek)
+                    sk = Station(case_id=case.id, question=qv, station_type='knowledge', order_index=0)
+                    db.session.add(sk)
                     db.session.flush()
                     if av:
-                        db.session.add(KnowledgeAnswer(knowledge_id=ek.id, answer_item=av, order_index=0))
+                        db.session.add(StandardAnswer(station_id=sk.id, answer_item=av, order_index=0))
 
             created += 1
 
@@ -894,9 +904,11 @@ def get_case_detail(case_id):
 
         stations_data.append({
             'id': station.id,
-            'name': station.name,
+            'name': station.name or '',
             'assessment_task': station.assessment_task,
+            'condition_report': station.condition_report,
             'question': station.question,
+            'station_type': station.station_type,
             'answers': [
                 {
                     'id': ans.id,
@@ -912,18 +924,6 @@ def get_case_detail(case_id):
 
     videos = ExtensionVideo.query.filter_by(case_id=case_id).order_by(ExtensionVideo.order_index).all()
     links = ExtensionLink.query.filter_by(case_id=case_id).order_by(ExtensionLink.order_index).all()
-    extended_knowledge = ExtendedKnowledge.query.filter_by(case_id=case_id).all()
-    knowledge_data = []
-    for ek in extended_knowledge:
-        answers = KnowledgeAnswer.query.filter_by(knowledge_id=ek.id)\
-            .order_by(KnowledgeAnswer.order_index).all()
-        knowledge_data.append({
-            'id': ek.id,
-            'question': ek.question,
-            'answers': [{'id': a.id, 'answer_item': a.answer_item,
-                         'score_weight': float(a.score_weight)} for a in answers]
-        })
-
     return jsonify({
         'success': True,
         'data': {
@@ -938,7 +938,6 @@ def get_case_detail(case_id):
                 'created_at': case.created_at.isoformat()
             },
             'stations': stations_data,
-            'extended_knowledge': knowledge_data,
             'videos': [{'id': v.id, 'title': v.title, 'url': v.url,
                         'description': v.description or '', 'order_index': v.order_index}
                        for v in videos],
@@ -1569,7 +1568,6 @@ def update_station_answers(case_id, station_id):
 @admin_bp.route('/videos/upload', methods=['POST'])
 @login_or_jwt_required
 @admin_required
-@csrf.exempt
 def upload_video_file():
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': '未选择文件'})
@@ -1670,12 +1668,12 @@ def add_case_knowledge(case_id):
     answers = data.get('answers') or []
     if not answers:
         return jsonify({'success': False, 'message': '至少需要一个答案项'}), 400
-    ek = ExtendedKnowledge(case_id=case_id, question=data['question'])
-    db.session.add(ek)
+    sk = Station(case_id=case_id, question=data['question'], station_type='knowledge')
+    db.session.add(sk)
     db.session.flush()
     for idx, a in enumerate(answers):
-        db.session.add(KnowledgeAnswer(
-            knowledge_id=ek.id,
+        db.session.add(StandardAnswer(
+            station_id=sk.id,
             answer_item=(a.get('answer_item') or '').strip(),
             score_weight=float(a.get('score_weight', 1)),
             order_index=idx
@@ -1688,10 +1686,10 @@ def add_case_knowledge(case_id):
 @login_or_jwt_required
 @admin_required
 def delete_case_knowledge(case_id, knowledge_id):
-    ek = ExtendedKnowledge.query.filter_by(id=knowledge_id, case_id=case_id).first()
-    if not ek:
+    sk = Station.query.filter_by(id=knowledge_id, case_id=case_id, station_type='knowledge').first()
+    if not sk:
         return jsonify({'success': False, 'message': '扩展知识不存在'}), 404
-    db.session.delete(ek)
+    db.session.delete(sk)
     db.session.commit()
     return jsonify({'success': True, 'message': '扩展知识已删除'})
 
@@ -1714,7 +1712,7 @@ def get_user_progress(user_id):
     ).join(Case, CaseCategory.id == Case.category_id)\
      .join(Station, Case.id == Station.case_id)\
      .outerjoin(LearningRecord, (Station.id == LearningRecord.station_id) & (LearningRecord.user_id == user_id))\
-     .filter(Case.case_type == 'learning')\
+     .filter(Case.case_type == 'learning', Station.station_type == 'assessment')\
      .group_by(CaseCategory.id, CaseCategory.name).all()
 
     # 最近学习记录
@@ -1935,6 +1933,110 @@ def delete_baidu_asr_key(key_id):
         db.session.rollback()
         current_app.logger.error(f"百度ASR Key删除失败: {e}", exc_info=True)
         return jsonify({'success': False, 'message': '删除失败，请稍后重试'})
+
+
+# ---- 知识库管理 ----
+
+@admin_bp.route('/knowledge/docs', methods=['GET', 'POST'])
+@login_or_jwt_required
+@admin_required
+def knowledge_docs():
+    store = KnowledgeStore(persist_dir=current_app.config.get('CHROMA_DIR', './chroma_data'))
+
+    if request.method == 'GET':
+        return jsonify({'success': True, 'data': {
+            'doc_count': store.get_doc_count(),
+            'docs': store.get_all_docs(),
+        }})
+
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'message': '未选择文件'})
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({'success': False, 'message': '未选择文件'})
+
+    try:
+        import tempfile
+        ext = os.path.splitext(f.filename)[1].lower()
+        if ext not in ('.pdf', '.docx', '.doc', '.txt'):
+            return jsonify({'success': False, 'message': '仅支持 PDF/Word/TXT 文件'})
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+            f.save(tmp.name)
+            tmp_path = tmp.name
+
+        text = DocumentParser.parse_file(tmp_path)
+        os.unlink(tmp_path)
+
+        if not text.strip():
+            return jsonify({'success': False, 'message': '文档内容为空'})
+
+        doc_id = f"admin_{datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+        store.add_doc(doc_id, text, {'filename': f.filename, 'uploaded_at': datetime.now().isoformat()})
+
+        return jsonify({'success': True, 'message': '文档已上传并索引'})
+    except Exception as e:
+        current_app.logger.error(f"知识文档上传失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '上传失败，请稍后重试'})
+
+
+@admin_bp.route('/knowledge/docs/<doc_id>', methods=['DELETE'])
+@login_or_jwt_required
+@admin_required
+def delete_knowledge_doc(doc_id):
+    store = KnowledgeStore(persist_dir=current_app.config.get('CHROMA_DIR', './chroma_data'))
+    if store.delete_doc(doc_id):
+        return jsonify({'success': True, 'message': '文档已删除'})
+    return jsonify({'success': False, 'message': '删除失败'})
+
+
+# ---- 管理员端知识问答（复用护士端逻辑）----
+
+@admin_bp.route('/knowledge/ask', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def admin_knowledge_ask():
+    user = current_user
+    if not user.knowledge_provider or not user.knowledge_key:
+        return jsonify({'success': False, 'message': '请先在个人设置中配置知识问答AI'})
+
+    data = request.get_json() or {}
+    question = (data.get('question') or '').strip()
+    if not question:
+        return jsonify({'success': False, 'message': '请输入问题'})
+
+    try:
+        from utils.rag import KnowledgeStore, KnowledgeQAAgent
+        store = KnowledgeStore(persist_dir=current_app.config.get('CHROMA_DIR', './chroma_data'))
+        api_key = decrypt_value(user.knowledge_key)
+        agent = KnowledgeQAAgent(user.knowledge_provider, api_key, user.knowledge_model or 'gpt-4o-mini', store)
+        result = agent.ask(question)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        current_app.logger.error(f"管理员知识问答失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '知识问答服务暂不可用，请稍后重试'})
+
+
+@admin_bp.route('/personal-ai-settings', methods=['GET', 'PUT'])
+@login_or_jwt_required
+@admin_required
+def admin_personal_ai_settings():
+    user = current_user
+    if request.method == 'GET':
+        return jsonify({'success': True, 'data': {
+            'knowledge_provider': user.knowledge_provider or '',
+            'knowledge_model': user.knowledge_model or '',
+            'has_knowledge_key': bool(user.knowledge_key),
+        }})
+
+    data = request.get_json() or {}
+    for field in ['knowledge_provider', 'knowledge_model']:
+        if field in data:
+            setattr(user, field, data[field] or None)
+    if data.get('knowledge_key'):
+        user.knowledge_key = encrypt_value(data['knowledge_key'])
+    db.session.commit()
+    return jsonify({'success': True, 'message': '个人AI设置已更新'})
 
 
 @admin_bp.route('/baidu-asr-keys/<int:key_id>/toggle', methods=['POST'])

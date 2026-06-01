@@ -45,7 +45,6 @@ class TestNurseCases:
         assert 'videos' in data['data']
         assert 'links' in data['data']
         assert 'stations' in data['data']
-        assert 'extended_knowledge' in data['data']
 
     def test_case_not_found(self, client, nurse_token):
         resp = client.get('/nurse/cases/99999',

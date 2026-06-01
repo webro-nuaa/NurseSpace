@@ -171,6 +171,14 @@
 
 
   function renderStation(data){
+    const isKnowledge = (data.station_type || 'assessment') === 'knowledge';
+    const nl2br = (value) => sanitizeHTML(value || '').replace(/\n/g, '<br>');
+    // 动态设置页面标题
+    $('.page-title h2').html(isKnowledge
+      ? '<i class="fas fa-lightbulb me-2"></i>扩展知识 - 标准答案'
+      : '<i class="fas fa-clipboard-check me-2"></i>标准答案');
+    $('.page-title p').text(isKnowledge ? '查看扩展知识题目的答案要点' : '查看题目的标准答案要点');
+
     const html = `
       <div class="card">
         <div class="card-header bg-primary text-white">
@@ -179,12 +187,12 @@
         <div class="card-body">
           <div class="mb-3">
             <div class="fw-bold text-primary mb-2">题目：</div>
-            <div class="question-text">${(data.question||'').replace(/\n/g,'<br>')}</div>
+            <div class="question-text">${nl2br(data.question)}</div>
           </div>
-          ${data.assessment_task ? `
+          ${!isKnowledge && data.assessment_task ? `
           <div class="mb-3">
             <div class="fw-bold text-primary mb-2">考核任务：</div>
-            <div class="assessment-text small">${data.assessment_task.replace(/\n/g,'<br>')}</div>
+            <div class="assessment-text small">${nl2br(data.assessment_task)}</div>
           </div>` : ''}
         </div>
       </div>
@@ -207,7 +215,7 @@
             ${answers.map((answer, index) => `
               <li class="mb-3">
                 <div class="answer-item">
-                  <span class="answer-text">${answer.answer_item}</span>
+                  <span class="answer-text">${sanitizeHTML(answer.answer_item)}</span>
                   ${answer.score_weight > 1 ? `<span class="badge bg-warning ms-2">权重: ${answer.score_weight}</span>` : ''}
                 </div>
               </li>
@@ -368,14 +376,14 @@
           <div class="flex-grow-1">
             <div class="comment-header d-flex justify-content-between align-items-start mb-2">
               <div>
-                <span class="fw-bold">${comment.user.real_name}</span>
-                <span class="text-muted ms-2">${comment.user.department || ''}</span>
+                <span class="fw-bold">${sanitizeHTML(comment.user.real_name)}</span>
+                <span class="text-muted ms-2">${sanitizeHTML(comment.user.department || '')}</span>
                 <span class="badge bg-secondary ms-2">${getCommentTypeLabel(comment.comment_type)}</span>
               </div>
               <small class="text-muted">${formatTime(comment.created_at)}</small>
             </div>
             <div class="comment-content mb-2">
-              ${comment.content.replace(/\n/g, '<br>')}
+              ${sanitizeHTML(comment.content).replace(/\n/g, '<br>')}
             </div>
             <div class="comment-actions d-flex align-items-center gap-3">
               <button class="btn btn-sm btn-outline-primary" onclick="toggleLike(${comment.id})">

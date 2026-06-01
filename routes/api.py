@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import User, Case, CaseCategory, Station, StandardAnswer, ExtendedKnowledge, KnowledgeAnswer, Comment, CommentLike, CommentReport, db
+from models import User, Case, CaseCategory, Station, StandardAnswer, Comment, CommentLike, CommentReport, db
 from sqlalchemy import func
 
 api_bp = Blueprint('api', __name__)
@@ -47,13 +47,21 @@ def get_station_detail(station_id: int):
     """获取单个站点详情（题干/考核任务/标准答案）"""
     station = Station.query.get_or_404(station_id)
     answers = StandardAnswer.query.filter_by(station_id=station_id).order_by(StandardAnswer.order_index).all()
+    case_guide = station.case.case_guide if station.case else None
+    case_title = station.case.title if station.case else None
+
     return jsonify({
         'success': True,
         'data': {
             'id': station.id,
-            'name': station.name,
+            'name': station.name or '',
             'assessment_task': station.assessment_task,
+            'condition_report': station.condition_report,
             'question': station.question,
+            'station_type': station.station_type,
+            'case_id': station.case_id,
+            'case_guide': case_guide,
+            'case_title': case_title,
             'standard_answers': [
                 {
                     'answer_item': a.answer_item,
@@ -103,7 +111,8 @@ def search_stations():
 
     query = db.session.query(Station, Case, CaseCategory)\
         .join(Case, Station.case_id == Case.id)\
-        .join(CaseCategory, Case.category_id == CaseCategory.id)
+        .join(CaseCategory, Case.category_id == CaseCategory.id)\
+        .filter(Station.station_type == 'assessment')
 
     if category_id:
         query = query.filter(Case.category_id == category_id)
@@ -337,7 +346,7 @@ def create_comment():
         return jsonify({'success': False, 'message': '评论内容不能超过1000个字符'})
     
     # 验证内容类型
-    if content_type not in ['station_answer', 'knowledge_answer']:
+    if content_type not in ['station_answer']:
         return jsonify({'success': False, 'message': '无效的内容类型'})
     
     # 验证评论类型
@@ -490,39 +499,7 @@ def get_comment_replies(comment_id):
         }
     })
 
-@api_bp.route('/knowledge/<int:knowledge_id>')
-@jwt_required(optional=True)
-def get_knowledge_detail(knowledge_id: int):
-    """获取单个扩展知识题目详情"""
-    ek = ExtendedKnowledge.query.get_or_404(knowledge_id)
-    answers = KnowledgeAnswer.query.filter_by(knowledge_id=knowledge_id)\
-        .order_by(KnowledgeAnswer.order_index).all()
-    return jsonify({
-        'success': True,
-        'data': {
-            'id': ek.id,
-            'question': ek.question,
-            'case_id': ek.case_id,
-            'answers': [a.answer_item for a in answers]
-        }
-    })
 
-@api_bp.route('/knowledge/<int:knowledge_id>/answers')
-@jwt_required(optional=True)
-def get_knowledge_answers(knowledge_id: int):
-    """获取扩展知识题目的标准答案"""
-    answers = KnowledgeAnswer.query.filter_by(knowledge_id=knowledge_id)\
-        .order_by(KnowledgeAnswer.order_index).all()
-    answers_data = [{
-        'id': a.id,
-        'answer_item': a.answer_item,
-        'score_weight': float(a.score_weight),
-        'order_index': a.order_index
-    } for a in answers]
-    return jsonify({
-        'success': True,
-        'data': answers_data
-    })
 
 @api_bp.route('/speech-to-text', methods=['POST'])
 @jwt_required(optional=True)

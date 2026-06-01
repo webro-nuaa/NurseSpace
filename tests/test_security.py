@@ -10,7 +10,7 @@ class TestCSRFProtection:
         assert app.config.get('WTF_CSRF_ENABLED') is False
 
     def test_auth_bp_login_works(self, client, app):
-        """Login works without CSRF because auth_bp is exempt."""
+        """Login works in tests with CSRF disabled by test config."""
         # Create a fresh user to avoid password-changed-by-other-tests issues
         from models import User, db
         with app.app_context():
@@ -25,7 +25,7 @@ class TestCSRFProtection:
         assert data['success']
 
     def test_admin_post_works_with_jwt(self, client, admin_token, category):
-        """Admin POST works with JWT even without CSRF (CSRF disabled in test)."""
+        """Admin POST works with JWT when CSRF is disabled in test config."""
         resp = client.post('/admin/cases', json={
             'title': 'csrf test case', 'category_id': category.id,
             'case_type': 'learning'
@@ -39,6 +39,10 @@ class TestCORSHeaders:
     def test_cors_response_ok(self, client):
         resp = client.get('/auth/login')
         assert resp.status_code == 200
+
+    def test_wildcard_cors_does_not_allow_credentials(self, client):
+        resp = client.get('/auth/login', headers={'Origin': 'https://example.test'})
+        assert resp.headers.get('Access-Control-Allow-Credentials') != 'true'
 
 
 class TestJWTProtection:
@@ -60,6 +64,12 @@ class TestJWTProtection:
                           headers={'Authorization': 'Bearer invalid.token.here',
                                    'Accept': 'application/json'})
         assert resp.status_code in (401, 422)
+
+    def test_query_string_user_token_is_not_accepted(self, app, nurse_token):
+        client = app.test_client()
+        resp = client.get(f'/nurse/dashboard?token={nurse_token}',
+                          headers={'Accept': 'application/json'})
+        assert resp.status_code in (302, 401, 403)
 
     def test_no_token_rejected(self, app):
         # Use a fresh client to avoid session contamination from other tests

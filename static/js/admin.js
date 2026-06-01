@@ -226,6 +226,7 @@ function loadUsers(page = 1, role = 'nurse') {
                                                 <th class="d-none d-md-table-cell">科室</th>
                                                 <th class="d-none d-lg-table-cell">邮箱</th>
                                                 <th>状态</th>
+                                                <th>知情同意</th>
                                                 <th class="d-none d-lg-table-cell">学习统计</th>
                                                 <th class="d-none d-md-table-cell">注册时间</th>
                                                 <th>操作</th>
@@ -241,6 +242,11 @@ function loadUsers(page = 1, role = 'nurse') {
                                                     <td>
                                                         <span class="badge ${user.status === 'active' ? 'bg-success' : 'bg-danger'}">
                                                             ${user.status === 'active' ? '正常' : '禁用'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge ${user.consent_accepted ? 'bg-success' : 'bg-warning text-dark'}">
+                                                            ${user.consent_accepted ? '已同意' : '未同意'}
                                                         </span>
                                                     </td>
                                                     <td class="d-none d-lg-table-cell">
@@ -282,6 +288,12 @@ function loadUsers(page = 1, role = 'nurse') {
     });
 }
 
+// 按角色显隐护士专属字段
+function toggleNurseFields() {
+    const isNurse = $('#add-role').val() === 'nurse';
+    $('#add-school-group, #add-serial-number-group').toggle(isNurse);
+}
+
 // 提交添加用户
 function submitAddUser() {
     const data = {
@@ -291,6 +303,8 @@ function submitAddUser() {
         email: $('#add-email').val(),
         phone: $('#add-phone').val(),
         department: $('#add-department').val(),
+        school: $('#add-school').val(),
+        serial_number: $('#add-serial-number').val(),
         role: $('#add-role').val()
     };
     
@@ -1450,7 +1464,7 @@ function submitCreateCase() {
             success: function(res) {
                 if (res.success) {
                     showAlert(res.message || '创建成功', 'success');
-                    setTimeout(function() { navToCases(); }, 800);
+                    setTimeout(function() { if (typeof adminReplaceView === 'function') adminReplaceView({tab: 'cases'}); loadCases(); }, 800);
                 } else {
                     showAlert(res.message || '创建失败', 'error');
                 }
@@ -1540,7 +1554,7 @@ function renderCaseDetailPage(caseId) {
                             <i class="fas fa-plus me-1"></i>添加知识
                         </button>
                     </div><div class="card-body" id="knowledge-area">
-                        ${d.extended_knowledge.length ? d.extended_knowledge.map(ek => {
+                        ${(() => { const kItems = (d.stations || []).filter(s => s.station_type === 'knowledge'); return kItems.length ? kItems.map(ek => {
                             const answers = ek.answers || [];
                             const totalWeight = answers.reduce((s, a) => s + (a.score_weight || 0), 0);
                             return `
@@ -1560,7 +1574,7 @@ function renderCaseDetailPage(caseId) {
                                     </div>
                                 </div>
                             </div>
-                        `}).join('') : '<p class="text-muted">暂无扩展知识</p>'}
+                        `}).join('') : '<p class="text-muted">暂无扩展知识</p>'; })()}
                     </div></div>
                 </div>
 
@@ -2237,7 +2251,7 @@ function submitEditUserPage(userId) {
         contentType: 'application/json',
         data: JSON.stringify(payload),
         success: function(res) {
-            if (res.success) { showAlert('保存成功','success'); renderUserDetailPage(userId); }
+            if (res.success) { showAlert('保存成功','success'); if (typeof adminReplaceView === 'function') adminReplaceView({tab: 'users', user_id: String(userId)}); renderUserDetailPage(userId); }
             else { showAlert(res.message||'保存失败','error'); }
         }
     });
@@ -2295,9 +2309,17 @@ function renderUserCreatePage() {
                     <label class="form-label">科室</label>
                     <input type="text" class="form-control" id="add-department">
                 </div>
+                <div class="mb-3 nurse-only" id="add-school-group">
+                    <label class="form-label">学校</label>
+                    <input type="text" class="form-control" id="add-school">
+                </div>
+                <div class="mb-3 nurse-only" id="add-serial-number-group">
+                    <label class="form-label">学号</label>
+                    <input type="text" class="form-control" id="add-serial-number">
+                </div>
                 <div class="mb-3">
                     <label class="form-label">角色</label>
-                    <select class="form-select" id="add-role">
+                    <select class="form-select" id="add-role" onchange="toggleNurseFields()">
                         <option value="nurse">护士</option>
                         <option value="admin">管理员</option>
                     </select>
@@ -2460,6 +2482,7 @@ function submitCreateExam() {
         success: function(response) {
             if (response.success) {
                 showAlert('考试创建成功', 'success');
+                if (typeof adminReplaceView === 'function') adminReplaceView({tab: 'exams'});
                 loadExams();
             } else {
                 showAlert(response.message, 'error');
@@ -2527,7 +2550,7 @@ function submitExamEdit(examId) {
         contentType: 'application/json',
         data: JSON.stringify(payload),
         success: function(res) {
-            if (res.success) { showAlert('已更新','success'); loadExams(); }
+            if (res.success) { showAlert('已更新','success'); if (typeof adminReplaceView === 'function') adminReplaceView({tab: 'exams'}); loadExams(); }
             else { showAlert(res.message||'更新失败','error'); }
         }
     });
@@ -2629,7 +2652,7 @@ function buildExamQuestionPage(examId, exam, existingCaseMap) {
                 <h4><i class="fas fa-list-check me-2"></i>${exam.title} — 添加题目</h4>
                 <p class="text-muted mb-0">从考试案例库中选择案例加入本场考试，每个案例包含其全部站点题目</p>
             </div>
-            <a href="#" class="btn btn-sm btn-outline-secondary" onclick="loadExams(); return false;">
+            <a href="#" class="btn btn-sm btn-outline-secondary" onclick="navToExams(); return false;">
                 <i class="fas fa-arrow-left me-1"></i>返回考试列表
             </a>
         </div>
@@ -2815,9 +2838,10 @@ function showCasePreviewModal(caseId) {
         if (!res.success) { showAlert(res.message || '加载失败', 'error'); return; }
         const c = res.data.case;
         const stations = res.data.stations || [];
-        const extendedKnowledge = res.data.extended_knowledge || [];
+        const assessmentStations = stations.filter(s => (s.station_type || 'assessment') === 'assessment');
+        const extendedKnowledge = stations.filter(s => s.station_type === 'knowledge');
         let stationsHtml = '';
-        stations.forEach(function(s, i) {
+        assessmentStations.forEach(function(s, i) {
             const answers = s.answers || [];
             stationsHtml += `
                 <div class="border rounded p-2 mb-2">
@@ -2852,7 +2876,7 @@ function showCasePreviewModal(caseId) {
                                 ${getCaseTypeBadge(c.case_type)}
                             </div>
                             ${c.case_guide ? '<div class="mb-3"><strong>案例指引：</strong><p class="small text-muted mt-1">' + c.case_guide + '</p></div>' : ''}
-                            <h6 class="border-bottom pb-2 mb-3">站点题目（共 ${stations.length} 题）</h6>
+                            <h6 class="border-bottom pb-2 mb-3">站点题目（共 ${assessmentStations.length} 题）</h6>
                             ${stationsHtml || '<p class="text-muted small">暂无站点题目</p>'}
                             ${knowledgeHtml}
                         </div>
@@ -3019,7 +3043,7 @@ function reviewExam(examId) {
                     <a href="/admin/exams/${examId}/export" class="btn btn-sm btn-outline-primary" target="_blank">
                         <i class="fas fa-download me-1"></i>导出成绩 (CSV)
                     </a>
-                    <a href="#" class="btn btn-sm btn-outline-secondary" onclick="loadExams(); return false;">
+                    <a href="#" class="btn btn-sm btn-outline-secondary" onclick="navToExams(); return false;">
                         <i class="fas fa-arrow-left me-1"></i>返回考试列表
                     </a>
                 </div>
@@ -3189,6 +3213,106 @@ var AI_PROVIDERS = {
     local:   { name: '本地匹配',   default_model: '',               default_base_url: '' }
 };
 
+function loadKnowledgeBase() {
+    setActiveNav('知识库');
+    var html = `
+        <div class="page-title">
+            <h2><i class="fas fa-database me-2"></i>知识库管理</h2>
+            <p>上传护理文档构建专属知识库，护士端配置个人 API Key 后即可使用智能问答</p>
+        </div>
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="fas fa-upload me-2"></i>上传知识文档</h6></div>
+            <div class="card-body">
+                <input type="file" id="kb-file-input" accept=".pdf,.docx,.doc,.txt" class="form-control mb-2">
+                <button class="btn btn-primary" id="btn-kb-upload"><i class="fas fa-upload me-1"></i>上传</button>
+                <div class="form-text">支持 PDF、Word、TXT 格式，上传后自动索引</div>
+            </div>
+        </div>
+        <div class="card mb-3" id="kb-docs-card">
+            <div class="card-header"><h6 class="mb-0"><i class="fas fa-list me-2"></i>已上传文档</h6></div>
+            <div class="card-body">
+                <div id="kb-doc-list"><div class="text-muted text-center py-3">加载中...</div></div>
+            </div>
+        </div>`;
+    $('#main-content').html(html);
+    $('#btn-kb-upload').on('click', uploadKnowledgeDoc);
+    refreshKnowledgeDocs();
+}
+function refreshKnowledgeDocs() {
+    $.ajax({
+        url: '/admin/knowledge/docs',
+        method: 'GET',
+        timeout: 30000,
+        success: function(res) {
+            if (res.success) {
+                var count = res.data.doc_count || 0;
+                var docs = res.data.docs || [];
+                $('#kb-doc-count').text(count);
+                if (count > 0) {
+                    var listHtml = '<table class="table table-sm"><thead><tr><th>文件名</th><th>上传时间</th><th style="width:80px">操作</th></tr></thead><tbody>';
+                    for (var i = 0; i < docs.length; i++) {
+                        var d = docs[i];
+                        listHtml += '<tr><td>' + (d.filename||'未知文件').replace(/</g,'&lt;') + '</td><td class="text-muted small">' + (d.uploaded_at||'').substring(0,19) + '</td>';
+                        listHtml += '<td><button class="btn btn-sm btn-outline-danger" onclick="deleteKnowledgeDoc(\'' + d.id + '\', this)"><i class="fas fa-trash"></i></button></td></tr>';
+                    }
+                    listHtml += '</tbody></table>';
+                    $('#kb-doc-list').html(listHtml);
+                } else {
+                    $('#kb-doc-list').html('<p class="text-muted">暂无文档，请上传护理相关文档以构建知识库。</p>');
+                }
+            }
+        },
+        error: function() {
+            $('#kb-doc-list').html('<p class="text-danger">知识库引擎初始化失败，请稍后刷新重试。</p>');
+        }
+    });
+}
+
+function deleteKnowledgeDoc(docId, btn) {
+    if (!confirm('确认删除此文档？删除后将从知识库中移除。')) return;
+    $(btn).prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+    $.ajax({
+        url: '/admin/knowledge/docs/' + encodeURIComponent(docId),
+        method: 'DELETE',
+        success: function(res) {
+            if (res.success) { showAlert('已删除', 'success', 1500); refreshKnowledgeDocs(); }
+            else showAlert(res.message, 'error');
+        },
+        error: function() { showAlert('删除失败', 'error'); }
+    });
+}
+
+function uploadKnowledgeDoc() {
+    var fileInput = document.getElementById('kb-file-input');
+    if (!fileInput || !fileInput.files || !fileInput.files.length) {
+        alert('请先选择文件');
+        return;
+    }
+    var file = fileInput.files[0];
+    var btn = $('#btn-kb-upload');
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>上传中...');
+    var formData = new FormData();
+    formData.append('file', file);
+    $.ajax({
+        url: '/admin/knowledge/docs',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(res) {
+            btn.prop('disabled', false).html('<i class="fas fa-upload me-1"></i>上传');
+            if (res.success) { showAlert(res.message, 'success', 2000); refreshKnowledgeDocs(); }
+            else showAlert(res.message, 'error');
+        },
+        error: function(xhr) {
+            btn.prop('disabled', false).html('<i class="fas fa-upload me-1"></i>上传');
+            var msg = '上传失败';
+            try { var r = JSON.parse(xhr.responseText); if (r.message) msg = r.message; } catch(e) {}
+            showAlert(msg + ' (' + xhr.status + ')', 'error');
+        }
+    });
+}
+
 function loadAiSettings() {
     setActiveNav('AI设置');
 
@@ -3205,17 +3329,18 @@ function loadAiSettings() {
             <div class="page-header">
                 <div>
                     <h4><i class="fas fa-robot me-2"></i>AI设置</h4>
-                    <p class="text-muted mb-0">配置 AI 评分模型</p>
+                    <p class="text-muted mb-0">配置系统 AI 模型，用于智能评分、反馈生成和知识积累</p>
                 </div>
             </div>
             <div class="row"><div class="col-lg-7">
-                <div class="card"><div class="card-body">
+                <div class="card"><div class="card-header"><h6 class="mb-0"><i class="fas fa-cog me-2"></i>系统 AI 模型（评分、反馈、知识积累共用）</h6></div>
+                <div class="card-body">
                     <div class="mb-3">
                         <label class="form-label">模型提供方</label>
                         <select class="form-select" id="ai-provider" onchange="switchAiProvider()">
                             <option value="openai" ${prov==='openai'?'selected':''}>OpenAI</option>
                             <option value="glm" ${prov==='glm'?'selected':''}>智谱 GLM</option>
-                            <option value="local" ${prov==='local'?'selected':''}>本地匹配（不使用外部模型）</option>
+                            <option value="local" ${prov==='local'?'selected':''}>本地匹配</option>
                         </select>
                     </div>
                     <div id="ai-provider-fields">${renderAiProviderFields(prov, d)}</div>
@@ -3279,6 +3404,114 @@ function switchAiProvider() {
 function toggleAiKeyVisibility() {
     var inp = $('#ai-key');
     inp.attr('type', inp.attr('type') === 'password' ? 'text' : 'password');
+}
+
+// 管理员知识问答
+function loadAdminKnowledgeQA() {
+    setActiveNav('知识问答');
+    $.get('/admin/personal-ai-settings', function(res) {
+        var hasKey = res.success && res.data && res.data.has_knowledge_key;
+        if (!hasKey) {
+            $('#main-content').html(`
+                <div style="max-width:800px;margin:60px auto;text-align:center">
+                    <h2 style="font-size:2rem;margin-bottom:10px">NurseSpace 知识问答</h2>
+                    <p style="color:#888;margin-bottom:40px">配置个人 API Key 后即可使用</p>
+                    <button class="btn btn-primary btn-lg" onclick="navigateTo('personal-ai')" style="padding:12px 40px;border-radius:12px">
+                        <i class="fas fa-key me-2"></i>配置 AI Key
+                    </button>
+                </div>`);
+            return;
+        }
+        $('#main-content').html(`
+            <div class="qa-wrapper" style="display:flex;flex-direction:column;height:calc(100vh - 120px);max-width:800px;margin:0 auto">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+                    <h4 style="margin:0;font-weight:600">NurseSpace 知识问答</h4>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="navigateTo('personal-ai')" style="border-radius:8px">
+                        <i class="fas fa-cog me-1"></i>设置
+                    </button>
+                </div>
+                <div id="qa-chat" style="flex:1;overflow-y:auto;padding:10px 0">
+                    <div style="text-align:center;color:#bbb;padding-top:80px">
+                        <div style="font-size:3rem;margin-bottom:16px">💬</div>
+                        <div style="font-size:1.1rem;margin-bottom:8px">有什么护理问题可以问我</div>
+                        <div style="font-size:0.85rem">基于知识库为您提供参考答案</div>
+                    </div>
+                </div>
+                <div style="padding:12px 0;border-top:1px solid #eee">
+                    <div style="display:flex;gap:8px;background:#f5f5f5;border-radius:16px;padding:6px 16px;align-items:center">
+                        <input type="text" id="qa-input" placeholder="输入问题，例如：新生儿黄疸的护理要点？"
+                            style="flex:1;border:none;background:transparent;outline:none;font-size:.95rem;padding:8px 0"
+                            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();adminAskKnowledge()}">
+                        <button onclick="adminAskKnowledge()" style="border:none;background:#2b6ef0;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center">
+                            <i class="fas fa-arrow-up" style="font-size:14px"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>`);
+    });
+}
+
+function adminAskKnowledge() {
+    var q = $('#qa-input').val().trim();
+    if (!q) return;
+    var chat = $('#qa-chat');
+    chat.find('div[style*="padding-top"]').remove();
+    chat.append('<div style="display:flex;justify-content:flex-end;margin-bottom:16px"><div style="max-width:75%;background:#2b6ef0;color:#fff;border-radius:16px 16px 4px 16px;padding:10px 16px;font-size:.9rem;line-height:1.5">' + sanitizeHTML(q).replace(/\n/g,'<br>') + '</div></div>');
+    chat.append('<div style="display:flex;margin-bottom:16px"><div style="max-width:85%;background:#f0f0f0;border-radius:16px 16px 16px 4px;padding:10px 16px;color:#999;font-size:.9rem"><i class="fas fa-spinner fa-pulse me-1"></i>思考中...</div></div>');
+    chat.scrollTop(chat[0].scrollHeight);
+    $('#qa-input').val('').focus();
+    $.ajax({
+        url: '/admin/knowledge/ask', method: 'POST', contentType: 'application/json',
+        data: JSON.stringify({question: q}),
+        success: function(res) {
+            chat.find('div:contains("思考中...")').remove();
+            if (res.success) {
+                var d = res.data;
+                var srcHtml = d.sources && d.sources.length ? '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #ddd;font-size:.75rem;color:#999">来源：' + d.sources.map(sanitizeHTML).join('、') + '</div>' : '';
+                chat.append('<div style="display:flex;margin-bottom:16px"><div style="max-width:85%;background:#f0f0f0;border-radius:16px 16px 16px 4px;padding:10px 16px;font-size:.9rem;line-height:1.7;white-space:pre-wrap">' + sanitizeHTML(d.answer || '') + srcHtml + '</div></div>');
+            } else {
+                chat.append('<div style="display:flex;margin-bottom:16px"><div style="max-width:85%;background:#fff0f0;color:#d32f2f;border-radius:16px 16px 16px 4px;padding:10px 16px;font-size:.9rem">' + sanitizeHTML(res.message || '出错了') + '</div></div>');
+            }
+            chat.scrollTop(chat[0].scrollHeight);
+        },
+        error: function() { chat.find('div:contains("思考中...")').remove(); chat.append('<div style="display:flex;margin-bottom:16px"><div style="max-width:85%;background:#fff0f0;color:#d32f2f;border-radius:16px 16px 16px 4px;padding:10px 16px;font-size:.9rem">网络错误</div></div>'); }
+    });
+}
+
+function loadAdminPersonalAISettings() {
+    $.get('/admin/personal-ai-settings', function(res) {
+        var d = res.success ? res.data : {};
+        var html = `
+            <div class="page-title"><h2><i class="fas fa-cog me-2"></i>个人AI设置</h2><p>配置知识问答 AI Key（个人使用）</p></div>
+            <div class="row"><div class="col-lg-6"><div class="card"><div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Provider</label>
+                    <select class="form-select" id="qa-provider">
+                        <option value="glm" ${d.knowledge_provider==='glm'?'selected':''}>智谱 GLM</option>
+                        <option value="openai" ${d.knowledge_provider==='openai'?'selected':''}>OpenAI</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">API Key</label>
+                    <input type="password" class="form-control" id="qa-key" placeholder="${d.has_knowledge_key?'已设置，留空不修改':'输入 API Key'}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Model</label>
+                    <input type="text" class="form-control" id="qa-model" value="${d.knowledge_model||'glm-4-air'}">
+                </div>
+                <button class="btn btn-primary" onclick="saveAdminPersonalAI()">保存</button>
+                <button class="btn btn-outline-secondary ms-2" onclick="navigateTo('knowledge-qa')">返回问答</button>
+            </div></div></div></div>`;
+        $('#main-content').html(html);
+    });
+}
+
+function saveAdminPersonalAI() {
+    $.ajax({
+        url: '/admin/personal-ai-settings', method: 'PUT', contentType: 'application/json',
+        data: JSON.stringify({ knowledge_provider: $('#qa-provider').val(), knowledge_key: $('#qa-key').val()||undefined, knowledge_model: $('#qa-model').val() }),
+        success: function(res) { if (res.success) { showAlert('保存成功','success'); navigateTo('knowledge-qa'); } else showAlert(res.message,'error'); }
+    });
 }
 
 function testAiConnection() {

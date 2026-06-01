@@ -30,6 +30,16 @@ nginx/certs/*.pem
 
 案例/
 内科.zip
+*.zip
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.docx
+*.xlsx
+chroma_data/
+chroma_model.tar.gz
+instance/
 
 *.pyc
 *.pyo

@@ -84,6 +84,8 @@ def register():
     email = data.get('email')
     phone = data.get('phone')
     department = data.get('department')
+    school = data.get('school')
+    serial_number = data.get('serial_number')
     role = data.get('role', 'nurse')
 
     if not all([username, password, real_name]):
@@ -116,6 +118,8 @@ def register():
             email=email,
             phone=phone,
             department=department,
+            school=school,
+            serial_number=serial_number,
             role=role
         )
         user.set_password(password)

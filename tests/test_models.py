@@ -1,6 +1,6 @@
 """Tests for all ORM models and their relationships."""
 import pytest
-from models import User, CaseCategory, Case, Station, StandardAnswer, ExtendedKnowledge
+from models import User, CaseCategory, Case, Station, StandardAnswer
 from models import ExtensionVideo, ExtensionLink, LearningRecord, WrongQuestion
 from models import Exam, ExamQuestion, ExamRecord, ExamAnswer, PointRecord
 from models import AiSetting, WeaknessAnalysis, Comment, CommentLike, CommentReport

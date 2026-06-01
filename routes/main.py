@@ -69,8 +69,8 @@ def nurse_station_page():
 @login_or_jwt_required
 @_nurse_required_redirect
 def nurse_knowledge_page():
-    """扩展知识作答单页（?id=题目ID）"""
-    return render_template('nurse/knowledge.html')
+    """已合并到 station 页面，重定向"""
+    return redirect(url_for('main.nurse_station_page', **request.args))
 
 @main_bp.route('/nurse/wrong-detail')
 @login_or_jwt_required
@@ -90,8 +90,8 @@ def nurse_answer_view_page():
 @login_or_jwt_required
 @_nurse_required_redirect
 def nurse_knowledge_answer_view_page():
-    """护士扩展知识答案查看单页（?id=扩展知识ID）"""
-    return render_template('nurse/knowledge_answer_view.html')
+    """已合并到 answer-view 页面，重定向"""
+    return redirect(url_for('main.nurse_answer_view_page', **request.args))
 
 @main_bp.route('/nurse/exam-access')
 def nurse_exam_access_page():

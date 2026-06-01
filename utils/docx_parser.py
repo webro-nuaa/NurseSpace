@@ -1,6 +1,6 @@
 import re
 from docx import Document
-from models import Case, Station, StandardAnswer, ExtendedKnowledge, KnowledgeAnswer, CaseCategory, db
+from models import Case, Station, StandardAnswer, CaseCategory, db
 import os
 
 class DocxParser:
@@ -56,6 +56,7 @@ class DocxParser:
                     case_id=case.id,
                     name=station_data.get('name', ''),
                     assessment_task=station_data.get('assessment_task', ''),
+                    condition_report=station_data.get('condition_report', '') or None,
                     question=station_data.get('question', ''),
                     order_index=i
                 )
@@ -71,25 +72,27 @@ class DocxParser:
                     )
                     db.session.add(answer)
             
-            # 创建扩展知识
+            # 创建扩展知识（作为 knowledge 类型的 Station）
             for knowledge_data in case_data.get('extended_knowledge', []):
-                knowledge = ExtendedKnowledge(
+                sk = Station(
                     case_id=case.id,
-                    question=knowledge_data.get('question', '')
+                    question=knowledge_data.get('question', ''),
+                    station_type='knowledge',
+                    order_index=0
                 )
-                db.session.add(knowledge)
+                db.session.add(sk)
                 db.session.flush()
                 items = knowledge_data.get('items', [])
                 if not items:
                     items = [knowledge_data.get('answer', '')]
                 for i, item_text in enumerate(items):
                     if item_text.strip():
-                        ka = KnowledgeAnswer(
-                            knowledge_id=knowledge.id,
+                        sa = StandardAnswer(
+                            station_id=sk.id,
                             answer_item=item_text,
                             order_index=i
                         )
-                        db.session.add(ka)
+                        db.session.add(sa)
             
             db.session.commit()
             return case
@@ -151,6 +154,17 @@ class DocxParser:
             elif text == '【考核任务结尾】':
                 if current_station:
                     current_station['assessment_task'] = '\n'.join(text_buffer)
+                current_section = None
+                continue
+
+            # 识别【病情汇报】
+            elif text == '【病情汇报】':
+                current_section = 'condition_report'
+                text_buffer = []
+                continue
+            elif text == '【病情汇报结尾】':
+                if current_station:
+                    current_station['condition_report'] = '\n'.join(text_buffer)
                 current_section = None
                 continue
             
@@ -229,14 +243,18 @@ class DocxParser:
                     current_station = {
                         'name': text,
                         'assessment_task': '',
+                        'condition_report': '',
                         'question': '',
                         'answers': []
                     }
                 current_section = None
-            
+
             elif current_section == 'assessment_task':
                 text_buffer.append(text)
-            
+
+            elif current_section == 'condition_report':
+                text_buffer.append(text)
+
             elif current_section == 'question':
                 # 如果在知识拓展区，首次遇到问题时初始化当前知识对象
                 if in_knowledge_section and current_knowledge is None:

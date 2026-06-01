@@ -4,8 +4,10 @@ from flask_login import current_user
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from utils.auth import login_or_jwt_required
 from utils.decorators import nurse_required
-from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, KnowledgeLearningRecord, WrongQuestion, KnowledgeWrongQuestion, Exam, ExamQuestion, ExamRecord, ExamAnswer, PointRecord, ExtendedKnowledge, KnowledgeAnswer, WeaknessAnalysis, ExtensionVideo, ExtensionLink, db
+from models import User, Case, CaseCategory, Station, StandardAnswer, LearningRecord, WrongQuestion, Exam, ExamQuestion, ExamRecord, ExamAnswer, PointRecord, WeaknessAnalysis, ExtensionVideo, ExtensionLink, db
 from utils.ai_evaluator import AIEvaluator
+from utils.rag import KnowledgeStore, KnowledgeQAAgent
+from utils.crypto import encrypt_value, decrypt_value
 from sqlalchemy import desc, func
 from datetime import datetime, timezone
 
@@ -137,10 +139,7 @@ def dashboard():
 
     total_cases = Case.query.count()
     completed_stations = LearningRecord.query.filter_by(user_id=current_user.id).count()
-    wrong_questions_count = (
-        WrongQuestion.query.filter_by(user_id=current_user.id).count()
-        + KnowledgeWrongQuestion.query.filter_by(user_id=current_user.id).count()
-    )
+    wrong_questions_count = WrongQuestion.query.filter_by(user_id=current_user.id).count()
     exam_count = ExamRecord.query.filter_by(user_id=current_user.id).count()
 
     recent_records = db.session.query(LearningRecord, Station, Case)\
@@ -169,6 +168,7 @@ def dashboard():
      .outerjoin(LearningRecord,
                 (Station.id == LearningRecord.station_id) &
                 (LearningRecord.user_id == current_user.id))\
+     .filter(Station.station_type == 'assessment')\
      .group_by(CaseCategory.id, CaseCategory.name).all()
 
     progress_data = []
@@ -186,7 +186,8 @@ def dashboard():
             'user_info': {
                 'real_name': user.real_name,
                 'department': user.department,
-                'points': user.points
+                'points': user.points,
+                'consent_accepted': user.consent_accepted
             },
             'statistics': {
                 'total_cases': total_cases,
@@ -198,6 +199,17 @@ def dashboard():
             'progress_data': progress_data
         }
     })
+
+
+@nurse_bp.route('/consent/accept', methods=['POST'])
+@login_or_jwt_required
+@nurse_required
+def accept_consent():
+    user = current_user
+    user.consent_accepted = True
+    user.consent_accepted_at = datetime.now(timezone.utc)
+    db.session.commit()
+    return jsonify({'success': True, 'message': '知情同意已确认'})
 
 
 @nurse_bp.route('/cases')
@@ -219,10 +231,10 @@ def get_cases():
 
     cases_data = []
     for case, category in pagination.items:
-        total_stations = Station.query.filter_by(case_id=case.id).count()
+        total_stations = Station.query.filter_by(case_id=case.id, station_type='assessment').count()
         completed_stations = db.session.query(LearningRecord)\
             .join(Station, LearningRecord.station_id == Station.id)\
-            .filter(Station.case_id == case.id, LearningRecord.user_id == current_user.id)\
+            .filter(Station.case_id == case.id, Station.station_type == 'assessment', LearningRecord.user_id == current_user.id)\
             .count()
 
         cases_data.append({
@@ -283,31 +295,19 @@ def get_case_detail(case_id):
             user_id=current_user.id,
             station_id=station.id
         ).first()
+        answers = StandardAnswer.query.filter_by(station_id=station.id)\
+            .order_by(StandardAnswer.order_index).all()
 
         stations_data.append({
             'id': station.id,
-            'name': station.name,
+            'name': station.name or '',
             'assessment_task': station.assessment_task,
+            'condition_report': station.condition_report,
             'question': station.question,
+            'station_type': station.station_type,
             'completed': learning_record is not None,
             'score': float(learning_record.score) if (learning_record is not None and learning_record.score is not None) else (None if learning_record is None else 0.0),
-            'completed_at': learning_record.completed_at.isoformat() if learning_record else None
-        })
-
-    extended_knowledge = ExtendedKnowledge.query.filter_by(case_id=case_id).all()
-    knowledge_data = []
-    for ek in extended_knowledge:
-        klr = KnowledgeLearningRecord.query.filter_by(
-            user_id=current_user.id, knowledge_id=ek.id
-        ).first()
-        answers = KnowledgeAnswer.query.filter_by(knowledge_id=ek.id)\
-            .order_by(KnowledgeAnswer.order_index).all()
-        knowledge_data.append({
-            'id': ek.id,
-            'question': ek.question,
-            'completed': klr is not None,
-            'score': float(klr.score) if (klr is not None and klr.score is not None) else (None if klr is None else 0.0),
-            'completed_at': klr.completed_at.isoformat() if klr else None,
+            'completed_at': learning_record.completed_at.isoformat() if learning_record else None,
             'answers': [{'id': a.id, 'answer_item': a.answer_item,
                          'score_weight': float(a.score_weight)} for a in answers]
         })
@@ -328,7 +328,6 @@ def get_case_detail(case_id):
                 'category_name': case.category.name
             },
             'stations': stations_data,
-            'extended_knowledge': knowledge_data,
             'videos': [{'id': v.id, 'title': v.title, 'url': v.url,
                         'description': v.description or '', 'order_index': v.order_index}
                        for v in videos],
@@ -337,39 +336,6 @@ def get_case_detail(case_id):
                       for l in links]
         }
     })
-
-
-@nurse_bp.route('/knowledge/<int:knowledge_id>/submit', methods=['POST'])
-@login_or_jwt_required
-@nurse_required
-def submit_knowledge_answer(knowledge_id):
-    user = current_user
-    knowledge = ExtendedKnowledge.query.get_or_404(knowledge_id)
-    data = request.get_json()
-    user_answer = (data.get('answer') or '').strip()
-    if not user_answer:
-        return jsonify({'success': False, 'message': '答案不能为空'})
-
-    answers = KnowledgeAnswer.query.filter_by(knowledge_id=knowledge_id)\
-        .order_by(KnowledgeAnswer.order_index).all()
-    standard_data = [{'answer_item': a.answer_item, 'score_weight': float(a.score_weight)} for a in answers]
-
-    if not standard_data:
-        return jsonify({'success': False, 'message': '该题暂无标准答案'})
-
-    try:
-        return _process_submission(
-            user=user, ref_id=knowledge_id, user_answer=user_answer,
-            question=knowledge.question, standard_data=standard_data,
-            record_model=KnowledgeLearningRecord, wrong_model=KnowledgeWrongQuestion,
-            ref_field='knowledge_id', related_type='knowledge',
-            point_reason_prefix='扩展知识高分奖励',
-            answers_for_response=[{'answer_item': a.answer_item, 'order_index': a.order_index} for a in answers]
-        )
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"知识答案提交失败: {e}", exc_info=True)
-        return jsonify({'success': False, 'message': '提交失败，请稍后重试'})
 
 
 @nurse_bp.route('/stations/<int:station_id>/submit', methods=['POST'])
@@ -396,12 +362,13 @@ def submit_answer(station_id):
     ]
 
     try:
+        prefix = '扩展知识高分奖励' if station.station_type == 'knowledge' else '案例学习高分奖励'
         return _process_submission(
             user=user, ref_id=station_id, user_answer=user_answer,
             question=station.question, standard_data=standard_data,
             record_model=LearningRecord, wrong_model=WrongQuestion,
             ref_field='station_id', related_type='learning',
-            point_reason_prefix='案例学习高分奖励',
+            point_reason_prefix=prefix,
             answers_for_response=[{'answer_item': ans.answer_item, 'order_index': ans.order_index} for ans in standard_answers]
         )
     except Exception as e:
@@ -417,41 +384,20 @@ def get_wrong_questions():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
 
-    # Station wrong questions
-    station_query = db.session.query(WrongQuestion, Station, Case, CaseCategory)\
+    query = db.session.query(WrongQuestion, Station, Case, CaseCategory)\
         .join(Station, WrongQuestion.station_id == Station.id)\
         .join(Case, Station.case_id == Case.id)\
         .join(CaseCategory, Case.category_id == CaseCategory.id)\
         .filter(WrongQuestion.user_id == current_user.id)
 
     station_items = []
-    for wrong_q, station, case, category in station_query.all():
+    for wrong_q, station, case, category in query.all():
         station_items.append({
             'id': wrong_q.id,
-            'type': 'station',
+            'type': station.station_type,
             'ref_id': station.id,
-            'ref_name': station.name,
+            'ref_name': station.name or '',
             'question': station.question,
-            'case_title': case.title,
-            'category_name': category.name,
-            'score': float(wrong_q.score) if wrong_q.score else 0,
-            'created_at': wrong_q.created_at
-        })
-
-    # Knowledge wrong questions
-    knowledge_query = db.session.query(KnowledgeWrongQuestion, ExtendedKnowledge, Case, CaseCategory)\
-        .join(ExtendedKnowledge, KnowledgeWrongQuestion.knowledge_id == ExtendedKnowledge.id)\
-        .join(Case, ExtendedKnowledge.case_id == Case.id)\
-        .join(CaseCategory, Case.category_id == CaseCategory.id)\
-        .filter(KnowledgeWrongQuestion.user_id == current_user.id)
-
-    for wrong_q, ek, case, category in knowledge_query.all():
-        station_items.append({
-            'id': wrong_q.id,
-            'type': 'knowledge',
-            'ref_id': ek.id,
-            'ref_name': '',
-            'question': ek.question,
             'case_title': case.title,
             'category_name': category.name,
             'score': float(wrong_q.score) if wrong_q.score else 0,
@@ -470,9 +416,8 @@ def get_wrong_questions():
         wrong_questions_data.append({
             'id': item['id'],
             'type': item['type'],
-            'station_id': item['ref_id'] if item['type'] == 'station' else None,
-            'knowledge_id': item['ref_id'] if item['type'] == 'knowledge' else None,
-            'station_name': item['ref_name'] if item['type'] == 'station' else '扩展知识',
+            'station_id': item['ref_id'],
+            'station_name': item['ref_name'] or '扩展知识',
             'question': item['question'],
             'case_title': item['case_title'],
             'category_name': item['category_name'],
@@ -585,37 +530,6 @@ def run_weakness_analysis():
             'user_answer': (record.user_answer if record else '') or '',
             'standard_answers': standard_answer_items,
             'score': float(wrong_q.score) if wrong_q.score else 0,
-            'ai_feedback': ai_feedback_text,
-            'ai_reason': ai_reason_text,
-            'completed_at': record.completed_at.isoformat() if record and record.completed_at else None
-        })
-
-    # Include knowledge wrong questions
-    knowledge_wrong = db.session.query(KnowledgeWrongQuestion, ExtendedKnowledge, Case, CaseCategory)\
-        .join(ExtendedKnowledge, KnowledgeWrongQuestion.knowledge_id == ExtendedKnowledge.id)\
-        .join(Case, ExtendedKnowledge.case_id == Case.id)\
-        .join(CaseCategory, Case.category_id == CaseCategory.id)\
-        .filter(KnowledgeWrongQuestion.user_id == current_user.id).all()
-
-    for kwq, ek, case, category in knowledge_wrong:
-        record = db.session.query(KnowledgeLearningRecord)\
-            .filter_by(user_id=current_user.id, knowledge_id=ek.id)\
-            .order_by(desc(KnowledgeLearningRecord.completed_at))\
-            .first()
-        ai_feedback_text, ai_reason_text = _parse_ai_feedback(record)
-        knowledge_answers = db.session.query(KnowledgeAnswer)\
-            .filter_by(knowledge_id=ek.id)\
-            .order_by(KnowledgeAnswer.order_index).all()
-        standard_answer_items = [a.answer_item for a in knowledge_answers]
-
-        wrong_data.append({
-            'category': category.name,
-            'case_title': case.title,
-            'station_name': '扩展知识',
-            'question': ek.question,
-            'user_answer': (record.user_answer if record else '') or '',
-            'standard_answers': standard_answer_items,
-            'score': float(kwq.score) if kwq.score else 0,
             'ai_feedback': ai_feedback_text,
             'ai_reason': ai_reason_text,
             'completed_at': record.completed_at.isoformat() if record and record.completed_at else None
@@ -1052,3 +966,53 @@ def get_wrong_question_detail(station_id: int):
             'my_record': _build_my_record(record)
         }
     })
+
+# ---- 知识问答 ----
+
+@nurse_bp.route('/knowledge/ask', methods=['POST'])
+@login_or_jwt_required
+@nurse_required
+def knowledge_ask():
+    user = current_user
+    if not user.knowledge_provider or not user.knowledge_key:
+        return jsonify({'success': False, 'message': '请先在个人设置中配置知识问答AI'})
+
+    data = request.get_json() or {}
+    question = (data.get('question') or '').strip()
+    if not question:
+        return jsonify({'success': False, 'message': '请输入问题'})
+
+    try:
+        store = KnowledgeStore(persist_dir=current_app.config.get('CHROMA_DIR', './chroma_data'))
+        api_key = decrypt_value(user.knowledge_key)
+        agent = KnowledgeQAAgent(user.knowledge_provider, api_key, user.knowledge_model or 'gpt-4o-mini', store)
+        result = agent.ask(question)
+        return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        current_app.logger.error(f"知识问答失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '知识问答服务暂不可用，请稍后重试'})
+
+
+# ---- 护士端AI设置 ----
+
+@nurse_bp.route('/ai-settings', methods=['GET', 'PUT'])
+@login_or_jwt_required
+@nurse_required
+def nurse_ai_settings():
+    user = current_user
+    if request.method == 'GET':
+        return jsonify({'success': True, 'data': {
+            'knowledge_provider': user.knowledge_provider or '',
+            'knowledge_model': user.knowledge_model or '',
+            'knowledge_embedding_model': user.knowledge_embedding_model or '',
+            'has_knowledge_key': bool(user.knowledge_key),
+        }})
+
+    data = request.get_json() or {}
+    for field in ['knowledge_provider', 'knowledge_model', 'knowledge_embedding_model']:
+        if field in data:
+            setattr(user, field, data[field] or None)
+    if data.get('knowledge_key'):
+        user.knowledge_key = encrypt_value(data['knowledge_key'])
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'AI设置已更新'})

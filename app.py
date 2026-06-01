@@ -55,7 +55,13 @@ def create_app():
     login_manager.init_app(app)
     jwt.init_app(app)
     csrf.init_app(app)
-    CORS(app, supports_credentials=True, origins=Config.CORS_ORIGINS.split(',') if Config.CORS_ORIGINS != '*' else '*')
+    cors_origins = Config.CORS_ORIGINS.split(',') if Config.CORS_ORIGINS else []
+    if '*' in cors_origins and Config.CORS_SUPPORTS_CREDENTIALS:
+        app.logger.warning("CORS_ORIGINS='*' cannot be used with credentialed requests; disabling CORS credentials")
+        cors_supports_credentials = False
+    else:
+        cors_supports_credentials = Config.CORS_SUPPORTS_CREDENTIALS
+    CORS(app, supports_credentials=cors_supports_credentials, origins=cors_origins or [])
 
     # Cache
     if Config.REDIS_ENABLED:
@@ -69,7 +75,7 @@ def create_app():
 
     # Rate limiter
     if Config.RATELIMIT_ENABLED:
-        app.config['RATELIMIT_STORAGE_URL'] = Config.RATELIMIT_STORAGE_URL
+        app.config['RATELIMIT_STORAGE_URI'] = Config.RATELIMIT_STORAGE_URL
         app.config['RATELIMIT_STRATEGY'] = 'fixed-window'
     else:
         app.config['RATELIMIT_ENABLED'] = False
@@ -127,13 +133,9 @@ def create_app():
     from routes.admin import admin_bp
     from routes.api import api_bp
 
-    # 豁免 CSRF 的蓝图
-    # api_bp: 纯 JWT Bearer 认证，无 session cookie，天然免疫 CSRF
-    # auth_bp: 登录/注册页面使用传统表单 POST，需要 CSRF 豁免（表单内嵌 csrf_token）
+    # api_bp: public/JWT API endpoints do not rely on the browser session cookie.
+    # Browser-backed auth/admin/nurse routes keep CSRF protection enabled.
     csrf.exempt(api_bp)
-    csrf.exempt(auth_bp)
-    csrf.exempt(nurse_bp)
-    csrf.exempt(admin_bp)
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(nurse_bp, url_prefix='/nurse')

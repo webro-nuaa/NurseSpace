@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Set test environment variables before any imports
 os.environ.setdefault('SECRET_KEY', 'test-secret-key-for-testing-only')
-os.environ.setdefault('JWT_SECRET_KEY', 'test-jwt-secret-for-testing-only')
+os.environ.setdefault('JWT_SECRET_KEY', 'test-jwt-secret-for-testing-only-32-bytes-min')
 os.environ.setdefault('ENCRYPTION_KEY', 'd0EMMLL-wOGkN5Az6IQvXd16BSbE6Fx8EDZT4xcifg4=')
 os.environ.setdefault('MYSQL_PASSWORD', 'test')
 os.environ.setdefault('MYSQL_HOST', 'localhost')
@@ -29,7 +29,7 @@ def app():
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'WTF_CSRF_ENABLED': False,
         'SECRET_KEY': 'test-secret',
-        'JWT_SECRET_KEY': 'test-jwt-secret',
+        'JWT_SECRET_KEY': 'test-jwt-secret-for-testing-only-32-bytes-min',
     })
     _app.json.ensure_ascii = False
 

@@ -2,7 +2,7 @@
 
 基于 Flask + MySQL + Redis 的智能护士培训系统，支持案例学习、AI 评分、语音答题、错题管理、考试功能、二维码分享和薄弱点分析。
 
-> **最新版本：v2.0.0** | 全页面 SPA 架构
+> **最新版本：v3.0.8** | 全页面 SPA 架构
 
 ## 目录
 
@@ -192,6 +192,19 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 # CORS_ORIGINS=https://nurse.hospital.com   ← 替换为实际域名，切勿使用 *
 ```
 
+建议同时确认：
+
+```bash
+# 生产环境保持 HTTPS Cookie 安全
+SESSION_COOKIE_SECURE=1
+
+# 默认跳过 ChromaDB 模型启动下载，避免外部网络波动阻塞容器启动
+SKIP_CHROMA_MODEL_DOWNLOAD=1
+
+# 只有前端和后端跨域且必须携带 Cookie 时才开启；开启时 CORS_ORIGINS 不能为 *
+CORS_SUPPORTS_CREDENTIALS=0
+```
+
 **.env 各配置项说明**：
 
 | 变量 | 必填 | 默认值 | 说明 |
@@ -219,11 +232,12 @@ python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().
 | `REDIS_ENABLED` | — | `1` | 是否启用 Redis 缓存 |
 | `RATELIMIT_ENABLED` | — | `1` | 是否启用速率限制 |
 | `JWT_ACCESS_TOKEN_EXPIRES` | — | `3600` | JWT Token 有效期（秒） |
-| `SITE_URL` | — | — | 站点外部 URL（用于生成考试二维码，生产环境必设） |
 | `CORS_ORIGINS` | ✅ | — | CORS 允许的来源，生产环境必须设为实际域名 |
+| `CORS_SUPPORTS_CREDENTIALS` | — | `0` | 跨域请求是否允许携带 Cookie；开启时 `CORS_ORIGINS` 不能为 `*` |
 | `SITE_URL` | ✅ | — | 站点外部 URL（生成考试二维码），生产环境必须设置 |
 | `ENCRYPTION_KEY` | ✅ | — | Fernet 密钥（加密 AI API Key），生成方法见上文 |
 | `REDIS_PASSWORD` | ✅ | — | Redis 密码（需与 docker-compose.yml 一致） |
+| `SKIP_CHROMA_MODEL_DOWNLOAD` | — | `1` | 是否跳过 ChromaDB ONNX 模型启动下载，避免启动依赖外网 |
 
 ### 第四步：启动服务
 
@@ -252,14 +266,18 @@ docker compose ps
 **验证部署**：
 
 ```bash
-# 健康检查
-curl http://localhost/api/health
+# 健康检查（未配置证书前可用本机 HTTP；正式域名建议用 HTTPS）
+curl http://localhost/health
+# 或：
+curl -k https://localhost/health
 
 # 预期输出：
-# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"2.0.0"}
+# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"3.0.8"}
 
 # 访问登录页
 curl -I http://localhost/auth/login
+# 或：
+curl -k -I https://localhost/auth/login
 # 应返回 HTTP 200
 ```
 
@@ -278,21 +296,21 @@ docker compose logs -f
 
 ### 第五步：首次登录
 
-1. 浏览器打开 `http://服务器IP`
+1. 浏览器打开 `http://服务器IP`；配置正式证书后使用 `https://你的域名`
 2. 使用 `.env` 中设置的 `ADMIN_USERNAME` / `ADMIN_PASSWORD` 登录
 3. 登录后立即修改密码：右上角用户菜单 → 修改密码
 
-### 第六步：初始化数据库迁移（可选）
+### 第六步：确认数据库迁移状态
 
 ```bash
-# 如果之前没有 migrations/versions/ 下的迁移文件，生成初始迁移：
-docker compose exec app flask db migrate -m "initial"
+# 容器启动时会自动执行迁移。启动后确认当前版本已到 head：
+docker compose exec app flask db current
 
-# 应用迁移：
-docker compose exec app flask db upgrade
-
-# 注意：如果跳过此步，entrypoint.sh 会自动使用 db.create_all() 建表
+# 确认模型和迁移文件没有漂移：
+docker compose exec app flask db check
 ```
+
+当前仓库已包含 Alembic 迁移文件，生产部署不需要手工生成 `initial` 迁移。若迁移失败，app 容器会启动失败，避免数据库结构不一致时继续对外服务。
 
 ### 第七步：上传案例
 
@@ -328,7 +346,7 @@ sudo cp /path/to/your/cases/*.docx /var/lib/docker/volumes/nursespace_app_cases/
 **批量导入**：
 - 管理员后台 → 用户管理 → 下载 Excel 模板 → 填写后上传
 - 支持自动生成工号和初始密码（按规则随机生成，导入成功后列出账号清单）
-- Excel 列：用户名、初始密码、真实姓名、科室、邮箱、手机号、角色、状态
+- Excel 列：真实姓名、科室、学校、学号、邮箱、手机号、角色、状态
 
 ### 第九步：配置防火墙和安全组
 
@@ -377,11 +395,50 @@ sudo ufw enable
 ### 验证
 
 - [ ] `docker compose ps` 所有服务状态为 `healthy`
-- [ ] `curl http://localhost/api/health` 返回 `{"status":"healthy","version":"2.0.0"}`
+- [ ] `curl http://localhost/health` 或 `curl -k https://localhost/health` 返回 `{"status":"healthy","version":"3.0.8"}`
+- [ ] `docker compose exec app flask db current` 显示 `92dc4402a201 (head)`
+- [ ] `docker compose exec app flask db check` 显示 `No new upgrade operations detected.`
 - [ ] 浏览器访问登录页正常加载
 - [ ] 管理员账号可以登录
 - [ ] AI 设置页面可以正常访问（不再出现 302 重定向）
 - [ ] 考试二维码链接正确（包含正确的域名）
+
+### 预发布自动验收
+
+在正式开放访问前，建议在服务器或 CI 上执行以下检查：
+
+```bash
+# 单元/接口测试
+pytest -q
+
+# 真实浏览器 smoke test（需要 Python playwright 包和 Chrome/Chromium）
+python scripts/e2e_smoke.py
+
+# Docker 配置检查
+docker compose config --quiet
+
+# 全新数据库启动/迁移演练（隔离 project，不污染默认数据卷）
+docker compose -p nursespace_migration_check \
+  -f docker-compose.yml -f docker-compose.e2e.yml up -d db redis app
+
+curl -fsS http://localhost:5001/api/health
+docker compose -p nursespace_migration_check \
+  -f docker-compose.yml -f docker-compose.e2e.yml exec -T app flask db current
+docker compose -p nursespace_migration_check \
+  -f docker-compose.yml -f docker-compose.e2e.yml exec -T app flask db check
+
+# 清理隔离演练栈
+docker compose -p nursespace_migration_check \
+  -f docker-compose.yml -f docker-compose.e2e.yml down -v
+```
+
+HTTPS / 安全头检查：
+
+```bash
+curl -k -I https://localhost/auth/login
+```
+
+应能看到 `Strict-Transport-Security`、`Content-Security-Policy`、`X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、`Referrer-Policy`。
 
 ### 可选优化
 
@@ -394,14 +451,16 @@ sudo ufw enable
 
 ## 配置参考
 
-### Nginx 限流说明
+### Nginx 与应用限流说明
 
 `nginx/nginx.conf` 中配置了：
 
 | 区域 | 限制 | 说明 |
 |------|------|------|
 | `/auth/login` | 5次/分钟 | 防暴力破解 |
-| 全站 API | 30次/分钟 | 由应用层 Flask-Limiter 处理 |
+| `/admin/`、`/nurse/` | 60次/分钟，burst 20 | Nginx 边界限流 |
+| `/admin/cases/upload` | 10次/分钟，burst 3 | 上传入口限流 |
+| 应用层登录接口 | 5次/分钟 | Flask-Limiter，生产环境使用 Redis 存储 |
 | 静态资源 | 无限制 | 直接 Nginx 返回，不经过 Flask |
 
 ### AI 评分模式
@@ -594,15 +653,18 @@ cd /opt/nursespace
 # 拉取新代码
 git pull origin main
 
-# 重新构建并启动
-docker compose up -d --build app
+# 重新构建并启动应用
+docker compose build app
+docker compose up -d app
 
-# 执行数据库迁移（如有新增）
-docker compose exec app flask db upgrade
+# app 启动时会自动执行数据库迁移；启动后确认迁移状态
+docker compose exec app flask db current
+docker compose exec app flask db check
 
 # 查看是否正常运行
 docker compose ps
 docker compose logs --tail=20 app
+curl -fsS http://localhost/health
 ```
 
 ### 数据库迁移
@@ -611,7 +673,7 @@ docker compose logs --tail=20 app
 # 生成新迁移（修改模型后）
 docker compose exec app flask db migrate -m "描述你的改动"
 
-# 应用迁移
+# 手动应用迁移（通常由 app 容器启动脚本自动执行）
 docker compose exec app flask db upgrade
 
 # 回滚一个版本
@@ -687,8 +749,8 @@ docker compose logs app
 
 ### 5. 静态资源 404
 
-- 静态资源由 Nginx 直接返回，通过共享 volume `static_volume` 访问
-- 如果图标/CSS 加载失败，检查 `static/` 目录是否完整
+- `/static/` 由 Nginx 反向代理到 Flask 应用
+- 如果图标/CSS 加载失败，检查镜像内 `static/` 目录是否完整：`docker compose exec app ls -la /app/static`
 - 重启可修复：`docker compose restart app nginx`
 
 ### 6. 语音输入不工作
@@ -722,13 +784,12 @@ NurseSpace/
 ├── entrypoint.sh             # 容器启动脚本（等待 MySQL + 迁移 + 建管理员）
 ├── Dockerfile                # 多阶段 Docker 构建
 ├── docker-compose.yml        # Docker Compose 编排（db + redis + app + nginx）
+├── docker-compose.e2e.yml    # 隔离部署验收栈（本地 5001 端口）
 ├── requirements.txt          # Python 依赖
 ├── run.sh                    # 一键部署脚本
 ├── .env.example              # 环境变量模板
 ├── .gitignore                # Git 忽略规则
 ├── .dockerignore             # Docker 忽略规则
-├── database/
-│   └── init.sql              # 数据库初始化（建表 + 索引 + 种子数据）
 ├── nginx/
 │   └── nginx.conf            # Nginx 反向代理 + 限流 + 静态资源
 ├── migrations/               # Alembic 数据库迁移
@@ -742,7 +803,7 @@ NurseSpace/
 │   ├── admin.py              # 管理员端（用户/案例/考试/统计）
 │   ├── api.py                # 公共 API（类别/站点/评论/健康检查）
 │   └── main.py               # 页面路由
-├── tests/                    # 测试套件（139 个用例）
+├── tests/                    # pytest 测试套件
 │   ├── conftest.py
 │   ├── test_models.py
 │   ├── test_auth.py
@@ -761,7 +822,7 @@ NurseSpace/
 ├── static/                   # 静态资源（CSS/JS/图片）
 │   ├── css/
 │   ├── js/
-│   └── favicon.ico
+│   └── favicon.svg
 └── templates/                # Jinja2 模板
     ├── base.html
     ├── auth/
@@ -798,8 +859,8 @@ NurseSpace/
 # 安装测试依赖
 pip install pytest pytest-flask pytest-cov
 
-# 运行全部测试（139 个用例）
-pytest tests/ -v
+# 运行全部测试
+pytest -q
 
 # 带覆盖率报告
 pytest tests/ --cov=. --cov-report=html
@@ -817,6 +878,7 @@ pytest tests/test_auth.py -v
 - Word 文档解析
 - AI 评分与降级
 - CSRF/CORS/限流安全
+- 真实浏览器 smoke test：`python scripts/e2e_smoke.py`
 
 ---
 

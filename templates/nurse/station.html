@@ -87,16 +87,42 @@
   const stationId = parseInt(qs.get('id'));
   const caseId = parseInt(qs.get('case'));
 
+  let _stationType = 'assessment';
+
   function renderStation(data){
+    _stationType = data.station_type || 'assessment';
+    const isKnowledge = _stationType === 'knowledge';
+    const nl2br = (value) => sanitizeHTML(value || '').replace(/\n/g, '<br>');
+    // 动态设置页面标题
+    $('.page-title h2').html(isKnowledge
+      ? '<i class="fas fa-lightbulb me-2"></i>扩展知识答题'
+      : '<i class="fas fa-edit me-2"></i>答题站点');
+    $('.page-title p').text(isKnowledge ? '思考并回答扩展知识问题' : '仔细阅读题目，认真作答');
+
     const html = `
+      ${data.case_guide ? `
+      <div class="card mb-3 border-info">
+        <div class="card-header bg-info bg-opacity-10 py-2">
+          <i class="fas fa-info-circle me-2 text-info"></i><strong>案例指引</strong>
+          <small class="text-muted ms-2">— ${sanitizeHTML(data.case_title || '')}</small>
+        </div>
+        <div class="card-body py-2 small">${nl2br(data.case_guide)}</div>
+      </div>` : ''}
+      ${data.condition_report ? `
+      <div class="card mb-3 border-warning">
+        <div class="card-header bg-warning bg-opacity-10 py-2">
+          <i class="fas fa-clipboard-list me-2 text-warning"></i><strong>病情汇报</strong>
+        </div>
+        <div class="card-body py-2 small" style="white-space:pre-wrap;">${sanitizeHTML(data.condition_report)}</div>
+      </div>` : ''}
       <div class="mb-3">
         <div class="fw-bold">题目：</div>
-        <div>${(data.question||'').replace(/\n/g,'<br>')}</div>
+        <div>${nl2br(data.question)}</div>
       </div>
-      ${data.assessment_task ? `
+      ${!isKnowledge && data.assessment_task ? `
       <div class="mb-3">
         <div class="fw-bold">考核任务：</div>
-        <div class="small">${data.assessment_task.replace(/\n/g,'<br>')}</div>
+        <div class="small">${nl2br(data.assessment_task)}</div>
       </div>` : ''}
     `;
     document.getElementById('station-content').innerHTML = html;
@@ -110,15 +136,15 @@
       </div>
       <div class="feedback-container">
         <h6><i class="fas fa-comments me-2"></i>AI反馈：</h6>
-        <p class="content-wrap">${result.feedback || ''}</p>
-        ${result.reason ? `<h6 class="mt-2"><i class='fas fa-info-circle me-2'></i>评分理由</h6><p class="content-wrap">${result.reason}</p>`:''}
-        ${result.covered_points?.length ? `<h6 class="text-success mt-3"><i class="fas fa-check-circle me-2"></i>答对要点</h6><ul>${result.covered_points.map(p=>`<li class='text-success'><i class='fas fa-check me-2'></i>${p}</li>`).join('')}</ul>`:''}
-        ${result.missed_points?.length ? `<h6 class="text-warning mt-3"><i class="fas fa-exclamation-triangle me-2"></i>遗漏要点</h6><ul>${result.missed_points.map(p=>`<li class='text-warning'><i class='fas fa-minus me-2'></i>${p}</li>`).join('')}</ul>`:''}
-        ${result.suggestions ? `<h6 class="text-info mt-3"><i class="fas fa-lightbulb me-2"></i>改进建议</h6><p class="text-info">${result.suggestions}</p>`:''}
+        <p class="content-wrap">${sanitizeHTML(result.feedback || '')}</p>
+        ${result.reason ? `<h6 class="mt-2"><i class='fas fa-info-circle me-2'></i>评分理由</h6><p class="content-wrap">${sanitizeHTML(result.reason)}</p>`:''}
+        ${result.covered_points?.length ? `<h6 class="text-success mt-3"><i class="fas fa-check-circle me-2"></i>答对要点</h6><ul>${result.covered_points.map(p=>`<li class='text-success'><i class='fas fa-check me-2'></i>${sanitizeHTML(p)}</li>`).join('')}</ul>`:''}
+        ${result.missed_points?.length ? `<h6 class="text-warning mt-3"><i class="fas fa-exclamation-triangle me-2"></i>遗漏要点</h6><ul>${result.missed_points.map(p=>`<li class='text-warning'><i class='fas fa-minus me-2'></i>${sanitizeHTML(p)}</li>`).join('')}</ul>`:''}
+        ${result.suggestions ? `<h6 class="text-info mt-3"><i class="fas fa-lightbulb me-2"></i>改进建议</h6><p class="text-info">${sanitizeHTML(result.suggestions)}</p>`:''}
       </div>
       <div class="mt-3">
         <h6><i class="fas fa-clipboard-list me-2"></i>标准答案</h6>
-        <ol>${std.map(a=>`<li class="content-wrap">${a.answer_item}</li>`).join('')}</ol>
+        <ol>${std.map(a=>`<li class="content-wrap">${sanitizeHTML(a.answer_item)}</li>`).join('')}</ol>
       </div>
     `;
     document.getElementById('evaluation-body').innerHTML = html;
@@ -177,5 +203,4 @@
   });
 </script>
 {% endblock %}
-
 

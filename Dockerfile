@@ -60,7 +60,8 @@ COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 RUN useradd --create-home appuser && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app /home/appuser
+
 USER appuser
 
 EXPOSE 8000

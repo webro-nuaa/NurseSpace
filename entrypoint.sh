@@ -38,52 +38,19 @@ import sys
 from app import create_app
 from models import db
 from flask_migrate import upgrade, stamp
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect
 
-try:
-    app = create_app()
-    with app.app_context():
-        inspector = inspect(db.engine)
-        existing_tables = inspector.get_table_names()
-        if not existing_tables:
-            db.create_all()
-            try:
-                stamp()
-            except BaseException:
-                pass
-            print('[entrypoint] 数据库表已创建（全新安装）')
-        else:
-            try:
-                upgrade()
-                print('[entrypoint] 数据库迁移完成')
-            except BaseException as e:
-                print(f'[entrypoint] 迁移失败: {e}，回退到 create_all')
-                try:
-                    db.create_all()
-                except BaseException:
-                    pass
-                try:
-                    stamp()
-                except BaseException:
-                    pass
-        # 安全补列：token_version（v2.0.0+）
-        try:
-            with db.engine.connect() as conn:
-                conn.execute(text('ALTER TABLE users ADD COLUMN token_version INT NOT NULL DEFAULT 0'))
-                conn.commit()
-                print('[entrypoint] token_version 列已添加')
-        except BaseException:
-            print('[entrypoint] token_version 列已存在，跳过')
-        # 安全补表：baidu_asr_keys（v2.0.0+）
-        try:
-            db.create_all()
-            print('[entrypoint] 新表检查完成')
-        except BaseException:
-            print('[entrypoint] 新表检查跳过')
-
-except BaseException as e:
-    print(f'[entrypoint] 数据库初始化遇到错误: {e}，继续启动')
-    sys.exit(0)
+app = create_app()
+with app.app_context():
+    inspector = inspect(db.engine)
+    existing_tables = inspector.get_table_names()
+    if not existing_tables:
+        db.create_all()
+        stamp()
+        print('[entrypoint] 数据库表已创建并标记当前迁移版本（全新安装）')
+    else:
+        upgrade()
+        print('[entrypoint] 数据库迁移完成')
 "
 
 echo "[entrypoint] 创建初始管理员账号..."
@@ -139,6 +106,37 @@ except BaseException as e:
     print(f'[entrypoint] 默认配置初始化遇到错误: {e}，继续启动')
     sys.exit(0)
 "
+
+echo "[entrypoint] 检查 ChromaDB 模型缓存..."
+MODEL_DIR="$HOME/.cache/chroma/onnx_models/all-MiniLM-L6-v2"
+if [ "${SKIP_CHROMA_MODEL_DOWNLOAD:-1}" = "1" ]; then
+    echo "[entrypoint] 跳过 ChromaDB 模型启动下载（SKIP_CHROMA_MODEL_DOWNLOAD=1）"
+elif [ ! -f "$MODEL_DIR/onnx.tar.gz" ]; then
+    echo "[entrypoint] 未找到模型缓存，开始下载（约90MB，来自 huggingface 镜像）..."
+    MIRROR="https://hf-mirror.com/sentence-transformers/all-MiniLM-L6-v2/resolve/main"
+    mkdir -p "$MODEL_DIR"
+    cd "$MODEL_DIR"
+
+    # 小文件先下
+    for f in config.json tokenizer.json vocab.txt special_tokens_map.json; do
+        if [ ! -f "$f" ]; then
+            curl -fsSL -o "$f" "$MIRROR/$f" && echo "  OK: $f" || echo "  FAIL: $f"
+        fi
+    done
+
+    # 大文件 model.onnx (~90MB)
+    if [ ! -f "model.onnx" ]; then
+        echo "  正在下载 model.onnx (约90MB)..."
+        curl -fSL --progress-bar -o model.onnx "$MIRROR/onnx/model.onnx" && echo "  OK: model.onnx" || echo "  FAIL: model.onnx"
+    fi
+
+    # 打包 onnx.tar.gz
+    echo "  打包 onnx.tar.gz..."
+    tar czf onnx.tar.gz config.json tokenizer.json vocab.txt special_tokens_map.json model.onnx 2>/dev/null && \
+        echo "  OK: onnx.tar.gz ($(du -sh onnx.tar.gz | cut -f1))" || echo "  FAIL: tar"
+else
+    echo "[entrypoint] 模型缓存已就绪 ($(du -sh $MODEL_DIR/onnx.tar.gz | cut -f1))"
+fi
 
 echo "[entrypoint] 启动应用..."
 exec "$@"

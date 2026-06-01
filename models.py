@@ -22,8 +22,17 @@ class User(UserMixin, db.Model):
     real_name = db.Column(db.String(50), nullable=False)
     role = db.Column(db.Enum('nurse', 'admin'), nullable=False, default='nurse')
     department = db.Column(db.String(100))
+    school = db.Column(db.String(100))
+    serial_number = db.Column(db.String(50))
     status = db.Column(db.Enum('active', 'disabled'), default='active')
     points = db.Column(db.Integer, default=0)
+    consent_accepted = db.Column(db.Boolean, default=False)
+    consent_accepted_at = db.Column(db.DateTime)
+    # 知识问答 AI（护士端自配 Key，可选）
+    knowledge_provider = db.Column(db.String(20))
+    knowledge_key = db.Column(db.String(500))
+    knowledge_model = db.Column(db.String(100))
+    knowledge_embedding_model = db.Column(db.String(100))
     token_version = db.Column(db.Integer, nullable=False, default=0, server_default='0')
     created_at = db.Column(db.DateTime, default=_utcnow)
     updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
@@ -72,7 +81,6 @@ class Case(db.Model):
 
     # 关系
     stations = db.relationship('Station', backref='case', lazy='dynamic', cascade='all, delete-orphan')
-    extended_knowledge = db.relationship('ExtendedKnowledge', backref='case', lazy='dynamic', cascade='all, delete-orphan')
     exam_questions = db.relationship('ExamQuestion', backref='case', lazy='dynamic', cascade='all, delete-orphan')
     videos = db.relationship('ExtensionVideo', backref='case', lazy='dynamic', cascade='all, delete-orphan')
     links = db.relationship('ExtensionLink', backref='case', lazy='dynamic', cascade='all, delete-orphan')
@@ -82,9 +90,11 @@ class Station(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     case_id = db.Column(db.Integer, db.ForeignKey('cases.id'), nullable=False)
-    name = db.Column(db.String(200), nullable=False)
+    name = db.Column(db.String(200), nullable=True)
     assessment_task = db.Column(db.Text)
+    condition_report = db.Column(db.Text)
     question = db.Column(db.Text, nullable=False)
+    station_type = db.Column(db.Enum('assessment', 'knowledge'), nullable=False, default='assessment')
     order_index = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=_utcnow)
     
@@ -103,29 +113,6 @@ class StandardAnswer(db.Model):
     score_weight = db.Column(db.Numeric(5, 2), default=1.00)
     order_index = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=_utcnow)
-
-class ExtendedKnowledge(db.Model):
-    __tablename__ = 'extended_knowledge'
-
-    id = db.Column(db.Integer, primary_key=True)
-    case_id = db.Column(db.Integer, db.ForeignKey('cases.id'), nullable=False)
-    question = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=_utcnow)
-
-    # 关系
-    answers = db.relationship('KnowledgeAnswer', backref='knowledge', lazy='dynamic', cascade='all, delete-orphan')
-
-
-class KnowledgeAnswer(db.Model):
-    __tablename__ = 'knowledge_answers'
-
-    id = db.Column(db.Integer, primary_key=True)
-    knowledge_id = db.Column(db.Integer, db.ForeignKey('extended_knowledge.id'), nullable=False)
-    answer_item = db.Column(db.Text, nullable=False)
-    score_weight = db.Column(db.Numeric(5, 2), default=1.00)
-    order_index = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=_utcnow)
-
 
 class ExtensionVideo(db.Model):
     __tablename__ = 'extension_videos'
@@ -163,18 +150,6 @@ class LearningRecord(db.Model):
     ai_feedback = db.Column(db.Text)
     completed_at = db.Column(db.DateTime, default=_utcnow)
 
-class KnowledgeLearningRecord(db.Model):
-    __tablename__ = 'knowledge_learning_records'
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    knowledge_id = db.Column(db.Integer, db.ForeignKey('extended_knowledge.id'), nullable=False)
-    user_answer = db.Column(db.Text)
-    score = db.Column(db.Numeric(5, 2))
-    max_score = db.Column(db.Numeric(5, 2), default=100.00)
-    ai_feedback = db.Column(db.Text)
-    completed_at = db.Column(db.DateTime, default=_utcnow)
-
 class WrongQuestion(db.Model):
     __tablename__ = 'wrong_questions'
     
@@ -185,17 +160,6 @@ class WrongQuestion(db.Model):
     created_at = db.Column(db.DateTime, default=_utcnow)
     
     __table_args__ = (db.UniqueConstraint('user_id', 'station_id', name='unique_user_station'),)
-
-class KnowledgeWrongQuestion(db.Model):
-    __tablename__ = 'knowledge_wrong_questions'
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    knowledge_id = db.Column(db.Integer, db.ForeignKey('extended_knowledge.id'), nullable=False)
-    score = db.Column(db.Numeric(5, 2))
-    created_at = db.Column(db.DateTime, default=_utcnow)
-
-    __table_args__ = (db.UniqueConstraint('user_id', 'knowledge_id', name='unique_user_knowledge'),)
 
 class Exam(db.Model):
     __tablename__ = 'exams'
@@ -261,7 +225,7 @@ class PointRecord(db.Model):
     points = db.Column(db.Integer, nullable=False)
     reason = db.Column(db.String(200))
     related_id = db.Column(db.Integer)
-    related_type = db.Column(db.Enum('learning', 'exam', 'knowledge'))
+    related_type = db.Column(db.Enum('learning', 'exam'))
     created_at = db.Column(db.DateTime, default=_utcnow)
 
 
@@ -281,6 +245,12 @@ class AiSetting(db.Model):
     zhipu_key = db.Column(db.String(500))
     zhipu_model = db.Column(db.String(100))
     zhipu_base_url = db.Column(db.String(300))
+
+    # 知识积累（管理员配置，写入向量库用）
+    accumulation_provider = db.Column(db.String(20))
+    accumulation_key = db.Column(db.String(500))
+    accumulation_model = db.Column(db.String(100))
+    accumulation_embedding_model = db.Column(db.String(100))
 
     updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
 
@@ -325,7 +295,7 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
     # 评论内容类型：station_answer(站点答案), knowledge_answer(扩展知识答案)
-    content_type = db.Column(db.Enum('station_answer', 'knowledge_answer'), nullable=False)
+    content_type = db.Column(db.Enum('station_answer'), nullable=False)
     
     # 关联的答案ID（站点ID或扩展知识ID）
     content_id = db.Column(db.Integer, nullable=False)

@@ -12,7 +12,7 @@ def _require_env(key):
 
 
 class Config:
-    VERSION = '3.0.3'
+    VERSION = '3.0.8'
 
     SECRET_KEY = _require_env('SECRET_KEY')
 
@@ -74,7 +74,8 @@ class Config:
     SITE_URL = os.environ.get('SITE_URL', '').rstrip('/')
 
     # CORS
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
+    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '')
+    CORS_SUPPORTS_CREDENTIALS = os.environ.get('CORS_SUPPORTS_CREDENTIALS', '0') == '1'
 
     # Session security
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', '1') == '1'

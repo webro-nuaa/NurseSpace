@@ -14,8 +14,15 @@ certs/
 __MACOSX/
 *.zip
 *.rar
+*.tar
+*.tar.gz
+*.tgz
 *.xlsx
 *.pdf
+*.docx
+chroma_data/
+instance/
+.pytest_cache/
 .idea/
 .vscode/
 *.md

@@ -194,9 +194,9 @@ class TestNurseFeatures:
         data = resp.get_json()
         assert data['success']
 
-    def test_submit_knowledge_answer_requires_content(self, client, nurse_token, app):
+    def test_submit_answer_requires_content(self, client, nurse_token, app):
         """Submit answer requires content."""
-        resp = client.post('/nurse/knowledge/1/submit',
+        resp = client.post('/nurse/stations/1/submit',
                            headers={'Authorization': f'Bearer {nurse_token}'},
                            json={'answer': ''})
         if resp.status_code == 200:

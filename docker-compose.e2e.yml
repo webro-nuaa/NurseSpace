@@ -1,0 +1,12 @@
+# Isolated validation stack. Keeps nginx disabled and maps the app to 5001 so
+# it can run alongside the default local stack.
+services:
+  app:
+    ports:
+      - "5001:8000"
+    environment:
+      SKIP_CHROMA_MODEL_DOWNLOAD: "1"
+
+  nginx:
+    profiles:
+      - production

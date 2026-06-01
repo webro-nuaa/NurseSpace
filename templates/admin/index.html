@@ -40,6 +40,12 @@
         <a class="d-block nav-link-mobile" href="#" data-page="voice-settings" onclick="navigateTo('voice-settings')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-microphone me-2"></i>语音设置
         </a>
+        <a class="d-block nav-link-mobile" href="#" data-page="knowledge-qa" onclick="navigateTo('knowledge-qa')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
+            <i class="fas fa-robot me-2"></i>知识问答
+        </a>
+        <a class="d-block nav-link-mobile" href="#" data-page="knowledge-base" onclick="navigateTo('knowledge-base')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
+            <i class="fas fa-database me-2"></i>知识库
+        </a>
         <div class="nav-section-title">其他</div>
         <a class="d-block nav-link-mobile" href="#" data-page="help" onclick="navigateTo('help')" data-bs-toggle="collapse" data-bs-target="#adminNavCollapse">
             <i class="fas fa-question-circle me-2"></i>使用帮助
@@ -90,6 +96,16 @@
 <li class="nav-item">
     <a class="nav-link" href="#" data-page="voice-settings" onclick="navigateTo('voice-settings')">
         <i class="fas fa-microphone"></i>语音设置
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="knowledge-qa" onclick="navigateTo('knowledge-qa')">
+        <i class="fas fa-robot"></i>知识问答
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link" href="#" data-page="knowledge-base" onclick="navigateTo('knowledge-base')">
+        <i class="fas fa-database"></i>知识库
     </a>
 </li>
 <li class="nav-section-title">其他</li>
@@ -194,6 +210,9 @@
             case 'group-analysis': loadGroupAnalysis(); break;
             case 'ai-settings':   loadAiSettings(); break;
             case 'voice-settings': loadVoiceSettings(); break;
+            case 'knowledge-base': loadKnowledgeBase(); break;
+            case 'knowledge-qa': loadAdminKnowledgeQA(); break;
+            case 'personal-ai': loadAdminPersonalAISettings(); break;
             case 'help':          loadHelp(); break;
         }
     }

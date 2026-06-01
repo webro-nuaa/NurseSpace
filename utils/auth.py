@@ -15,29 +15,6 @@ def login_or_jwt_required(f):
         if not has_jwt and current_user.is_authenticated:
             return f(*args, **kwargs)
 
-        # Check for token in query parameter (for standalone page <a> links from SPA)
-        query_token = request.args.get('token', '').strip()
-        if query_token and not has_jwt:
-            from flask_jwt_extended import decode_token
-            try:
-                claims = decode_token(query_token)
-                user_id = claims.get('sub')
-                token_ver = claims.get('v', 0) if claims else 0
-                if user_id:
-                    try:
-                        uid = int(user_id)
-                    except (ValueError, TypeError):
-                        uid = None
-                    if uid:
-                        user = db.session.get(User, uid)
-                        if user and user.is_active():
-                            if token_ver != (user.token_version or 0):
-                                return jsonify({'success': False, 'message': '密码已修改，请重新登录'}), 401
-                            login_user(user, remember=False)
-                            return f(*args, **kwargs)
-            except Exception:
-                pass
-
         try:
             from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
             verify_jwt_in_request(optional=True)

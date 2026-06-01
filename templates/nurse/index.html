@@ -39,6 +39,11 @@
         <i class="fas fa-coins me-1"></i>积分记录
     </a>
 </li>
+<li class="nav-item">
+    <a class="nav-link" href="/nurse?tab=knowledge_qa">
+        <i class="fas fa-robot me-1"></i>知识问答
+    </a>
+</li>
 {% endblock %}
 
 {% block nav_mobile %}
@@ -61,6 +66,9 @@
         </a>
         <a class="d-block nav-link-mobile" href="#" onclick="navigateTo('points')" data-bs-toggle="collapse" data-bs-target="#nurseNavCollapse">
             <i class="fas fa-coins me-2"></i>积分记录
+        </a>
+        <a class="d-block nav-link-mobile" href="#" onclick="navigateTo('knowledge_qa')" data-bs-toggle="collapse" data-bs-target="#nurseNavCollapse">
+            <i class="fas fa-robot me-2"></i>知识问答
         </a>
     </div>
 </div>
@@ -123,6 +131,7 @@
             case 'weakness': navigateTo('weakness'); break;
             case 'exams': navigateTo('exams'); break;
             case 'points': navigateTo('points'); break;
+            case 'knowledge_qa': navigateTo('knowledge_qa'); break;
             default: navigateTo('dashboard');
         }
     });
@@ -229,7 +238,63 @@
             case 'weakness': loadWeaknessAnalysis(); break;
             case 'exams': loadExams(); break;
             case 'points': loadPointRecords(); break;
+            case 'knowledge_qa': loadKnowledgeQA(); break;
         }
+    }
+
+    function showConsentModal() {
+        if ($('#consentModal').length) return;
+        const modal = `
+            <div class="modal fade" id="consentModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="fas fa-file-contract me-2"></i>知情同意书</h5>
+                        </div>
+                        <div class="modal-body" style="max-height:60vh;overflow-y:auto; padding: 2rem 2.5rem;">
+                            <h4 class="text-center text-primary mb-4">知情同意书</h4>
+                            <div class="mx-auto" style="max-width: 600px; line-height: 2;">
+                                <p class="mb-3">亲爱的同学：</p>
+                                <p class="mb-3" style="text-indent: 2em;">您好！您将被邀请参加由<b>扬州大学</b>与<b>扬州大学附属医院</b>共同主持的一项研究。该研究通过分析您在系统中完成学习与测评后生成的成绩数据，探索更高效的护理教学模式，提升护理专业人才培养质量与教学效果，由扬州大学与扬州大学附属医院资助进行。</p>
+                                <p class="mb-3" style="text-indent: 2em;">您将进入智慧化护理教学案例库系统，完成指定的护理案例学习与能力测评，系统将自动记录您的学习行为与测评分数。我们仅收集您的匿名化成绩数据用于学术研究，不会采集您的个人身份信息，所有数据严格保密，仅用于研究分析与系统优化，不会影响您的课程成绩与学业评价。</p>
+                                <p class="mb-3" style="text-indent: 2em;">您的参与完全自愿，可随时选择退出研究，退出后已收集的匿名化数据将按研究伦理规范处理，不会对您造成任何不利影响。若您有任何疑问，请与平台管理员联系。</p>
+                                <p class="mt-4">非常感谢您的参与与支持！</p>
+                                <p class="text-end text-muted mt-4">扬州大学 &amp; 扬州大学附属医院</p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-outline-secondary" onclick="window.location.href='/auth/logout'">我不愿使用该系统并参与本次研究</button>
+                            <button class="btn btn-primary" id="btn-consent-agree" onclick="acceptConsent()">
+                                <i class="fas fa-check me-1"></i>我已阅读并同意，自愿参与
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        $('body').append(modal);
+        var m = new bootstrap.Modal('#consentModal');
+        m.show();
+    }
+
+    function acceptConsent() {
+        $('#btn-consent-agree').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>处理中...');
+        $.ajax({
+            url: '/nurse/consent/accept',
+            method: 'POST',
+            success: function(res) {
+                if (res.success) {
+                    bootstrap.Modal.getInstance('#consentModal').hide();
+                    $('#consentModal').remove();
+                } else {
+                    showAlert(res.message || '操作失败', 'error');
+                    $('#btn-consent-agree').prop('disabled', false).html('<i class="fas fa-check me-1"></i>同意并继续');
+                }
+            },
+            error: function() {
+                showAlert('网络错误，请重试', 'error');
+                $('#btn-consent-agree').prop('disabled', false).html('<i class="fas fa-check me-1"></i>同意并继续');
+            }
+        });
     }
 
     function setActiveNav(title) {
@@ -243,6 +308,14 @@
 
     function loadDashboard() {
         setActiveNav('首页概览');
+
+        // 检查知情同意状态
+        $.get('/nurse/dashboard', function(res) {
+            if (res.success && res.data.user_info && !res.data.user_info.consent_accepted) {
+                showConsentModal();
+            }
+        });
+
         const html = `
             <section class="hero-section text-white mb-4">
                 <div class="row align-items-center">
@@ -326,6 +399,50 @@
         `;
 
         $('#main-content').html(html);
+    }
+
+    function loadKnowledgeQA() {
+        setActiveNav('知识问答');
+        $.get('/nurse/ai-settings', function(res) {
+            var hasKey = res.success && res.data && res.data.has_knowledge_key;
+            if (!hasKey) {
+                $('#main-content').html(`
+                    <div style="max-width:800px;margin:60px auto;text-align:center">
+                        <h2 style="font-size:2rem;margin-bottom:10px">NurseSpace 知识问答</h2>
+                        <p style="color:#888;margin-bottom:40px">配置个人 API Key 后即可使用</p>
+                        <button class="btn btn-primary btn-lg" onclick="showKnowledgeAISettings()" style="padding:12px 40px;border-radius:12px">
+                            <i class="fas fa-key me-2"></i>配置 AI Key
+                        </button>
+                    </div>`);
+                return;
+            }
+            $('#main-content').html(`
+                <div class="qa-wrapper" style="display:flex;flex-direction:column;height:calc(100vh - 120px);max-width:800px;margin:0 auto">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+                        <h4 style="margin:0;font-weight:600">NurseSpace 知识问答</h4>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="showKnowledgeAISettings()" style="border-radius:8px">
+                            <i class="fas fa-cog me-1"></i>设置
+                        </button>
+                    </div>
+                    <div id="qa-chat" style="flex:1;overflow-y:auto;padding:10px 0">
+                        <div style="text-align:center;color:#bbb;padding-top:80px">
+                            <div style="font-size:3rem;margin-bottom:16px">💬</div>
+                            <div style="font-size:1.1rem;margin-bottom:8px">有什么护理问题可以问我</div>
+                            <div style="font-size:0.85rem">基于知识库为您提供参考答案</div>
+                        </div>
+                    </div>
+                    <div style="padding:12px 0;border-top:1px solid #eee">
+                        <div style="display:flex;gap:8px;background:#f5f5f5;border-radius:16px;padding:6px 16px;align-items:center">
+                            <input type="text" id="qa-input" placeholder="输入问题，例如：新生儿黄疸的护理要点？"
+                                style="flex:1;border:none;background:transparent;outline:none;font-size:.95rem;padding:8px 0"
+                                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();askKnowledge()}">
+                            <button onclick="askKnowledge()" style="border:none;background:#2b6ef0;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center">
+                                <i class="fas fa-arrow-up" style="font-size:14px"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>`);
+        });
     }
 </script>
 {% endblock %}
