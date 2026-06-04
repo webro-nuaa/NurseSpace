@@ -161,7 +161,7 @@
                 {label: c.title, href: hrefWithToken('/nurse?tab=cases&case_id=' + caseId)},
                 {label: '扩展知识作答'}
               ]));
-              $('#btn-back-knowledge').attr('onclick', 'window.location.href=hrefWithToken("/nurse?tab=cases&case_id=' + caseId + '")');
+              $('#btn-back-knowledge').attr('onclick', 'if(document.referrer.indexOf("/nurse")!==-1){window.history.back()}else{window.location.href=hrefWithToken("/nurse?tab=cases&case_id=' + caseId + '")}');
             }
           });
         }

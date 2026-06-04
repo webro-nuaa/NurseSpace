@@ -259,6 +259,16 @@ showProfile = function() {
                         ${isAdmin?'':'<div class="form-text">科室信息由管理员维护</div>'}
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">学校</label>
+                        <input type="text" class="form-control" id="profile-school" value="${user.school||''}" readonly>
+                        <div class="form-text">学校信息由管理员维护</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">学号</label>
+                        <input type="text" class="form-control" id="profile-serial-number" value="${user.serial_number||''}" readonly>
+                        <div class="form-text">学号信息由管理员维护</div>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">角色 / 积分</label>
                         <input type="text" class="form-control" value="${isAdmin?'管理员':'护士'} · 积分: ${user.points||0}" readonly>
                     </div>

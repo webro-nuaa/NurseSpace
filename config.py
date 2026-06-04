@@ -12,7 +12,7 @@ def _require_env(key):
 
 
 class Config:
-    VERSION = '3.0.8'
+    VERSION = '3.0.9'
 
     SECRET_KEY = _require_env('SECRET_KEY')
 
@@ -66,6 +66,12 @@ class Config:
     UPLOAD_DIR = os.environ.get('UPLOAD_DIR', os.path.join(BASE_DIR, 'uploads'))
     MAX_CONTENT_LENGTH = 128 * 1024 * 1024
     CASES_DIR = os.environ.get('CASES_DIR', os.path.join(BASE_DIR, '案例'))
+
+    # ChromaDB 向量库
+    CHROMA_MODE = os.environ.get('CHROMA_MODE', 'local')  # local | remote
+    CHROMA_HOST = os.environ.get('CHROMA_HOST', 'localhost')
+    CHROMA_PORT = int(os.environ.get('CHROMA_PORT', 8000))
+    CHROMA_DIR = os.environ.get('CHROMA_DIR', os.path.join(BASE_DIR, 'chroma_data'))
 
     # Encryption (用于加密 DB 中存储的 API Key)
     ENCRYPTION_KEY = _require_env('ENCRYPTION_KEY')

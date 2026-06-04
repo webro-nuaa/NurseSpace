@@ -162,6 +162,8 @@ def profile():
                 'email': user.email,
                 'phone': user.phone,
                 'department': user.department,
+                'school': user.school,
+                'serial_number': user.serial_number,
                 'role': user.role,
                 'points': user.points,
                 'status': user.status,
@@ -169,8 +171,8 @@ def profile():
             }
         })
 
-    data = request.get_json()
-    allowed_fields = ['real_name', 'email', 'phone', 'department']
+    data = request.get_json() or {}
+    allowed_fields = ['real_name', 'email', 'phone', 'department', 'school', 'serial_number']
     if user.role == 'nurse':
         allowed_fields.remove('department')
 

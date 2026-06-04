@@ -52,6 +52,13 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # ---- 依赖注入：统一管理共享实例 ----
+    from utils.ai_evaluator import AIEvaluator
+    app.extensions['ai_evaluator'] = AIEvaluator()
+
+    from services.knowledge import KnowledgeService
+    app.extensions['knowledge_service'] = KnowledgeService()
+
     login_manager.init_app(app)
     jwt.init_app(app)
     csrf.init_app(app)

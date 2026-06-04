@@ -98,21 +98,28 @@
         const categoryId = qs.get('category_id');
         const caseId = qs.get('case_id');
 
-        // Build dashboard URL for guard state
-        var _guardUrl = (function() {
-            var u = new URL(window.location);
-            u.searchParams.set('tab', 'dashboard');
-            u.searchParams.delete('category_id');
-            u.searchParams.delete('case_id');
-            return u.toString();
-        })();
+        // Only set up guard history on initial page entry; skip when
+        // navigating back from standalone pages so history stays intact
+        var _isInitialEntry = !sessionStorage.getItem('_spa_loaded');
+        if (_isInitialEntry) {
+            sessionStorage.setItem('_spa_loaded', '1');
 
-        // Replace initial page load with exit guard at dashboard
-        window.history.replaceState({_spaGuard: true}, '', _guardUrl);
+            // Build dashboard URL for guard state
+            var _guardUrl = (function() {
+                var u = new URL(window.location);
+                u.searchParams.set('tab', 'dashboard');
+                u.searchParams.delete('category_id');
+                u.searchParams.delete('case_id');
+                return u.toString();
+            })();
 
-        // For deep links: push dashboard first, so back returns there before exit confirm
-        if (tab && tab !== 'dashboard') {
-            window.history.pushState({}, '', _guardUrl);
+            // Replace initial page load with exit guard at dashboard
+            window.history.replaceState({_spaGuard: true}, '', _guardUrl);
+
+            // For deep links: push dashboard first, so back returns there before exit confirm
+            if (tab && tab !== 'dashboard') {
+                window.history.pushState({}, '', _guardUrl);
+            }
         }
 
         switch(tab){
@@ -182,12 +189,14 @@
         const userInfo = localStorage.getItem('user_info');
 
         if (!token || !userInfo) {
+            sessionStorage.removeItem('_spa_loaded');
             window.location.href = '/auth/login';
             return;
         }
 
         const user = JSON.parse(userInfo);
         if (user.role !== 'nurse') {
+            sessionStorage.removeItem('_spa_loaded');
             window.location.href = '/auth/login';
             return;
         }

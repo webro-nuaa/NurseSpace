@@ -2202,6 +2202,14 @@ function renderUserEditPage(userId) {
                         <input type="text" class="form-control" id="edit-department" value="${u.department||''}">
                     </div>
                     <div class="mb-2">
+                        <label class="form-label">学校</label>
+                        <input type="text" class="form-control" id="edit-school" value="${u.school||''}">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">学号</label>
+                        <input type="text" class="form-control" id="edit-serial-number" value="${u.serial_number||''}">
+                    </div>
+                    <div class="mb-2">
                         <label class="form-label">邮箱</label>
                         <input type="email" class="form-control" id="edit-email" value="${u.email||''}">
                     </div>
@@ -2240,6 +2248,8 @@ function submitEditUserPage(userId) {
     const payload = {
         real_name: $('#edit-real-name').val(),
         department: $('#edit-department').val(),
+        school: $('#edit-school').val(),
+        serial_number: $('#edit-serial-number').val(),
         email: $('#edit-email').val(),
         phone: $('#edit-phone').val(),
         role: $('#edit-role').val(),
