@@ -12,7 +12,7 @@ limit_req_zone $binary_remote_addr zone=upload:10m rate=10r/m;
 # ============================================================
 server {
     listen 80;
-    server_name nursezy.art;
+    server_name ${NGINX_SERVER_NAME};
 
     # Let's Encrypt HTTP challenge
     location /.well-known/acme-challenge/ {
@@ -39,7 +39,7 @@ server {
 server {
     listen 443 ssl;
     http2 on;
-    server_name nursezy.art;
+    server_name ${NGINX_SERVER_NAME};
 
     # SSL 证书（Let's Encrypt）
     ssl_certificate     /etc/nginx/certs/server.crt;
@@ -62,11 +62,7 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location /static/ {
-        proxy_pass http://flask_app;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        alias /usr/share/nginx/html/static/;
         expires 1h;
         add_header Cache-Control "public, must-revalidate";
     }
