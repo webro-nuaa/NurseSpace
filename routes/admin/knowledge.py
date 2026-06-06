@@ -127,9 +127,11 @@ def knowledge_docs():
 
     try:
         import tempfile
+        from utils.file_upload import validate_upload
+        ok, err = validate_upload(f, ('.pdf', '.docx', '.doc', '.txt'))
+        if not ok:
+            return jsonify({'success': False, 'message': err})
         ext = os.path.splitext(f.filename)[1].lower()
-        if ext not in ('.pdf', '.docx', '.doc', '.txt'):
-            return jsonify({'success': False, 'message': '仅支持 PDF/Word/TXT 文件'})
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
             f.save(tmp.name)

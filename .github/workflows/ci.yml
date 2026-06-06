@@ -39,11 +39,6 @@ jobs:
           ENVEOF
           chmod 600 .env
 
-      - name: 调高 Nginx 限流（CI 测试用）
-        run: |
-          sed -i 's/rate=60r\/m/rate=600r\/m/' nginx/nginx.conf
-          sed -i 's/burst=20/burst=200/' nginx/nginx.conf
-
       - name: 构建并启动服务
         run: |
           docker compose build --pull

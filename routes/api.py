@@ -231,7 +231,7 @@ def get_overview_statistics():
 
 @api_bp.route('/health')
 def health_check():
-    """健康检查接口 —— 验证应用与数据库连通性"""
+    """健康检查接口 —— 验证应用、数据库与 Redis 连通性"""
     db_ok = False
     try:
         db.session.execute(db.text('SELECT 1'))
@@ -239,12 +239,23 @@ def health_check():
     except Exception:
         pass
 
-    status_code = 200 if db_ok else 503
+    redis_ok = True  # 未启用则视为正常
+    if current_app.config.get('CACHE_TYPE') == 'RedisCache':
+        try:
+            from app import cache
+            cache.get('__health_check__')
+            cache.set('__health_check__', '1', timeout=5)
+        except Exception:
+            redis_ok = False
+
+    all_ok = db_ok and redis_ok
+    status_code = 200 if all_ok else 503
     return jsonify({
-        'status': 'healthy' if db_ok else 'degraded',
+        'status': 'healthy' if all_ok else 'degraded',
         'service': 'nurse_training_system',
         'version': current_app.config.get('VERSION', 'unknown'),
-        'database': 'connected' if db_ok else 'disconnected'
+        'database': 'connected' if db_ok else 'disconnected',
+        'redis': 'connected' if redis_ok else 'disconnected'
     }), status_code
 
 # 评论相关接口

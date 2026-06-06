@@ -448,6 +448,9 @@ function loadCases(page = 1) {
                                                         <button class="btn btn-sm btn-outline-primary" onclick="navToCaseDetail(${case_.id})">
                                                             <i class="fas fa-eye me-1"></i>详情
                                                         </button>
+                                                        <button class="btn btn-sm btn-outline-success" onclick="window.open('/admin/cases/${case_.id}/export','_blank')">
+                                                            <i class="fas fa-download me-1"></i>导出
+                                                        </button>
                                                         <button class="btn btn-sm btn-outline-danger" onclick="deleteCase(${case_.id})">
                                                             <i class="fas fa-trash-alt me-1"></i>删除
                                                         </button>

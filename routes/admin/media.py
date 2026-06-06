@@ -21,9 +21,11 @@ def upload_video_file():
     f = request.files['file']
     if f.filename == '':
         return jsonify({'success': False, 'message': '未选择文件'})
+    from utils.file_upload import validate_upload
+    ok, err = validate_upload(f, ('.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'), check_magic=False)
+    if not ok:
+        return jsonify({'success': False, 'message': err})
     ext = os.path.splitext(f.filename)[1].lower()
-    if ext not in ('.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'):
-        return jsonify({'success': False, 'message': f'不支持的视频格式: {ext}'})
     videos_dir = os.path.join(current_app.config.get('UPLOAD_DIR', '/app/uploads'), 'videos')
     os.makedirs(videos_dir, exist_ok=True)
     filename = f"{uuid.uuid4().hex}{ext}"

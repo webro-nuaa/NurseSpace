@@ -17,6 +17,8 @@ from utils.docx_parser import DocxParser
 from models import Case, CaseCategory, Station, StandardAnswer, LearningRecord, ExtensionVideo, ExtensionLink, db
 from sqlalchemy import desc, func
 
+from utils.docx_exporter import export_case_to_docx
+
 docx_parser = DocxParser()
 
 
@@ -213,29 +215,20 @@ def manage_cases():
     if file.filename == '':
         return jsonify({'success': False, 'message': '未选择文件'})
 
-    if not file.filename.endswith('.docx'):
-        return jsonify({'success': False, 'message': '只支持docx格式的文件'})
+    from utils.file_upload import validate_upload
+    ok, err = validate_upload(file, ('.docx',))
+    if not ok:
+        return jsonify({'success': False, 'message': err})
 
     try:
-        cases_dir = current_app.config['CASES_DIR']
-        os.makedirs(cases_dir, exist_ok=True)
-        orig_name = os.path.basename(file.filename.strip())
-        if not orig_name.lower().endswith('.docx'):
-            return jsonify({'success': False, 'message': '文件后缀必须为 .docx'})
-
-        target_path = os.path.join(cases_dir, orig_name)
-        if os.path.exists(target_path):
-            name, ext = os.path.splitext(orig_name)
-            idx = 1
-            while True:
-                candidate = f"{name}_{idx}{ext}"
-                target_path = os.path.join(cases_dir, candidate)
-                if not os.path.exists(target_path):
-                    break
-                idx += 1
-        file.save(target_path)
-
-        case = docx_parser.parse_file(target_path)
+        # 临时文件解析入库后立即删除，不保留 docx 副本
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
+        try:
+            case = docx_parser.parse_file(tmp_path)
+        finally:
+            os.unlink(tmp_path)
 
         return jsonify({
             'success': True,
@@ -591,3 +584,37 @@ def batch_import_cases_xlsx():
         db.session.rollback()
         current_app.logger.error(f"案例导入失败: {e}", exc_info=True)
         return jsonify({'success': False, 'message': '导入失败，请稍后重试'})
+
+
+@admin_bp.route('/cases/<int:case_id>/export', methods=['GET'])
+@login_or_jwt_required
+@admin_required
+def export_case(case_id):
+    """导出案例为 .docx 文件（格式与上传模板一致，可重新导入）"""
+    from models import Station
+
+    case = db.session.get(Case, case_id)
+    if not case:
+        return jsonify({'success': False, 'message': '案例不存在'}), 404
+
+    category = db.session.get(CaseCategory, case.category_id)
+    if not category:
+        return jsonify({'success': False, 'message': '类别不存在'}), 404
+
+    assessment_stations = Station.query.filter_by(
+        case_id=case_id, station_type='assessment'
+    ).order_by(Station.order_index).all()
+
+    knowledge_stations = Station.query.filter_by(
+        case_id=case_id, station_type='knowledge'
+    ).order_by(Station.order_index).all()
+
+    buf = export_case_to_docx(case, category, assessment_stations, knowledge_stations)
+
+    filename = f'【{category.name}】{case.title}.docx'
+    return send_file(
+        buf,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        as_attachment=True,
+        download_name=filename,
+    )

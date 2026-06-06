@@ -42,6 +42,10 @@ def create_app():
     # JSON 不应转义中文（提高可读性、减少带宽）
     app.json.ensure_ascii = False
 
+    # 请求追踪 ID — 每个请求自动分配，响应头返回 X-Request-Id
+    from utils.logging import init_request_id
+    init_request_id(app)
+
     # 信任 Nginx 反向代理的 X-Forwarded-* 头（HTTPS 终止）
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 

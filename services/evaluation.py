@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
+import threading
 
 from utils.ai_evaluator import AIEvaluator
 
@@ -14,7 +15,34 @@ EXCELLENT_THRESHOLD = 90
 GOOD_POINTS = 10
 EXCELLENT_POINTS = 20
 
-_eval_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='ai-eval-')
+# 有界线程池：max_workers=2，最多排队 8 个任务，超出则拒绝
+_MAX_QUEUE_SIZE = 8
+
+
+class _BoundedExecutor:
+    """包装 ThreadPoolExecutor，用 Semaphore 限制排队任务数，防止 OOM。"""
+
+    def __init__(self, max_workers: int, max_queue: int, thread_name_prefix: str = ''):
+        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix=thread_name_prefix)
+        self._semaphore = threading.BoundedSemaphore(max_workers + max_queue)
+
+    def submit(self, fn, *args, **kwargs):
+        acquired = self._semaphore.acquire(blocking=False)
+        if not acquired:
+            raise RuntimeError('AI 评分队列已满，请稍后重试')
+        try:
+            future = self._executor.submit(fn, *args, **kwargs)
+        except Exception:
+            self._semaphore.release()
+            raise
+        future.add_done_callback(lambda _: self._semaphore.release())
+        return future
+
+    def shutdown(self, wait=True):
+        self._executor.shutdown(wait=wait)
+
+
+_eval_executor = _BoundedExecutor(max_workers=2, max_queue=_MAX_QUEUE_SIZE, thread_name_prefix='ai-eval-')
 
 
 class EvaluationService:
@@ -35,10 +63,17 @@ class EvaluationService:
         return self.evaluator.evaluate_answer(question, user_answer, standard_answers)
 
     def evaluate_answer_async(self, question, user_answer, standard_answers, callback=None):
-        """异步评估（不阻塞请求），完成后调用 callback(result)"""
-        future = _eval_executor.submit(
-            self.evaluator.evaluate_answer, question, user_answer, standard_answers
-        )
+        """异步评估（不阻塞请求），完成后调用 callback(result)
+
+        队列满时抛出 RuntimeError，调用方应捕获并返回 503 给客户端。
+        """
+        try:
+            future = _eval_executor.submit(
+                self.evaluator.evaluate_answer, question, user_answer, standard_answers
+            )
+        except RuntimeError:
+            logger.warning('AI 评分队列已满，拒绝新任务')
+            raise
         if callback:
             future.add_done_callback(lambda f: callback(f.result() if not f.exception() else None))
         return future

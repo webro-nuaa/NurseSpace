@@ -45,7 +45,6 @@ class DocxParser:
                 category_id=category.id,
                 title=case_title,
                 case_guide=case_data.get('case_guide', ''),
-                file_path=file_path
             )
             db.session.add(case)
             db.session.flush()

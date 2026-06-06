@@ -395,7 +395,7 @@ sudo ufw enable
 ### 验证
 
 - [ ] `docker compose ps` 所有服务状态为 `healthy`
-- [ ] `curl http://localhost/health` 或 `curl -k https://localhost/health` 返回 `{"status":"healthy","version":"3.0.8"}`
+- [ ] `curl http://localhost/health` 返回 `{"status":"healthy","database":"connected","redis":"connected","version":"3.0.9"}`
 - [ ] `docker compose exec app flask db current` 显示 `92dc4402a201 (head)`
 - [ ] `docker compose exec app flask db check` 显示 `No new upgrade operations detected.`
 - [ ] 浏览器访问登录页正常加载
@@ -445,7 +445,7 @@ curl -k -I https://localhost/auth/login
 - [ ] 上传案例文档，验证 AI 评分功能正常
 - [ ] 创建护士账号，验证学习流程
 - [ ] 配置 HTTPS 证书（Let's Encrypt / 购买证书）
-- [ ] Nginx `server_name` 改为实际域名（`nginx/nginx.conf` 第 12 行）
+- [ ] Nginx 域名已通过 `NGINX_SERVER_NAME` 环境变量配置（`.env` 或 `docker-compose.yml`）
 
 ---
 
@@ -606,21 +606,11 @@ docker compose exec app cat /app/logs/error.log
 **手动备份**：
 
 ```bash
-# 创建备份目录
-mkdir -p /opt/nursespace/backups
+# 使用备份脚本（推荐）
+bash scripts/backup.sh
 
-# 导出数据库
-docker compose exec db mysqldump \
-  -u root -p"${MYSQL_PASSWORD}" \
-  --single-transaction \
-  --routines \
-  --triggers \
-  nurse_training_system \
-  | gzip > /opt/nursespace/backups/db_$(date +%Y%m%d_%H%M%S).sql.gz
-
-# 备份上传文件
-sudo tar czf /opt/nursespace/backups/uploads_$(date +%Y%m%d).tar.gz \
-  -C /var/lib/docker/volumes/nursespace_app_uploads/_data .
+# 或备份到指定目录
+bash scripts/backup.sh /mnt/backups/nursespace
 ```
 
 **自动备份（crontab）**：
@@ -629,20 +619,35 @@ sudo tar czf /opt/nursespace/backups/uploads_$(date +%Y%m%d).tar.gz \
 # 编辑定时任务
 crontab -e
 
-# 添加以下行：
-# 每天凌晨 2 点备份数据库
-0 2 * * * cd /opt/nursespace && docker compose exec -T db mysqldump -u root -p"YOUR_PASSWORD" --single-transaction nurse_training_system | gzip > /opt/nursespace/backups/db_$(date +\%Y\%m\%d).sql.gz
-
-# 每天凌晨 3 点清理 30 天前的备份
-0 3 * * * find /opt/nursespace/backups -name "db_*.sql.gz" -mtime +30 -delete
+# 每天凌晨 2 点执行备份脚本
+0 2 * * * cd /opt/nursespace && bash scripts/backup.sh /opt/nursespace/backups
 ```
 
 **恢复数据库**：
 
 ```bash
-# 解压并恢复
-gunzip -c /opt/nursespace/backups/db_20260507_020000.sql.gz | \
-  docker compose exec -T db mysql -u root -p"${MYSQL_PASSWORD}" nurse_training_system
+# 使用备份脚本恢复
+bash scripts/backup.sh --restore /opt/nursespace/backups/backup_20260507_020000.sql.gz
+
+# 或手动恢复
+gunzip -c /opt/nursespace/backups/backup_20260507_020000.sql.gz | \
+  docker compose exec -T db mysql -u root -p"${MYSQL_ROOT_PASSWORD}" nurse_training_system
+```
+
+### 迁移回滚
+
+```bash
+# 查看迁移历史
+docker compose exec app flask db history
+
+# 回滚最近一个迁移版本
+docker compose exec app flask db downgrade -1
+
+# 回滚到指定版本
+docker compose exec app flask db downgrade 91dc4402a200
+
+# 回滚后确认状态
+docker compose exec app flask db current
 ```
 
 ### 更新部署
@@ -749,9 +754,10 @@ docker compose logs app
 
 ### 5. 静态资源 404
 
-- `/static/` 由 Nginx 反向代理到 Flask 应用
-- 如果图标/CSS 加载失败，检查镜像内 `static/` 目录是否完整：`docker compose exec app ls -la /app/static`
-- 重启可修复：`docker compose restart app nginx`
+- `/static/` 由 Nginx 直接从文件系统 serve（`/usr/share/nginx/html/static/`），不经过 Flask
+- 如果图标/CSS 加载失败，检查 static 卷挂载：`docker compose exec nginx ls -la /usr/share/nginx/html/static/`
+- 确认 `docker-compose.yml` 中 nginx 的 static 卷挂载未注释
+- 重启可修复：`docker compose restart nginx`
 
 ### 6. 语音输入不工作
 
