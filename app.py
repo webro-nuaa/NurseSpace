@@ -102,8 +102,12 @@ def create_app():
 
     @login_manager.unauthorized_handler
     def unauthorized():
-        if request.accept_mimetypes.accept_json and \
-           not request.accept_mimetypes.accept_html:
+        is_api = (
+            request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            or (request.accept_mimetypes.accept_json
+                and not request.accept_mimetypes.accept_html)
+        )
+        if is_api:
             return jsonify({'success': False, 'message': '请先登录'}), 401
         return redirect(url_for('auth.login'))
 

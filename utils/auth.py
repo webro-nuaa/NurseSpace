@@ -42,8 +42,14 @@ def login_or_jwt_required(f):
         if current_user.is_authenticated:
             return f(*args, **kwargs)
 
-        if request.accept_mimetypes.accept_json and \
-           not request.accept_mimetypes.accept_html:
+        # 判断是否为 AJAX/API 请求（返回 401 JSON，避免 302 重定向）
+        is_api = (
+            request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            or request.headers.get('Authorization', '').startswith('Bearer ')
+            or (request.accept_mimetypes.accept_json
+                and not request.accept_mimetypes.accept_html)
+        )
+        if is_api:
             return jsonify({'success': False, 'message': '请先登录'}), 401
 
         return redirect(url_for('auth.login'))
