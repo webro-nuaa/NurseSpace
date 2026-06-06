@@ -36,7 +36,7 @@ class Config:
 
     # JWT
     JWT_SECRET_KEY = _require_env('JWT_SECRET_KEY')
-    JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES', 3600))
+    JWT_ACCESS_TOKEN_EXPIRES = int(os.environ.get('JWT_ACCESS_TOKEN_EXPIRES', 86400))  # 24h
 
     # AI
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')

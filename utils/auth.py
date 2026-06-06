@@ -38,6 +38,10 @@ def login_or_jwt_required(f):
                     login_user(user, remember=False)
                     return f(*args, **kwargs)
 
+        # JWT 过期/无效时回退到 session cookie（默认 31 天有效期）
+        if current_user.is_authenticated:
+            return f(*args, **kwargs)
+
         if request.accept_mimetypes.accept_json and \
            not request.accept_mimetypes.accept_html:
             return jsonify({'success': False, 'message': '请先登录'}), 401
