@@ -413,6 +413,9 @@ function loadCases(page = 1) {
                                 <div class="table-responsive">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                       <div>
+                                        <button class="btn btn-outline-success btn-sm" onclick="batchExportCases()">
+                                          <i class="fas fa-download me-1"></i>导出选中
+                                        </button>
                                         <button class="btn btn-outline-danger btn-sm" onclick="batchDeleteCases()">
                                           <i class="fas fa-trash-alt me-1"></i>批量删除
                                         </button>
@@ -447,9 +450,6 @@ function loadCases(page = 1) {
                                                         <div class="btn-action-group">
                                                         <button class="btn btn-sm btn-outline-primary" onclick="navToCaseDetail(${case_.id})">
                                                             <i class="fas fa-eye me-1"></i>详情
-                                                        </button>
-                                                        <button class="btn btn-sm btn-outline-success" onclick="window.open('/admin/cases/${case_.id}/export','_blank')">
-                                                            <i class="fas fa-download me-1"></i>导出
                                                         </button>
                                                         <button class="btn btn-sm btn-outline-danger" onclick="deleteCase(${case_.id})">
                                                             <i class="fas fa-trash-alt me-1"></i>删除
@@ -712,6 +712,31 @@ function submitUploadCase(){
 // 切换全选
 function toggleCheckAll(cb){
   $('.case-check').prop('checked', cb.checked);
+}
+
+// 批量导出
+function batchExportCases(){
+  const ids = $('.case-check:checked').map((_,el)=>parseInt(el.value)).get();
+  if(ids.length===0){ showAlert('请先勾选要导出的案例', 'error'); return; }
+  if (ids.length === 1) {
+    window.open(`/admin/cases/${ids[0]}/export`, '_blank');
+    return;
+  }
+  // 多选：POST 下载 zip
+  fetch('/admin/cases/export-batch', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({case_ids: ids})
+  }).then(r => {
+    if (!r.ok) { showAlert('导出失败', 'error'); return; }
+    return r.blob();
+  }).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `案例批量导出_${new Date().toISOString().slice(0,10)}.zip`;
+    a.click(); URL.revokeObjectURL(url);
+    showAlert(`已导出 ${ids.length} 个案例`, 'success');
+  }).catch(() => showAlert('导出失败', 'error'));
 }
 
 // 批量删除

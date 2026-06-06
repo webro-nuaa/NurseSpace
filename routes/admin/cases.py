@@ -618,3 +618,43 @@ def export_case(case_id):
         as_attachment=True,
         download_name=filename,
     )
+
+
+@admin_bp.route('/cases/export-batch', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def export_cases_batch():
+    """批量导出案例为 .zip 文件"""
+    from models import Station
+
+    data = request.get_json() or {}
+    case_ids = data.get('case_ids', [])
+    if not case_ids:
+        return jsonify({'success': False, 'message': '请选择要导出的案例'}), 400
+
+    cases = Case.query.filter(Case.id.in_(case_ids)).all()
+    if not cases:
+        return jsonify({'success': False, 'message': '未找到所选案例'}), 404
+
+    zip_buf = BytesIO()
+    with zipfile.ZipFile(zip_buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for case in cases:
+            category = db.session.get(CaseCategory, case.category_id)
+            assessment = Station.query.filter_by(
+                case_id=case.id, station_type='assessment'
+            ).order_by(Station.order_index).all()
+            knowledge = Station.query.filter_by(
+                case_id=case.id, station_type='knowledge'
+            ).order_by(Station.order_index).all()
+
+            buf = export_case_to_docx(case, category, assessment, knowledge)
+            filename = f'【{category.name}】{case.title}.docx'
+            zf.writestr(filename, buf.read())
+
+    zip_buf.seek(0)
+    return send_file(
+        zip_buf,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'案例批量导出_{datetime.now().strftime("%Y%m%d")}.zip',
+    )
