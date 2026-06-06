@@ -318,96 +318,119 @@
     function loadDashboard() {
         setActiveNav('首页概览');
 
-        // 检查知情同意状态
         $.get('/nurse/dashboard', function(res) {
             if (res.success && res.data.user_info && !res.data.user_info.consent_accepted) {
                 showConsentModal();
             }
+
+            var d = res.data || {};
+            var u = d.user_info || {};
+            var s = d.statistics || {};
+            var progs = d.progress_data || [];
+            var recent = d.recent_activities || [];
+
+            // 分类进度条
+            var progressRows = '';
+            if (progs.length > 0) {
+                progressRows = progs.map(function(p) {
+                    var pct = p.progress || 0;
+                    var color = pct >= 80 ? '#11998e' : pct >= 40 ? '#f0ad4e' : '#e55353';
+                    return '<div class="d-flex align-items-center mb-2">' +
+                        '<span class="me-3" style="min-width:72px;font-size:.88rem">' + sanitizeHTML(p.category) + '</span>' +
+                        '<div class="flex-grow-1 me-2" style="height:7px;background:#e9ecef;border-radius:4px;overflow:hidden">' +
+                        '<div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:4px;transition:width .8s ease"></div></div>' +
+                        '<span class="text-muted" style="font-size:.78rem;min-width:40px;text-align:right">' + p.completed + '/' + p.total + '</span></div>';
+                }).join('');
+            } else {
+                progressRows = '<p class="text-muted text-center py-3 mb-0 small">还没有学习记录～</p>';
+            }
+
+            // 最近活动
+            var recentHtml = '';
+            if (recent.length > 0) {
+                recentHtml = recent.map(function(r) {
+                    var sc = r.score >= 80 ? 'text-success' : r.score >= 60 ? 'text-warning' : 'text-danger';
+                    var t = '';
+                    try { t = moment(r.completed_at).fromNow(); } catch(e) { t = r.completed_at ? r.completed_at.slice(0,16) : ''; }
+                    return '<div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">' +
+                        '<div><span class="fw-medium small">' + sanitizeHTML(r.case_title) + '</span>' +
+                        '<span class="text-muted small ms-2">' + sanitizeHTML(r.station_name || '') + '</span></div>' +
+                        '<div><span class="fw-bold ' + sc + ' small">' + r.score + '分</span>' +
+                        '<span class="text-muted small ms-2">' + t + '</span></div></div>';
+                }).join('');
+            } else {
+                recentHtml = '<p class="text-muted text-center py-3 mb-0 small">暂无活动记录</p>';
+            }
+
+            // 统计卡片
+            var statCards = [
+                {icon:'fa-book-medical',label:'案例总数',val:s.total_cases||0,color:'#667eea'},
+                {icon:'fa-check-circle',label:'已完成',val:s.completed_stations||0,color:'#11998e'},
+                {icon:'fa-exclamation-triangle',label:'待巩固错题',val:s.wrong_questions_count||0,color:'#f0ad4e'},
+                {icon:'fa-file-alt',label:'参加考试',val:s.exam_count||0,color:'#e55353'}
+            ].map(function(c){
+                return '<div class="col-6 col-md-3 mb-3">' +
+                    '<div class="stat-card p-3 rounded-3" style="background:#fff;border:1px solid #eef0f4;box-shadow:0 1px 6px rgba(0,0,0,.04)">' +
+                    '<div class="d-flex align-items-center mb-2"><div class="rounded-circle d-flex align-items-center justify-content-center me-2" style="width:32px;height:32px;background:'+c.color+'15;color:'+c.color+'"><i class="fas '+c.icon+' fa-sm"></i></div>' +
+                    '<span class="text-muted" style="font-size:.82rem">'+c.label+'</span></div>' +
+                    '<div class="fw-bold" style="font-size:1.4rem;line-height:1">'+c.val+'</div></div></div>';
+            }).join('');
+
+            var html =
+            '<div class="fade-in">' +
+            // 欢迎横幅
+            '<div class="rounded-4 p-4 mb-3" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff">' +
+            '<div class="row align-items-center">' +
+            '<div class="col-md-8">' +
+            '<h4 class="mb-1 fw-bold">' + getGreeting() + '，' + sanitizeHTML(u.real_name || '同学') + '</h4>' +
+            '<p class="mb-0 opacity-80" style="font-size:.92rem">' + sanitizeHTML(u.department || '') + (u.department?'  ·  ':'') + 'NurseSpace 与你一同成长</p>' +
+            '</div>' +
+            '<div class="col-md-4 text-md-end mt-2 mt-md-0">' +
+            '<span class="badge rounded-pill px-3 py-2" style="background:rgba(255,255,255,.2);font-size:.85rem"><i class="fas fa-coins me-1"></i>' + (u.points||0) + ' 积分</span>' +
+            '</div></div>' +
+            // 数据卡片
+            '<div class="row mt-3">' + statCards + '</div>' +
+            '</div>' +
+            // 进度 + 最近活动
+            '<div class="row g-3 mb-3">' +
+            '<div class="col-lg-7">' +
+            '<div class="card border-0 shadow-sm rounded-4 h-100"><div class="card-body p-3 p-md-4">' +
+            '<h5 class="card-title mb-3" style="font-size:1rem"><i class="fas fa-chart-bar me-2" style="color:#667eea"></i>分类学习进度</h5>' +
+            progressRows + '</div></div></div>' +
+            '<div class="col-lg-5">' +
+            '<div class="card border-0 shadow-sm rounded-4 h-100"><div class="card-body p-3 p-md-4">' +
+            '<h5 class="card-title mb-3" style="font-size:1rem"><i class="fas fa-clock me-2" style="color:#11998e"></i>最近学习</h5>' +
+            recentHtml + '</div></div></div></div>' +
+            // 快捷入口
+            '<div class="row g-2">' +
+            makeQuickLink('开始学习','浏览案例题库','cases','#667eea','fa-play-circle','#eef2ff','#d4dafc',s.total_cases||0,'个案例') +
+            makeQuickLink('错题巩固','待复习','wrongs','#f0ad4e','fa-redo-alt','#fff8ee','#f5d9a8',s.wrong_questions_count||0,'道') +
+            makeQuickLink('薄弱分析','AI 诊断报告','weakness','#3f5efb','fa-chart-line','#f0f9ff','#b8daff') +
+            makeQuickLink('在线考试','参加考试','exams','#e55353','fa-clipboard-check','#fff5f5','#f5c6cb',s.exam_count||0,'次') +
+            '</div></div>';
+
+            $('#main-content').html(html);
+        }).fail(function() {
+            $('#main-content').html('<div class="text-center py-5 text-muted"><i class="fas fa-exclamation-circle fa-2x mb-2 d-block"></i>加载失败，请刷新重试</div>');
         });
+    }
 
-        const html = `
-            <section class="hero-section text-white mb-4">
-                <div class="row align-items-center">
-                    <div class="col-lg-7">
-                        <h1 class="hero-title mb-3">智慧化护理实践教学案例库平台(NurseSpace)</h1>
-                        <p class="hero-subtitle mb-4">以真实临床案例为核心，结合大语言模型评估与个性化学习路径，帮助护理人员快速提升临床思维与实操能力。</p>
-                        <div class="d-flex flex-wrap gap-2">
-                            <a class="btn btn-light btn-lg" href="/nurse?tab=cases"><i class="fas fa-play me-2"></i>开始学习</a>
-                            <a class="btn btn-outline-light btn-lg" href="/nurse?tab=weakness"><i class="fas fa-magnifying-glass-chart me-2"></i>薄弱点分析</a>
-                        </div>
-                        <div class="mt-3 small opacity-75">
-                            <i class="fas fa-shield-alt me-1"></i>数据私有化 · <i class="fas fa-lock ms-2 me-1"></i>安全合规 · <i class="fas fa-robot ms-2 me-1"></i>AI赋能
-                        </div>
-                    </div>
-                    <div class="col-lg-5 d-none d-lg-block text-center">
-                        <i class="fas fa-user-nurse fa-6x opacity-50"></i>
-                    </div>
-                </div>
-            </section>
+    function getGreeting() {
+        var h = new Date().getHours();
+        if (h < 6) return '夜深了';
+        if (h < 9) return '早上好';
+        if (h < 12) return '上午好';
+        if (h < 14) return '中午好';
+        if (h < 18) return '下午好';
+        return '晚上好';
+    }
 
-            <section class="mb-4">
-                <h3 class="section-title"><i class="fas fa-star me-2"></i>核心价值</h3>
-                <div class="row g-3">
-                    <div class="col-md-3">
-                        <div class="feature-card h-100">
-                            <div class="feature-icon bg-gradient-primary"><i class="fas fa-book-medical"></i></div>
-                            <h6>案例驱动</h6>
-                            <p class="text-muted small mb-0">覆盖内、外、妇、儿等多学科真实情景，贴近临床。</p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="feature-card h-100">
-                            <div class="feature-icon bg-gradient-success"><i class="fas fa-wand-magic-sparkles"></i></div>
-                            <h6>AI评估反馈</h6>
-                            <p class="text-muted small mb-0">自动评分、指出遗漏要点并提供改进建议。</p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="feature-card h-100">
-                            <div class="feature-icon bg-gradient-warning"><i class="fas fa-rotate"></i></div>
-                            <h6>错题闭环</h6>
-                            <p class="text-muted small mb-0">错题集中管理，一键重做，形成学习闭环。</p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="feature-card h-100">
-                            <div class="feature-icon bg-gradient-danger"><i class="fas fa-chart-line"></i></div>
-                            <h6>个性化路径</h6>
-                            <p class="text-muted small mb-0">依据薄弱点生成个性化学习计划，效果更可度量。</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section>
-                <h3 class="section-title"><i class="fas fa-route me-2"></i>如何使用</h3>
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <div class="step-card">
-                            <span class="step-index">1</span>
-                            <h6>选择案例模块</h6>
-                            <p class="text-muted small mb-0">进入案例学习，选择感兴趣的学科与案例。</p>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="step-card">
-                            <span class="step-index">2</span>
-                            <h6>作答并获取AI反馈</h6>
-                            <p class="text-muted small mb-0">提交答案后即时获得评分、要点覆盖与改进建议。</p>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="step-card">
-                            <span class="step-index">3</span>
-                            <h6>查看薄弱点并制定计划</h6>
-                            <p class="text-muted small mb-0">在薄弱点分析中查看个性化建议，持续复盘错题。</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-        `;
-
-        $('#main-content').html(html);
+    function makeQuickLink(title, sub, tab, color, icon, bg, border, count, unit) {
+        var extra = count !== undefined ? '<span class="badge rounded-pill ms-1" style="background:'+color+'15;color:'+color+';font-weight:500">'+count+' '+(unit||'')+'</span>' : '';
+        return '<div class="col-6 col-md-3"><a href="/nurse?tab='+tab+'" class="quick-link-card rounded-4 p-3 d-block text-decoration-none" style="background:'+bg+';border:1px solid '+border+'">' +
+            '<div style="font-size:1.4rem;color:'+color+'" class="mb-1"><i class="fas '+icon+'"></i></div>' +
+            '<div class="fw-medium small" style="color:#333">'+title+' '+extra+'</div>' +
+            '<div class="small text-muted">'+sub+'</div></a></div>';
     }
 
     function loadKnowledgeQA() {
