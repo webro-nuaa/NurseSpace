@@ -146,7 +146,7 @@ function loadCases(page = 1, categoryId = null, categoryName = null) {
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-start mb-3">
                                         <h5 class="card-title mb-0">${sanitizeHTML(case_.title)}</h5>
-                                        <span class="badge bg-primary">${sanitizeHTML(case_.category)}</span>
+                                        <span class="badge bg-primary">${sanitizeHTML(case_.category)}</span>${case_.is_knowledge_only ? '<span class="badge bg-info ms-1" title="仅含知识问答，无考核站点">知识型</span>' : ''}
                                     </div>
                                     <p class="card-text">
                                         <small class="text-muted">

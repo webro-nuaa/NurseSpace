@@ -21,6 +21,7 @@ jobs:
           JWT_SECRET_KEY=ci-test-jwt-key-not-for-production
           MYSQL_HOST=db
           MYSQL_PORT=3306
+          MYSQL_ROOT_PASSWORD=CiTest2024
           MYSQL_USER=nursespace_app
           MYSQL_PASSWORD=CiTest2024
           MYSQL_DATABASE=nurse_training_system
@@ -38,6 +39,13 @@ jobs:
           GUNICORN_THREADS=4
           ENVEOF
           chmod 600 .env
+
+      - name: 生成测试证书（CI 自签，正式环境由 nginx/certs 提供）
+        run: |
+          mkdir -p nginx/certs
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout nginx/certs/server.key -out nginx/certs/server.crt \
+            -subj "/CN=localhost"
 
       - name: 构建并启动服务
         run: |
@@ -58,9 +66,7 @@ jobs:
           done
 
       - name: 运行全功能测试
-        run: |
-          chmod +x test_system.sh
-          bash test_system.sh
+        run: bash scripts/test_system.sh
 
       - name: 收集失败日志
         if: failure()

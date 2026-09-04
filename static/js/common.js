@@ -532,3 +532,35 @@ function resetVoiceButtonState(btnEl) {
     $(btnEl).find('i').removeClass('fa-beat fa-spin').addClass('fa-microphone');
     $(btnEl).find('span').text('语音输入');
 }
+
+// ============================================================================
+// 评论相关工具（answer_view / knowledge_answer_view 共用）
+// ============================================================================
+
+function getCommentTypeLabel(type) {
+  const labels = {
+    'comment': '💬 评论',
+    'question': '❓ 问题',
+    'answer': '💡 回答',
+    'suggestion': '💭 建议'
+  };
+  return labels[type] || '💬 评论';
+}
+
+function formatTime(timeStr) {
+  const date = new Date(timeStr);
+  const now = new Date();
+  const diff = now - date;
+
+  if (diff < 60000) { // 1分钟内
+    return '刚刚';
+  } else if (diff < 3600000) { // 1小时内
+    return `${Math.floor(diff / 60000)}分钟前`;
+  } else if (diff < 86400000) { // 1天内
+    return `${Math.floor(diff / 3600000)}小时前`;
+  } else if (diff < 2592000000) { // 30天内
+    return `${Math.floor(diff / 86400000)}天前`;
+  } else {
+    return date.toLocaleDateString();
+  }
+}

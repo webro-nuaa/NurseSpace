@@ -183,7 +183,7 @@ class TestStationCRUD:
         resp = client.delete(
             f'/admin/cases/{sample_case.id}/stations/{sid}',
             headers={'Authorization': f'Bearer {admin_token}'})
-        assert resp.get_json()['success']
+        assert resp.get_json()['success'], resp.get_json()
 
 
 class TestVideoLinkCRUD:

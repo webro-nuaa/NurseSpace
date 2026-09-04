@@ -138,7 +138,7 @@ class TestToggleStatus:
         resp = client.post(f'/auth/users/{uid}/toggle-status',
                            headers={'Authorization': f'Bearer {admin_token}'})
         data = resp.get_json()
-        assert data['success']
+        assert data['success'], data
         assert data['status'] == 'disabled'
 
     def test_cannot_disable_self(self, client, admin_token, admin_user):

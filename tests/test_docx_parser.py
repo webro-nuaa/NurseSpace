@@ -272,6 +272,140 @@ class TestBatchParsing:
             os.rmdir(d)
 
 
+class TestMarkerTokenization:
+    """标记分词语义：标记出现在段落内任意位置均可识别（HTML 式解析）。"""
+
+    def test_multiple_item_pairs_in_one_paragraph(self, app):
+        """旧实现把整段并成一条带标记垃圾的答案；分词后应为多条干净答案。"""
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '【站点】', '站点A', '【站点结尾】',
+            '【问题】', '问题A？', '【问题结尾】',
+            '【回答】',
+            '【项】 要点一 【项结尾】\n【项】 要点二 【项结尾】',
+            '【回答结尾】',
+        ]))
+        assert result['stations'][0]['answers'] == ['要点一', '要点二']
+
+    def test_marker_glued_to_content(self, app):
+        """内容首尾粘着标记也能正确开合，标记字符不混入答案。"""
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '【站点】', '站点A', '【站点结尾】',
+            '【问题】', '问题A？', '【问题结尾】',
+            '【回答】', '【项】', '答案要点【项结尾】', '【回答结尾】',
+        ]))
+        assert result['stations'][0]['answers'] == ['答案要点']
+
+    def test_case_guide_inline(self, app):
+        """指引标记与内容同段也能完整提取。"""
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(
+            _make_doc(['【案例指引】患者信息一段。【案例指引结尾】']))
+        assert result['case_guide'] == '患者信息一段。'
+
+    def test_inline_knowledge_pairs(self, app):
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '【知识拓展】',
+            '【问题】拓展问题？【问题结尾】',
+            '【回答】', '【项】 知识点 【项结尾】', '【回答结尾】',
+            '【知识拓展结尾】',
+        ]))
+        ek = result['extended_knowledge'][0]
+        assert ek['question'] == '拓展问题？'
+        assert ek['items'] == ['知识点']
+
+
+class TestAttachmentFaultTolerance:
+    """容错归属：站点块外紧跟的问答/考核任务归属最近的站点。"""
+
+    def test_qa_outside_station_attaches(self, app):
+        """肿瘤模块文件的实际写法：站点名后立即闭合，问答写在块外。"""
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '【站点】', '叙述放射性皮炎护理措施', '【站点结尾】',
+            '【问题】', '叙述放射性皮炎护理措施', '【问题结尾】',
+            '【回答】', '【项】', '放疗期间着棉质宽松衣服。', '【项结尾】',
+            '【回答结尾】',
+        ]))
+        s = result['stations'][0]
+        assert s['name'] == '叙述放射性皮炎护理措施'
+        assert s['question'] == '叙述放射性皮炎护理措施'
+        assert s['answers'] == ['放疗期间着棉质宽松衣服。']
+
+    def test_task_outside_station_attaches(self, app):
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '【站点】', '护理评估', '【站点结尾】',
+            '【考核任务】', '采集病史。', '【考核任务结尾】',
+            '【问题】', '评估要点？', '【问题结尾】',
+        ]))
+        s = result['stations'][0]
+        assert s['assessment_task'] == '采集病史。'
+        assert s['question'] == '评估要点？'
+
+    def test_attached_question_never_clobbers(self, app):
+        """块内已设置的问题不被块外游离问答覆盖（先到先得）。"""
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '【站点】', '站点A',
+            '【问题】', '块内问题？', '【问题结尾】',
+            '【回答】', '【项】', '块内答案', '【项结尾】', '【回答结尾】',
+            '【站点结尾】',
+            '【问题】', '游离问题？', '【问题结尾】',
+        ]))
+        assert result['stations'][0]['question'] == '块内问题？'
+
+    def test_multi_station_attachment_targets_nearest(self, app):
+        """站点外问答归属最近的站点，互不串扰。"""
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '【站点】', '站点一', '【站点结尾】',
+            '【问题】', '问题一？', '【问题结尾】',
+            '【站点】', '站点二', '【站点结尾】',
+            '【问题】', '问题二？', '【问题结尾】',
+        ]))
+        assert [s['question'] for s in result['stations']] == ['问题一？', '问题二？']
+
+    def test_knowledge_stops_station_attachment(self, app):
+        """知识拓开启后站点不再归属；其后游离问答被丢弃而非污染。"""
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '【站点】', '站点A', '【站点结尾】',
+            '【知识拓展】',
+            '【问题】', '知识问题？', '【问题结尾】',
+            '【回答】', '知识回答。', '【回答结尾】',
+            '【知识拓展结尾】',
+            '【问题】', '游离问题？', '【问题结尾】',
+        ]))
+        assert result['stations'][0]['question'] == ''
+        assert len(result['extended_knowledge']) == 1
+        assert result['extended_knowledge'][0]['question'] == '知识问题？'
+
+    def test_knowledge_not_duplicated_at_eof(self, app):
+        """知识拓展结尾后 EOF 不应重复收录同一问答（旧实现缺陷）。"""
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '【知识拓展】',
+            '【问题】', '知识问题？', '【问题结尾】',
+            '【回答】', '知识回答。', '【回答结尾】',
+            '【知识拓展结尾】',
+        ]))
+        assert len(result['extended_knowledge']) == 1
+
+    def test_dropped_text_collected_after_structure(self, app):
+        """结构出现后的游离文本被计数收集；首个标记前的标题区不计。"""
+        from utils.docx_parser import DocxParser
+        result = DocxParser()._parse_document_content(_make_doc([
+            '文档标题行（首标记前，不计）',
+            '【案例指引】', '指引内容。', '【案例指引结尾】',
+            '游离残片',
+        ]))
+        assert result['dropped']['count'] == 1
+        assert result['dropped']['samples'] == ['游离残片']
+
+
 # ---- helpers ----
 
 def _make_doc(paragraphs):

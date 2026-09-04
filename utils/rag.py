@@ -7,6 +7,7 @@ RAG 知识库模块
 
 import os
 import json
+import time
 import logging
 from typing import Optional
 from datetime import datetime
@@ -27,7 +28,37 @@ class KnowledgeStore:
             import chromadb
             os.makedirs(self.persist_dir, exist_ok=True)
             self._client = chromadb.PersistentClient(path=self.persist_dir)
+            self._enable_wal()
         return self._client
+
+    def _enable_wal(self):
+        """启用 SQLite WAL 模式，避免多 worker 并发时写锁阻塞读操作"""
+        try:
+            import sqlite3
+            db_path = os.path.join(self.persist_dir, 'chroma.sqlite3')
+            conn = sqlite3.connect(db_path)
+            conn.execute('PRAGMA journal_mode=WAL')
+            conn.close()
+            logger.debug("ChromaDB SQLite WAL 模式已启用")
+        except Exception as e:
+            logger.warning("启用 ChromaDB WAL 模式失败: %s", e)
+
+    def _retry_on_lock(self, fn, *args, **kwargs):
+        """SQLite 写锁冲突时重试，最多 3 次，间隔递增"""
+        max_retries = 3
+        last_exc = None
+        for attempt in range(max_retries):
+            try:
+                return fn(*args, **kwargs)
+            except Exception as e:
+                last_exc = e
+                if 'database is locked' not in str(e).lower():
+                    raise
+                if attempt < max_retries - 1:
+                    wait = 0.1 * (attempt + 1)
+                    logger.debug("ChromaDB 锁冲突，%.1fs 后重试 (%d/%d)", wait, attempt + 1, max_retries)
+                    time.sleep(wait)
+        raise last_exc
 
     def _get_collection(self):
         if self._admin_docs is None:
@@ -39,14 +70,18 @@ class KnowledgeStore:
         return self._admin_docs
 
     def add_doc(self, doc_id, text, metadata=None):
-        col = self._get_collection()
-        col.add(documents=[text], metadatas=[metadata or {}], ids=[doc_id])
+        def _add():
+            col = self._get_collection()
+            col.add(documents=[text], metadatas=[metadata or {}], ids=[doc_id])
+        self._retry_on_lock(_add)
 
     def search(self, query, top_k=5):
-        col = self._get_collection()
-        if col.count() == 0:
-            return []
-        results = col.query(query_texts=[query], n_results=min(top_k, col.count()))
+        def _search():
+            col = self._get_collection()
+            if col.count() == 0:
+                return []
+            return col.query(query_texts=[query], n_results=min(top_k, col.count()))
+        results = self._retry_on_lock(_search)
         docs = results.get('documents', [[]])[0]
         metas = results.get('metadatas', [[]])[0]
         ids = results.get('ids', [[]])[0]
@@ -84,8 +119,10 @@ class KnowledgeStore:
 
     def delete_doc(self, doc_id):
         """删除指定文档"""
-        try:
+        def _del():
             self._get_collection().delete(ids=[doc_id])
+        try:
+            self._retry_on_lock(_del)
             return True
         except Exception:
             return False

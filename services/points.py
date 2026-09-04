@@ -2,6 +2,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+MAX_REASON_LENGTH = 300
+
+
+def _fit_reason(reason):
+    if reason is None:
+        return None
+    return reason[:MAX_REASON_LENGTH]
+
 
 class PointService:
     """积分管理服务"""
@@ -22,7 +30,7 @@ class PointService:
         record = PointRecord(
             user_id=user_id,
             points=points,
-            reason=f"{reason_prefix} (得分: {score})",
+            reason=_fit_reason(f"{reason_prefix} (得分: {score})"),
             related_id=related_id,
             related_type=related_type
         )
@@ -37,7 +45,7 @@ class PointService:
         point_record = PointRecord(
             user_id=user_id,
             points=5,
-            reason=f'参加考试：{exam_title}',
+            reason=_fit_reason(f'参加考试：{exam_title}'),
             related_id=exam_id,
             related_type='exam'
         )

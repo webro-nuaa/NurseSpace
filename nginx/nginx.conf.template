@@ -4,7 +4,9 @@ upstream flask_app {
 
 # 限流区域定义
 limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
-limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
+# api 限流区已移除：/admin/、/nurse/ 为已认证面板，一次导航会并发加载多个
+# 接口，60r/m 会把正常操作误杀成 503。滥用防护由 login/upload 限流、
+# Flask-Limiter（登录/敏感接口）与 JWT 鉴权承担。
 limit_req_zone $binary_remote_addr zone=upload:10m rate=10r/m;
 
 # ============================================================
@@ -41,7 +43,7 @@ server {
     http2 on;
     server_name ${NGINX_SERVER_NAME};
 
-    # SSL 证书（Let's Encrypt）
+    # SSL 证书（当前为自签名证书；正式对外请切换 Let's Encrypt，见 setup-letsencrypt.sh）
     ssl_certificate     /etc/nginx/certs/server.crt;
     ssl_certificate_key /etc/nginx/certs/server.key;
 
@@ -54,23 +56,33 @@ server {
     client_max_body_size 128m;
     client_body_timeout 120s;
 
-    # 安全头
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob:; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self';" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # 安全头（location 内自带 add_header 时需重复 include，见 snippets/security-headers.conf）
+    include /etc/nginx/snippets/security-headers.conf;
 
     location /static/ {
         alias /usr/share/nginx/html/static/;
         expires 1h;
         add_header Cache-Control "public, must-revalidate";
+        include /etc/nginx/snippets/security-headers.conf;
     }
 
+    # 静态资源先经应用层鉴权（auth_request 子请求校验登录态），未登录返回 401
     location /uploads/ {
+        auth_request /_auth_check;
         alias /usr/share/nginx/html/uploads/;
         expires 1d;
         add_header Cache-Control "public";
+        include /etc/nginx/snippets/security-headers.conf;
+    }
+
+    # 鉴权子请求：转发原始 URI 给应用校验（2xx 放行，401/403 拒绝）
+    location = /_auth_check {
+        internal;
+        proxy_pass http://flask_app/api/media/auth;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI $request_uri;
+        client_max_body_size 0;
     }
 
     location /auth/login {
@@ -86,7 +98,6 @@ server {
     }
 
     location /admin/ {
-        limit_req zone=api burst=20 nodelay;
         proxy_pass http://flask_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -102,7 +113,6 @@ server {
     }
 
     location /nurse/ {
-        limit_req zone=api burst=20 nodelay;
         proxy_pass http://flask_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

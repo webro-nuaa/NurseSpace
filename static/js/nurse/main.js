@@ -1,0 +1,389 @@
+// 护士端 — 主页面 Tab 壳：各页签（案例/学习/考试/错题/薄弱点/积分/知识问答）的渲染与加载（由 templates/nurse/index.html 外置）
+    $(document).ready(function() {
+        checkLogin();
+
+        // Save original URL params before replaceState overwrites location.search
+        const qs = new URLSearchParams(location.search);
+        const tab = qs.get('tab');
+        const categoryId = qs.get('category_id');
+        const caseId = qs.get('case_id');
+
+        // Only set up guard history on initial page entry; skip when
+        // navigating back from standalone pages so history stays intact
+        var _isInitialEntry = !sessionStorage.getItem('_spa_loaded');
+        if (_isInitialEntry) {
+            sessionStorage.setItem('_spa_loaded', '1');
+
+            // Build dashboard URL for guard state
+            var _guardUrl = (function() {
+                var u = new URL(window.location);
+                u.searchParams.set('tab', 'dashboard');
+                u.searchParams.delete('category_id');
+                u.searchParams.delete('case_id');
+                return u.toString();
+            })();
+
+            // Replace initial page load with exit guard at dashboard
+            window.history.replaceState({_spaGuard: true}, '', _guardUrl);
+
+            // For deep links: push dashboard first, so back returns there before exit confirm
+            if (tab && tab !== 'dashboard') {
+                window.history.pushState({}, '', _guardUrl);
+            }
+        }
+
+        switch(tab){
+            case 'cases':
+                if (caseId) {
+                    navigateTo('cases');
+                    viewCase(parseInt(caseId));
+                } else if (categoryId) {
+                    navigateTo('cases');
+                    loadCases(1, parseInt(categoryId));
+                } else {
+                    navigateTo('cases');
+                }
+                break;
+            case 'wrongs': navigateTo('wrongs'); break;
+            case 'weakness': navigateTo('weakness'); break;
+            case 'exams': navigateTo('exams'); break;
+            case 'points': navigateTo('points'); break;
+            case 'knowledge_qa': navigateTo('knowledge_qa'); break;
+            default: navigateTo('dashboard');
+        }
+    });
+
+    var _spaExiting = false;
+
+    // Handle browser back/forward: restore SPA state from URL params
+    window.addEventListener('popstate', function(event) {
+        // Intercept back-button at SPA boundary (dashboard guard): show exit confirmation
+        if (event.state && event.state._spaGuard) {
+            window.history.pushState({_spaGuard: true}, '', window.location.href);
+            if (!_spaExiting && confirm('确定要退出 NurseSpace 吗？')) {
+                _spaExiting = true;
+                window.history.go(-2);
+            } else {
+                loadDashboard();
+            }
+            return;
+        }
+
+        _popstateInProgress = true;
+        const qs = new URLSearchParams(location.search);
+        const tab = qs.get('tab');
+        const categoryId = qs.get('category_id');
+        const caseId = qs.get('case_id');
+
+        switch(tab) {
+            case 'cases':
+                if (caseId) viewCase(parseInt(caseId));
+                else if (categoryId) loadCases(1, parseInt(categoryId));
+                else {
+                    currentCategoryId = null;
+                    currentCategoryName = null;
+                    loadCases(1);
+                }
+                break;
+            case 'wrongs': loadWrongQuestions(); break;
+            case 'weakness': loadWeaknessAnalysis(); break;
+            case 'exams': loadExams(); break;
+            case 'points': loadPointRecords(); break;
+            default: loadDashboard();
+        }
+        setTimeout(function() { _popstateInProgress = false; }, 0);
+    });
+
+    function checkLogin() {
+        const token = localStorage.getItem('access_token');
+        const userInfo = localStorage.getItem('user_info');
+
+        if (!token || !userInfo) {
+            sessionStorage.removeItem('_spa_loaded');
+            window.location.href = '/auth/login';
+            return;
+        }
+
+        const user = JSON.parse(userInfo);
+        if (user.role !== 'nurse') {
+            sessionStorage.removeItem('_spa_loaded');
+            window.location.href = '/auth/login';
+            return;
+        }
+
+        $('#user-name').text(user.real_name);
+
+        $.ajaxSetup({
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+    }
+
+    function navigateTo(tab) {
+        // Update desktop nav active
+        $('.navbar-top .nav-link').removeClass('active');
+        $('.navbar-top .nav-link').each(function() {
+            if ($(this).attr('href') && $(this).attr('href').includes('tab=' + tab)) {
+                $(this).addClass('active');
+            }
+        });
+
+        // Update mobile nav active
+        $('#nurseNavCollapse .nav-link-mobile').removeClass('active');
+        $('#nurseNavCollapse .nav-link-mobile').each(function() {
+            if ($(this).attr('href') && $(this).attr('href').includes('tab=' + tab)) {
+                $(this).addClass('active');
+            }
+        });
+
+        // Hide mobile nav after selection
+        var collapseEl = document.getElementById('nurseNavCollapse');
+        if (collapseEl) {
+            var bsCollapse = bootstrap.Collapse.getInstance(collapseEl);
+            if (bsCollapse) bsCollapse.hide();
+        }
+
+        // Update URL — remove case/category params when switching tabs
+        const url = new URL(window.location);
+        url.searchParams.set('tab', tab);
+        url.searchParams.delete('category_id');
+        url.searchParams.delete('case_id');
+        window.history.pushState({}, '', url);
+
+        // Route
+        switch(tab) {
+            case 'dashboard': loadDashboard(); break;
+            case 'cases': loadCases(); break;
+            case 'wrongs': loadWrongQuestions(); break;
+            case 'weakness': loadWeaknessAnalysis(); break;
+            case 'exams': loadExams(); break;
+            case 'points': loadPointRecords(); break;
+            case 'knowledge_qa': loadKnowledgeQA(); break;
+        }
+    }
+
+    function showConsentModal() {
+        if ($('#consentModal').length) return;
+        const modal = `
+            <div class="modal fade" id="consentModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+                <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="fas fa-file-contract me-2"></i>知情同意书</h5>
+                        </div>
+                        <div class="modal-body" style="max-height:60vh;overflow-y:auto; padding: 2rem 2.5rem;">
+                            <h4 class="text-center text-primary mb-4">知情同意书</h4>
+                            <div class="mx-auto" style="max-width: 600px; line-height: 2;">
+                                <p class="mb-3">亲爱的同学：</p>
+                                <p class="mb-3" style="text-indent: 2em;">您好！您将被邀请参加由<b>扬州大学</b>与<b>扬州大学附属医院</b>共同主持的一项研究。该研究通过分析您在系统中完成学习与测评后生成的成绩数据，探索更高效的护理教学模式，提升护理专业人才培养质量与教学效果，由扬州大学与扬州大学附属医院资助进行。</p>
+                                <p class="mb-3" style="text-indent: 2em;">您将进入智慧化护理教学案例库系统，完成指定的护理案例学习与能力测评，系统将自动记录您的学习行为与测评分数。我们仅收集您的匿名化成绩数据用于学术研究，不会采集您的个人身份信息，所有数据严格保密，仅用于研究分析与系统优化，不会影响您的课程成绩与学业评价。</p>
+                                <p class="mb-3" style="text-indent: 2em;">您的参与完全自愿，可随时选择退出研究，退出后已收集的匿名化数据将按研究伦理规范处理，不会对您造成任何不利影响。若您有任何疑问，请与平台管理员联系。</p>
+                                <p class="mt-4">非常感谢您的参与与支持！</p>
+                                <p class="text-end text-muted mt-4">扬州大学 &amp; 扬州大学附属医院</p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-outline-secondary" onclick="window.location.href='/auth/logout'">我不愿使用该系统并参与本次研究</button>
+                            <button class="btn btn-primary" id="btn-consent-agree" onclick="acceptConsent()">
+                                <i class="fas fa-check me-1"></i>我已阅读并同意，自愿参与
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        $('body').append(modal);
+        var m = new bootstrap.Modal('#consentModal');
+        m.show();
+    }
+
+    function acceptConsent() {
+        $('#btn-consent-agree').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>处理中...');
+        $.ajax({
+            url: '/nurse/consent/accept',
+            method: 'POST',
+            success: function(res) {
+                if (res.success) {
+                    bootstrap.Modal.getInstance('#consentModal').hide();
+                    $('#consentModal').remove();
+                } else {
+                    showAlert(res.message || '操作失败', 'error');
+                    $('#btn-consent-agree').prop('disabled', false).html('<i class="fas fa-check me-1"></i>同意并继续');
+                }
+            },
+            error: function() {
+                showAlert('网络错误，请重试', 'error');
+                $('#btn-consent-agree').prop('disabled', false).html('<i class="fas fa-check me-1"></i>同意并继续');
+            }
+        });
+    }
+
+    function setActiveNav(title) {
+        $('.navbar-top .nav-link').removeClass('active');
+        $('.navbar-top .nav-link').each(function() {
+            if ($(this).text().trim().includes(title)) {
+                $(this).addClass('active');
+            }
+        });
+    }
+
+    function loadDashboard() {
+        setActiveNav('首页概览');
+
+        $.get('/nurse/dashboard', function(res) {
+            if (res.success && res.data.user_info && !res.data.user_info.consent_accepted) {
+                showConsentModal();
+            }
+
+            var d = res.data || {};
+            var u = d.user_info || {};
+            var s = d.statistics || {};
+            var progs = d.progress_data || [];
+            var recent = d.recent_activities || [];
+
+            // 分类进度条
+            var progressRows = '';
+            if (progs.length > 0) {
+                progressRows = progs.map(function(p) {
+                    var pct = p.progress || 0;
+                    var color = pct >= 80 ? '#11998e' : pct >= 40 ? '#f0ad4e' : '#e55353';
+                    return '<div class="d-flex align-items-center mb-2">' +
+                        '<span class="me-3" style="min-width:72px;font-size:.88rem">' + sanitizeHTML(p.category) + '</span>' +
+                        '<div class="flex-grow-1 me-2" style="height:7px;background:#e9ecef;border-radius:4px;overflow:hidden">' +
+                        '<div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:4px;transition:width .8s ease"></div></div>' +
+                        '<span class="text-muted" style="font-size:.78rem;min-width:40px;text-align:right">' + p.completed + '/' + p.total + '</span></div>';
+                }).join('');
+            } else {
+                progressRows = '<p class="text-muted text-center py-3 mb-0 small">还没有学习记录～</p>';
+            }
+
+            // 最近活动
+            var recentHtml = '';
+            if (recent.length > 0) {
+                recentHtml = recent.map(function(r) {
+                    var sc = r.score >= 80 ? 'text-success' : r.score >= 60 ? 'text-warning' : 'text-danger';
+                    var t = '';
+                    try { t = moment(r.completed_at).fromNow(); } catch(e) { t = r.completed_at ? r.completed_at.slice(0,16) : ''; }
+                    return '<div class="d-flex justify-content-between align-items-center py-2 border-bottom border-light">' +
+                        '<div><span class="fw-medium small">' + sanitizeHTML(r.case_title) + '</span>' +
+                        '<span class="text-muted small ms-2">' + sanitizeHTML(r.station_name || '') + '</span></div>' +
+                        '<div><span class="fw-bold ' + sc + ' small">' + r.score + '分</span>' +
+                        '<span class="text-muted small ms-2">' + t + '</span></div></div>';
+                }).join('');
+            } else {
+                recentHtml = '<p class="text-muted text-center py-3 mb-0 small">暂无活动记录</p>';
+            }
+
+            var html =
+            '<div class="fade-in">' +
+            // ---- 欢迎横幅 ----
+            '<div class="rounded-4 p-4 mb-4" style="background:linear-gradient(135deg,#667eea,#764ba2);color:#fff">' +
+            '<div class="d-flex align-items-center justify-content-between flex-wrap">' +
+            '<div><h4 class="mb-1 fw-bold">' + getGreeting() + '，' + sanitizeHTML(u.real_name || '同学') + '</h4>' +
+            '<p class="mb-0 opacity-80">' + sanitizeHTML(u.department || '') + (u.department?' · ':'') + '继续你的学习之旅</p></div>' +
+            '<div class="mt-2 mt-md-0"><span class="badge rounded-pill px-3 py-2" style="background:rgba(255,255,255,.25);font-size:.9rem"><i class="fas fa-star me-1"></i>' + (u.points||0) + ' 积分</span></div>' +
+            '</div></div>' +
+
+            // ---- 四张数据卡片 ----
+            '<div class="row g-3 mb-4">' +
+            statCard('案例总数', s.total_cases||0, '个案例', 'fa-book-medical', '#667eea') +
+            statCard('已完成', s.completed_stations||0, '个站点', 'fa-check-circle', '#11998e') +
+            statCard('待巩固错题', s.wrong_questions_count||0, '道', 'fa-exclamation-triangle', '#f0ad4e') +
+            statCard('参加考试', s.exam_count||0, '次', 'fa-file-alt', '#e55353') +
+            '</div>' +
+
+            // ---- 进度 + 最近活动 ----
+            '<div class="row g-3 mb-4">' +
+            '<div class="col-lg-7">' +
+            '<div class="card border-0 shadow-sm rounded-4 h-100"><div class="card-body p-4">' +
+            '<h6 class="mb-3" style="color:#555"><i class="fas fa-chart-bar me-2" style="color:#667eea"></i>分类学习进度</h6>' +
+            progressRows + '</div></div></div>' +
+            '<div class="col-lg-5">' +
+            '<div class="card border-0 shadow-sm rounded-4 h-100"><div class="card-body p-4">' +
+            '<h6 class="mb-3" style="color:#555"><i class="fas fa-clock me-2" style="color:#11998e"></i>最近学习</h6>' +
+            recentHtml + '</div></div></div></div>' +
+
+            // ---- 快捷入口 ----
+            '<div class="row g-3">' +
+            quickCard('开始学习', '浏览案例题库', 'cases', '#667eea', 'fa-play-circle') +
+            quickCard('错题巩固', (s.wrong_questions_count||0) + ' 道待复习', 'wrongs', '#f0ad4e', 'fa-redo-alt') +
+            quickCard('薄弱分析', 'AI 智能诊断', 'weakness', '#3f5efb', 'fa-chart-line') +
+            quickCard('在线考试', (s.exam_count||0) + ' 次参与', 'exams', '#e55353', 'fa-clipboard-check') +
+            '</div></div>';
+
+            $('#main-content').html(html);
+        }).fail(function() {
+            $('#main-content').html('<div class="text-center py-5 text-muted"><i class="fas fa-exclamation-circle fa-2x mb-2 d-block"></i>加载失败，请刷新重试</div>');
+        });
+    }
+
+    function getGreeting() {
+        var h = new Date().getHours();
+        if (h < 6) return '夜深了';
+        if (h < 9) return '早上好';
+        if (h < 12) return '上午好';
+        if (h < 14) return '中午好';
+        if (h < 18) return '下午好';
+        return '晚上好';
+    }
+
+    function statCard(label, value, unit, icon, color) {
+        // 纯白底 + 实色图标块 → 对比度强，一目了然
+        return '<div class="col-6 col-md-3">' +
+            '<div class="rounded-4 p-3 h-100" style="background:#fff;border:1px solid #eef0f4;box-shadow:0 2px 8px rgba(0,0,0,.04)">' +
+            '<div class="d-flex align-items-center mb-2">' +
+            '<span class="rounded-3 d-inline-flex align-items-center justify-content-center me-2" style="width:34px;height:34px;background:'+color+';color:#fff"><i class="fas '+icon+' fa-sm"></i></span>' +
+            '<span style="color:#888;font-size:.85rem">'+label+'</span></div>' +
+            '<div style="font-size:1.6rem;font-weight:700;color:#333;line-height:1">'+value+'</div>' +
+            '<div style="font-size:.78rem;color:#aaa">'+unit+'</div></div></div>';
+    }
+
+    function quickCard(title, sub, tab, color, icon) {
+        // 纯白底 + 彩色图标 + hover 微动效
+        return '<div class="col-6 col-md-3"><a href="/nurse?tab='+tab+'" class="rounded-4 p-3 d-block text-decoration-none h-100" style="background:#fff;border:1px solid #eef0f4;box-shadow:0 2px 8px rgba(0,0,0,.04);transition:all .15s" onmouseover="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 4px 16px rgba(0,0,0,.08)\'" onmouseout="this.style.transform=\'\';this.style.boxShadow=\'\'">' +
+            '<div style="font-size:1.5rem;color:'+color+'" class="mb-2"><i class="fas '+icon+'"></i></div>' +
+            '<div class="fw-semibold mb-1" style="color:#333;font-size:.92rem">'+title+'</div>' +
+            '<div class="text-muted" style="font-size:.8rem">'+sub+'</div></a></div>';
+    }
+
+    function loadKnowledgeQA() {
+        setActiveNav('知识问答');
+        $.get('/nurse/ai-settings', function(res) {
+            var hasKey = res.success && res.data && res.data.has_knowledge_key;
+            if (!hasKey) {
+                $('#main-content').html(`
+                    <div style="max-width:800px;margin:60px auto;text-align:center">
+                        <h2 style="font-size:2rem;margin-bottom:10px">NurseSpace 知识问答</h2>
+                        <p style="color:#888;margin-bottom:40px">配置个人 API Key 后即可使用</p>
+                        <button class="btn btn-primary btn-lg" onclick="showKnowledgeAISettings()" style="padding:12px 40px;border-radius:12px">
+                            <i class="fas fa-key me-2"></i>配置 AI Key
+                        </button>
+                    </div>`);
+                return;
+            }
+            $('#main-content').html(`
+                <div class="qa-wrapper" style="display:flex;flex-direction:column;height:calc(100vh - 120px);max-width:800px;margin:0 auto">
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+                        <h4 style="margin:0;font-weight:600">NurseSpace 知识问答</h4>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="showKnowledgeAISettings()" style="border-radius:8px">
+                            <i class="fas fa-cog me-1"></i>设置
+                        </button>
+                    </div>
+                    <div id="qa-chat" style="flex:1;overflow-y:auto;padding:10px 0">
+                        <div style="text-align:center;color:#bbb;padding-top:80px">
+                            <div style="font-size:3rem;margin-bottom:16px">💬</div>
+                            <div style="font-size:1.1rem;margin-bottom:8px">有什么护理问题可以问我</div>
+                            <div style="font-size:0.85rem">基于知识库为您提供参考答案</div>
+                        </div>
+                    </div>
+                    <div style="padding:12px 0;border-top:1px solid #eee">
+                        <div style="display:flex;gap:8px;background:#f5f5f5;border-radius:16px;padding:6px 16px;align-items:center">
+                            <input type="text" id="qa-input" placeholder="输入问题，例如：新生儿黄疸的护理要点？"
+                                style="flex:1;border:none;background:transparent;outline:none;font-size:.95rem;padding:8px 0"
+                                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();askKnowledge()}">
+                            <button onclick="askKnowledge()" style="border:none;background:#2b6ef0;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center">
+                                <i class="fas fa-arrow-up" style="font-size:14px"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>`);
+        });
+    }

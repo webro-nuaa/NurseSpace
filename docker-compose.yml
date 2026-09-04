@@ -1,7 +1,8 @@
 services:
   db:
-    image: mysql:8.0
-    restart: always
+    # 版本固定到当前运行的具体版本，避免 minor 漂移带来意外升级
+    image: mysql:8.0.46
+    restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD 未设置}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-nurse_training_system}
@@ -17,27 +18,41 @@ services:
       --slow-query-log=ON
       --long-query-time=2
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD 未设置}"]
+      # mysqladmin ping 在服务器存活但认证失败时同样返回 0（官方语义），
+      # 因此无需在命令行携带明文密码
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 3s
       retries: 30
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     networks:
-      - nursespace-net
+      - back-net
 
   redis:
-    image: redis:7-alpine
-    restart: always
-    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD 未设置} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD 未设置}
+    # 注意：compose 的 command 是 exec 数组（不包 sh -c），$$ 不会展开，
+    # 因此 requirepass 用 compose 插值；健康检查是 CMD-SHELL，可用运行时变量
+    command: redis-server --requirepass "${REDIS_PASSWORD}" --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:?REDIS_PASSWORD 未设置} --no-auth-warning ping | grep -q PONG"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 384m
     networks:
-      - nursespace-net
+      - back-net
 
   app:
     build:
@@ -45,22 +60,55 @@ services:
       dockerfile: Dockerfile
       args:
         USE_CHINA_MIRROR: ${USE_CHINA_MIRROR:-false}
-    restart: always
-    env_file:
-      - .env
+    # 镜像以 git 短哈希为 tag（deploy.sh 注入 APP_VERSION），历史版本保留可回滚
+    image: nursespace-app:${APP_VERSION:-latest}
+    restart: unless-stopped
+    # 凭据最小化：显式列出应用所需变量，不整包注入 .env（root 数据库凭据不进 app 容器）
     environment:
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY 未设置}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY 未设置}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY 未设置}
+      MYSQL_USER: ${MYSQL_USER:-nursespace_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD 未设置}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nurse_training_system}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD 未设置}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
+      ZHIPU_MODEL: ${ZHIPU_MODEL:-glm-4-air}
+      BAIDU_ASR_APP_ID: ${BAIDU_ASR_APP_ID:-}
+      BAIDU_ASR_API_KEY: ${BAIDU_ASR_API_KEY:-}
+      BAIDU_ASR_SECRET_KEY: ${BAIDU_ASR_SECRET_KEY:-}
+      SITE_URL: ${SITE_URL:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      CORS_SUPPORTS_CREDENTIALS: ${CORS_SUPPORTS_CREDENTIALS:-0}
+      TIMEZONE: ${TIMEZONE:-Asia/Shanghai}
+      REDIS_ENABLED: ${REDIS_ENABLED:-1}
+      RATELIMIT_ENABLED: ${RATELIMIT_ENABLED:-1}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
+      DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-10}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-5}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+      LOG_FORMAT: ${LOG_FORMAT:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SKIP_CHROMA_MODEL_DOWNLOAD: ${SKIP_CHROMA_MODEL_DOWNLOAD:-1}
+      JWT_ACCESS_TOKEN_EXPIRES: ${JWT_ACCESS_TOKEN_EXPIRES:-86400}
       HF_ENDPOINT: https://hf-mirror.com
       MYSQL_HOST: db
       MYSQL_PORT: 3306
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD 未设置}@redis:6379/0
       RATELIMIT_STORAGE_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD 未设置}@redis:6379/1
-      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
-      GUNICORN_THREADS: ${GUNICORN_THREADS:-5}
-      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
     volumes:
       - app_uploads:/app/uploads
       - app_logs:/app/logs
       - app_cases:/app/案例
+      - chroma_data:/app/chroma_data
+      # 向量模型缓存放命名卷，重建镜像不丢（约90MB）
+      - chroma_cache:/home/appuser/.cache/chroma
     depends_on:
       db:
         condition: service_healthy
@@ -72,12 +120,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     networks:
-      - nursespace-net
+      - front-net
+      - back-net
 
   nginx:
-    image: nginx:1.25-alpine
-    restart: always
+    image: nginx:1.25.5-alpine
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
@@ -85,6 +138,7 @@ services:
       NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-_}
     volumes:
       - ./nginx/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./nginx/certbot-webroot:/var/www/certbot
       - ./static:/usr/share/nginx/html/static:ro
@@ -93,8 +147,12 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 128m
     networks:
-      - nursespace-net
+      - front-net
 
 volumes:
   mysql_data:
@@ -109,7 +167,14 @@ volumes:
     driver: local
   app_cases:
     driver: local
+  chroma_data:
+    driver: local
+  chroma_cache:
+    driver: local
 
+# 网络分层：nginx 只在 front-net，数据层（db/redis）隔离在 back-net
 networks:
-  nursespace-net:
+  front-net:
+    driver: bridge
+  back-net:
     driver: bridge

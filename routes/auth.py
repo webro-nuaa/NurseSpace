@@ -10,13 +10,21 @@ import re
 auth_bp = Blueprint('auth', __name__)
 
 
+def _login_rate_limit_breach(request):
+    """登录限流触发时的自定义响应。
+    flask-limiter 的 on_breach 仅接受 Response 实例作为返回值（元组会被忽略）。"""
+    resp = jsonify({'success': False, 'message': '登录尝试过于频繁，请1分钟后再试'})
+    resp.status_code = 429
+    return resp
+
+
 @auth_bp.route('/login', methods=['GET'])
 def login_page():
     return render_template('auth/login.html')
 
 
 @auth_bp.route('/login', methods=['POST'])
-@limiter.limit("5 per minute", on_breach=lambda: (jsonify({'success': False, 'message': '登录尝试过于频繁，请1分钟后再试'}), 429))
+@limiter.limit("5 per minute", on_breach=_login_rate_limit_breach)
 def login():
     data = request.get_json() if request.is_json else request.form
     username = data.get('username')

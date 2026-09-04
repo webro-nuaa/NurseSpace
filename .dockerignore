@@ -1,17 +1,45 @@
+# 版本控制与本地环境
+.git/
+.github/
+.claude/
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+
+# Python 运行产物
 venv/
 __pycache__/
 *.pyc
 *.pyo
-.git/
-.env
-.env.*
-!.env.example
+.pytest_cache/
+instance/
+
+# 敏感数据产物：备份、binlog、数据库文件 —— 严禁打进镜像
+backups/
 backup/
+db_recovery/
+database/
+*.sql
+*.sql.gz
+binlog.*
+binlog.index
+
+# 运行时数据（由挂载卷提供，不进镜像）
 logs/
 uploads/
 certs/
+chroma_data/
+
+# 不参与运行的目录
+docs/
+tests/
+scripts/
 案例/
 __MACOSX/
+
+# 归档与二进制文档
 *.zip
 *.rar
 *.tar
@@ -20,16 +48,16 @@ __MACOSX/
 *.xlsx
 *.pdf
 *.docx
-chroma_data/
-instance/
-.pytest_cache/
-.idea/
-.vscode/
+
+# Markdown 文档（保留 README）
 *.md
 !README.md
+
+# 构建配置自身
 Dockerfile
 docker-compose*.yml
 .dockerignore
 .gitignore
-database/
+
+# nginx（compose 直接挂载，不进镜像）
 nginx/

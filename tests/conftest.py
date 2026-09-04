@@ -1,4 +1,12 @@
-"""pytest fixtures for NurseSpace test suite."""
+"""pytest fixtures for NurseSpace test suite.
+
+集成测试策略：唯一测试后端是 MySQL（与生产一致），每个用例拥有独立空库
+`nurse_training_test`（DROP/CREATE DATABASE 重建，开销极小），完整覆盖
+外键 RESTRICT/CASCADE、ENUM 严格性、utf8mb4 字符集等 SQLite 无法验证的行为。
+
+必须通过容器运行（测试进程需访问 db 服务上的 MySQL）：
+    bash scripts/run_integration_tests.sh
+"""
 import os
 import sys
 import pytest
@@ -11,22 +19,58 @@ os.environ.setdefault('SECRET_KEY', 'test-secret-key-for-testing-only')
 os.environ.setdefault('JWT_SECRET_KEY', 'test-jwt-secret-for-testing-only-32-bytes-min')
 os.environ.setdefault('ENCRYPTION_KEY', 'd0EMMLL-wOGkN5Az6IQvXd16BSbE6Fx8EDZT4xcifg4=')
 os.environ.setdefault('MYSQL_PASSWORD', 'test')
-os.environ.setdefault('MYSQL_HOST', 'localhost')
+os.environ.setdefault('MYSQL_HOST', 'db')
 os.environ.setdefault('REDIS_ENABLED', '0')
 os.environ.setdefault('RATELIMIT_ENABLED', '0')
 os.environ.setdefault('CORS_ORIGINS', '*')
-os.environ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+
+TEST_MYSQL_DB = os.environ.get('TEST_MYSQL_DB', 'nurse_training_test')
+
+
+def _mysql_uri():
+    """测试专用 MySQL 连接串（nursespace_app 已被授予测试库的 ALL 权限）。"""
+    user = os.environ.get('TEST_MYSQL_USER', 'nursespace_app')
+    password = os.environ.get('TEST_MYSQL_PASSWORD',
+                              os.environ.get('MYSQL_PASSWORD', 'test'))
+    host = os.environ.get('TEST_MYSQL_HOST', 'db')
+    return (f"mysql+pymysql://{user}:{password}@{host}/{TEST_MYSQL_DB}"
+            f"?charset=utf8mb4")
+
+
+def _recreate_mysql_db():
+    """删除并重建测试数据库，保证每个用例拿到干净的空库。
+
+    lock_wait_timeout=10：若残留连接持有元数据锁，快速失败而非无限挂起。
+    """
+    from sqlalchemy import create_engine, text
+    uri = _mysql_uri()
+    server_uri = uri.rsplit('/', 1)[0] + '/'
+    admin_engine = create_engine(server_uri, pool_pre_ping=True)
+    with admin_engine.connect() as conn:
+        conn.execute(text("SET SESSION lock_wait_timeout = 10"))
+        conn.execute(text(f"DROP DATABASE IF EXISTS {TEST_MYSQL_DB}"))
+        conn.execute(text(
+            f"CREATE DATABASE {TEST_MYSQL_DB} CHARACTER SET utf8mb4 "
+            f"COLLATE utf8mb4_unicode_ci"))
+    admin_engine.dispose()
+    return uri
+
+
+# 安全关键：必须在 import app 之前把连接串指向测试库。
+# Flask-SQLAlchemy 在 create_app 时就绑定引擎，事后改 config 无效——
+# 否则所有测试（包括 drop_all）都会打到生产库。
+_recreate_mysql_db()
+os.environ['SQLALCHEMY_DATABASE_URI'] = _mysql_uri()
 
 from app import create_app
 
 
 @pytest.fixture(scope='function')
 def app():
-    """Per-test Flask app with SQLite in-memory database (clean isolation)."""
+    """Per-test Flask app with a clean MySQL database (per-test isolation)."""
     _app = create_app()
     _app.config.update({
         'TESTING': True,
-        'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'WTF_CSRF_ENABLED': False,
         'SECRET_KEY': 'test-secret',
         'JWT_SECRET_KEY': 'test-jwt-secret-for-testing-only-32-bytes-min',
@@ -37,7 +81,20 @@ def app():
     ctx.push()
     from models import db
     db.create_all()
+    # 关键：外层 context 的 session 会与 test client 请求共享 —— Flask 的
+    # RequestContext.push() 在栈顶已有同 app 的 context 时直接复用，请求内的
+    # db.session 就是这里的 session。默认 expire_on_commit 会让 fixture commit
+    # 之后的属性访问（如 sample_case.id）触发 refresh SELECT，留下一个
+    # REPEATABLE-READ 悬挂快照事务，快照早于测试中新建的数据，请求便读不到。
+    # 关闭后 fixture 链均以 commit 收尾、无悬挂事务，请求的 SELECT 拿到新快照。
+    # 注意必须通过 db.session() 取 session 实例再赋值 —— scoped_session 没有
+    # __setattr__ 代理，db.session.expire_on_commit = False 只会写到包装对象上。
+    db.session().expire_on_commit = False
     yield _app
+    # 必须先关闭全部池化连接：测试中打开的事务可能持有 MySQL 元数据锁，
+    # 不释放会让 drop_all（另一条连接）永远等待
+    db.session.rollback()
+    db.engine.dispose()
     db.drop_all()
     ctx.pop()
 

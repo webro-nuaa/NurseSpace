@@ -2,7 +2,7 @@
 
 基于 Flask + MySQL + Redis 的智能护士培训系统，支持案例学习、AI 评分、语音答题、错题管理、考试功能、二维码分享和薄弱点分析。
 
-> **最新版本：v3.0.8** | 全页面 SPA 架构
+> **最新版本：v3.0.9**（版本号唯一来源：`config.py` 的 `Config.VERSION`） | 全页面 SPA 架构
 
 ## 目录
 
@@ -272,7 +272,7 @@ curl http://localhost/health
 curl -k https://localhost/health
 
 # 预期输出：
-# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"3.0.8"}
+# {"database":"connected","service":"nurse_training_system","status":"healthy","version":"3.0.9"}
 
 # 访问登录页
 curl -I http://localhost/auth/login
@@ -792,7 +792,7 @@ NurseSpace/
 ├── docker-compose.yml        # Docker Compose 编排（db + redis + app + nginx）
 ├── docker-compose.e2e.yml    # 隔离部署验收栈（本地 5001 端口）
 ├── requirements.txt          # Python 依赖
-├── run.sh                    # 一键部署脚本
+├── deploy.sh                 # 生产部署脚本（构建/启动/健康验证/回滚）
 ├── .env.example              # 环境变量模板
 ├── .gitignore                # Git 忽略规则
 ├── .dockerignore             # Docker 忽略规则

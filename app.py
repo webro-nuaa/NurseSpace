@@ -124,6 +124,10 @@ def create_app():
     def method_not_allowed(e):
         return jsonify({'success': False, 'message': '请求方法不允许'}), 405
 
+    @app.errorhandler(413)
+    def too_large(e):
+        return jsonify({'success': False, 'message': '文件大小超过限制（最大128MB）'}), 413
+
     @app.errorhandler(500)
     def internal_error(e):
         try:
@@ -147,6 +151,7 @@ def create_app():
     from routes.nurse import nurse_bp
     from routes.admin import admin_bp
     from routes.api import api_bp
+    from routes.media import media_bp
 
     # api_bp: public/JWT API endpoints do not rely on the browser session cookie.
     # Browser-backed auth/admin/nurse routes keep CSRF protection enabled.
@@ -156,6 +161,8 @@ def create_app():
     app.register_blueprint(nurse_bp, url_prefix='/nurse')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(api_bp, url_prefix='/api')
+    # 媒体鉴权子请求端点（nginx auth_request 用）
+    app.register_blueprint(media_bp, url_prefix='/api/media')
 
     from routes.main import main_bp
     app.register_blueprint(main_bp)

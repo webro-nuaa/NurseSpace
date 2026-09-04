@@ -5,6 +5,15 @@ from flask_jwt_extended import get_jwt_identity
 from models import User, db
 
 
+def _jwt_identity_or_none():
+    """读取 JWT identity；当前请求无 JWT 上下文（如 Session Cookie 登录）时返回 None，
+    避免直接调用 get_jwt_identity() 抛 RuntimeError 导致 500。"""
+    try:
+        return get_jwt_identity()
+    except RuntimeError:
+        return None
+
+
 def admin_required(f):
     """要求管理员身份 —— 需配合 @login_or_jwt_required 使用"""
 
@@ -13,7 +22,7 @@ def admin_required(f):
         if current_user.is_authenticated and current_user.role == 'admin':
             return f(*args, **kwargs)
 
-        user_id = get_jwt_identity()
+        user_id = _jwt_identity_or_none()
         if user_id:
             user = db.session.get(User, int(user_id))
             if user and user.role == 'admin' and user.is_active():
@@ -32,7 +41,7 @@ def nurse_required(f):
         if current_user.is_authenticated and current_user.role == 'nurse':
             return f(*args, **kwargs)
 
-        user_id = get_jwt_identity()
+        user_id = _jwt_identity_or_none()
         if user_id:
             user = db.session.get(User, int(user_id))
             if user and user.role == 'nurse' and user.is_active():

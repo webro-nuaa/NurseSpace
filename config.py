@@ -12,12 +12,13 @@ def _require_env(key):
 
 
 class Config:
-    VERSION = '3.0.9'
+    VERSION = '3.0.11'
 
     SECRET_KEY = _require_env('SECRET_KEY')
 
     # MySQL
-    MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
+    # 默认与 docker-compose 中 MYSQL_USER 一致（业务账号）；.env 漏配时不会以 root 连库
+    MYSQL_USER = os.environ.get('MYSQL_USER', 'nursespace_app')
     MYSQL_PASSWORD = _require_env('MYSQL_PASSWORD')
     MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
     MYSQL_PORT = int(os.environ.get('MYSQL_PORT', 3306))
@@ -81,12 +82,21 @@ class Config:
 
     # CORS
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '')
+
+    # 管理员输入时间的解释时区（datetime-local 控件提交 naive 本地时间），
+    # 存库前统一转换为 naive UTC（见 utils/time_utils.py）
+    TIMEZONE = os.environ.get('TIMEZONE', 'Asia/Shanghai')
     CORS_SUPPORTS_CREDENTIALS = os.environ.get('CORS_SUPPORTS_CREDENTIALS', '0') == '1'
 
     # Session security
     SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', '1') == '1'
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+
+    # CSRF 令牌不随时间过期（默认 3600 秒会令 SPA 长开页面上的提交全部
+    # 400）。防护强度不变：令牌仍绑定会话、每请求必校验、HTTPS 下保留
+    # Referrer 严格校验（ProxyFix 使 Flask 识别 X-Forwarded-Proto）。
+    WTF_CSRF_TIME_LIMIT = None
 
     # Redis password (if set)
     REDIS_PASSWORD = os.environ.get('REDIS_PASSWORD', '')

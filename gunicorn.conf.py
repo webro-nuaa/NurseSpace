@@ -12,10 +12,9 @@ max_requests = 2000
 max_requests_jitter = 100
 preload_app = True
 
-# 日志：accesslog 输出到 stdout 供 Docker 采集，errorlog 保留文件
-# 生产环境可设 LOG_FORMAT=json 启用结构化日志
+# 日志：统一输出到 stdout 供 Docker 日志驱动采集（docker compose logs 可见全部）
 accesslog = "-"
-errorlog = os.environ.get("GUNICORN_ERROR_LOG", "/app/logs/error.log")
+errorlog = os.environ.get("GUNICORN_ERROR_LOG", "-")
 loglevel = os.environ.get("LOG_LEVEL", "info")
 
 _log_format = os.environ.get("LOG_FORMAT", "")

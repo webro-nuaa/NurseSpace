@@ -81,7 +81,12 @@ class Case(db.Model):
 
     # 关系
     stations = db.relationship('Station', backref='case', lazy='dynamic', cascade='all, delete-orphan')
-    exam_questions = db.relationship('ExamQuestion', backref='case', lazy='dynamic', cascade='all, delete-orphan')
+    # 考试题目不可随案例级联删除：题目（及经 ExamQuestion.answers 的学生答卷）
+    # 属于考试历史数据，删除案例时必须被 DB 外键（exam_questions.case_id /
+    # exam_answers.station_id 均 NO ACTION）拦截，由 delete_case 返回明确错误。
+    # 若此处用 delete-orphan，ORM 会先静默清掉题目和答卷，外键保护形同虚设。
+    exam_questions = db.relationship('ExamQuestion', backref='case', lazy='dynamic',
+                                     cascade='save-update, merge')
     videos = db.relationship('ExtensionVideo', backref='case', lazy='dynamic', cascade='all, delete-orphan')
     links = db.relationship('ExtensionLink', backref='case', lazy='dynamic', cascade='all, delete-orphan')
 
@@ -102,7 +107,9 @@ class Station(db.Model):
     standard_answers = db.relationship('StandardAnswer', backref='station', lazy='dynamic', cascade='all, delete-orphan')
     learning_records = db.relationship('LearningRecord', backref='station', lazy='dynamic', cascade='all, delete-orphan')
     wrong_questions = db.relationship('WrongQuestion', backref='station', lazy='dynamic', cascade='all, delete-orphan')
-    exam_answers = db.relationship('ExamAnswer', backref='station', lazy='dynamic', cascade='all, delete-orphan')
+    # 考试答卷的生命周期挂在 ExamRecord 下（见 ExamRecord.answers），
+    # 这里不级联：删除站点时若有答卷引用应被 FK RESTRICT 拦截，保护考试历史
+    exam_answers = db.relationship('ExamAnswer', backref='station', lazy='dynamic')
 
 class StandardAnswer(db.Model):
     __tablename__ = 'standard_answers'
@@ -150,6 +157,11 @@ class LearningRecord(db.Model):
     ai_feedback = db.Column(db.Text)
     completed_at = db.Column(db.DateTime, default=_utcnow)
 
+    # 一个用户对一个站点只有一条学习记录（重做时由服务层更新原记录）
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'station_id', name='unique_user_station_record'),
+    )
+
 class WrongQuestion(db.Model):
     __tablename__ = 'wrong_questions'
     
@@ -168,6 +180,7 @@ class Exam(db.Model):
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
     creator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    # 时间窗统一存 naive UTC：管理员输入的本地时间在服务层转换为 UTC 后写入
     start_time = db.Column(db.DateTime)
     end_time = db.Column(db.DateTime)
     duration = db.Column(db.Integer, default=60)  # 分钟
@@ -177,7 +190,7 @@ class Exam(db.Model):
     # 关系
     creator = db.relationship('User', backref='created_exams')
     questions = db.relationship('ExamQuestion', backref='exam', lazy='dynamic', cascade='all, delete-orphan')
-    records = db.relationship('ExamRecord', backref='exam', lazy='dynamic')
+    records = db.relationship('ExamRecord', backref='exam', lazy='dynamic', cascade='all, delete-orphan')
 
 class ExamQuestion(db.Model):
     __tablename__ = 'exam_questions'
@@ -189,7 +202,7 @@ class ExamQuestion(db.Model):
     order_index = db.Column(db.Integer, default=0)
 
     # 关系
-    answers = db.relationship('ExamAnswer', backref='exam_question', lazy='dynamic')
+    answers = db.relationship('ExamAnswer', backref='exam_question', lazy='dynamic', cascade='all, delete-orphan')
 
 class ExamRecord(db.Model):
     __tablename__ = 'exam_records'
@@ -202,6 +215,11 @@ class ExamRecord(db.Model):
     start_time = db.Column(db.DateTime, default=_utcnow)
     submit_time = db.Column(db.DateTime)
     status = db.Column(db.Enum('in_progress', 'submitted'), default='in_progress')
+
+    # 一个用户参加一场考试只有一条考试记录（start_exam 已有业务守卫）
+    __table_args__ = (
+        db.UniqueConstraint('exam_id', 'user_id', name='unique_exam_user_record'),
+    )
     
     # 关系
     answers = db.relationship('ExamAnswer', backref='exam_record', lazy='dynamic', cascade='all, delete-orphan')
@@ -223,7 +241,7 @@ class PointRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     points = db.Column(db.Integer, nullable=False)
-    reason = db.Column(db.String(200))
+    reason = db.Column(db.String(300))
     related_id = db.Column(db.Integer)
     related_type = db.Column(db.Enum('learning', 'exam'))
     created_at = db.Column(db.DateTime, default=_utcnow)
@@ -274,6 +292,7 @@ class BaiduAsrKey(db.Model):
     secret_key = db.Column(db.String(500), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=_utcnow)
+    updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
 
 
 class WeaknessAnalysis(db.Model):
@@ -294,7 +313,8 @@ class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
-    # 评论内容类型：station_answer(站点答案), knowledge_answer(扩展知识答案)
+    # 评论内容类型：station_answer(站点答案)
+    # 如需支持其他答案类型的讨论，需先扩展此枚举并添加数据库迁移
     content_type = db.Column(db.Enum('station_answer'), nullable=False)
     
     # 关联的答案ID（站点ID或扩展知识ID）

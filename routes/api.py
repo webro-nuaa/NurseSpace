@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import User, Case, CaseCategory, Station, StandardAnswer, Comment, CommentLike, CommentReport, db
+from models import User, Case, CaseCategory, Station, StandardAnswer, Comment, db
+from services import comment_service
 from sqlalchemy import func
 
 api_bp = Blueprint('api', __name__)
@@ -267,71 +268,15 @@ def get_comments():
     content_id = request.args.get('content_id', type=int)
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    
+
     if not content_type or not content_id:
         return jsonify({'success': False, 'message': '缺少必要参数'})
-    
-    # 查询评论
-    query = Comment.query.filter_by(
-        content_type=content_type,
-        content_id=content_id,
-        status='active',
-        parent_id=None  # 只查询顶级评论
-    ).order_by(Comment.created_at.desc())
-    
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    
-    comments_data = []
-    for comment in pagination.items:
-        # 获取用户信息
-        user = db.session.get(User, comment.user_id)
-        if not user:
-            continue
-            
-        # 获取回复数量
-        replies_count = Comment.query.filter_by(
-            parent_id=comment.id,
-            status='active'
-        ).count()
-        
-        # 获取当前用户是否点赞
-        current_user_id = get_jwt_identity()
-        is_liked = False
-        if current_user_id:
-            is_liked = CommentLike.query.filter_by(
-                user_id=current_user_id,
-                comment_id=comment.id
-            ).first() is not None
-        
-        comments_data.append({
-            'id': comment.id,
-            'content': comment.content,
-            'comment_type': comment.comment_type,
-            'likes_count': comment.likes_count,
-            'replies_count': replies_count,
-            'is_liked': is_liked,
-            'created_at': comment.created_at.isoformat(),
-            'user': {
-                'id': user.id,
-                'real_name': user.real_name,
-                'department': user.department
-            }
-        })
-    
-    return jsonify({
-        'success': True,
-        'data': {
-            'comments': comments_data,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': pagination.total,
-                'pages': pagination.pages,
-                'has_prev': pagination.has_prev,
-                'has_next': pagination.has_next
-            }
-        }
-    })
+
+    data = comment_service.list_comments(
+        content_type, content_id, page, per_page,
+        viewer_id=get_jwt_identity()
+    )
+    return jsonify({'success': True, 'data': data})
 
 @api_bp.route('/comments', methods=['POST'])
 @jwt_required()
@@ -339,113 +284,33 @@ def create_comment():
     """创建评论"""
     current_user_id = get_jwt_identity()
     data = request.get_json()
-    
-    content_type = data.get('content_type')
-    content_id = data.get('content_id')
-    content = data.get('content', '').strip()
-    comment_type = data.get('comment_type', 'comment')
-    parent_id = data.get('parent_id')
-    
-    # 验证参数
-    if not all([content_type, content_id, content]):
-        return jsonify({'success': False, 'message': '缺少必要参数'})
-    
-    if len(content) < 5:
-        return jsonify({'success': False, 'message': '评论内容至少5个字符'})
-    
-    if len(content) > 1000:
-        return jsonify({'success': False, 'message': '评论内容不能超过1000个字符'})
-    
-    # 验证内容类型
-    if content_type not in ['station_answer']:
-        return jsonify({'success': False, 'message': '无效的内容类型'})
-    
-    # 验证评论类型
-    if comment_type not in ['comment', 'question', 'answer', 'suggestion']:
-        return jsonify({'success': False, 'message': '无效的评论类型'})
-    
-    # 如果有父评论，验证父评论是否存在
-    if parent_id:
-        parent_comment = db.session.get(Comment, parent_id)
-        if not parent_comment or parent_comment.status != 'active':
-            return jsonify({'success': False, 'message': '父评论不存在或已被删除'})
-    
-    try:
-        comment = Comment(
-            user_id=current_user_id,
-            content_type=content_type,
-            content_id=content_id,
-            content=content,
-            comment_type=comment_type,
-            parent_id=parent_id
-        )
-        
-        db.session.add(comment)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': '评论发布成功',
-            'data': {
-                'id': comment.id,
-                'created_at': comment.created_at.isoformat()
-            }
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"发布评论失败: {e}", exc_info=True)
-        return jsonify({'success': False, 'message': '发布评论失败，请稍后重试'})
+
+    comment, error = comment_service.create_comment(current_user_id, data or {})
+    if error:
+        return jsonify({'success': False, 'message': error})
+
+    return jsonify({
+        'success': True,
+        'message': '评论发布成功',
+        'data': {
+            'id': comment.id,
+            'created_at': comment.created_at.isoformat()
+        }
+    })
 
 @api_bp.route('/comments/<int:comment_id>/like', methods=['POST'])
 @jwt_required()
 def toggle_comment_like(comment_id):
     """切换评论点赞状态"""
     current_user_id = get_jwt_identity()
-    
+
     comment = Comment.query.get_or_404(comment_id)
-    if comment.status != 'active':
-        return jsonify({'success': False, 'message': '评论不存在或已被删除'})
-    
-    # 检查是否已经点赞
-    existing_like = CommentLike.query.filter_by(
-        user_id=current_user_id,
-        comment_id=comment_id
-    ).first()
-    
-    try:
-        if existing_like:
-            # 取消点赞
-            db.session.delete(existing_like)
-            comment.likes_count = max(0, comment.likes_count - 1)
-            is_liked = False
-            message = '取消点赞成功'
-        else:
-            # 添加点赞
-            like = CommentLike(
-                user_id=current_user_id,
-                comment_id=comment_id
-            )
-            db.session.add(like)
-            comment.likes_count += 1
-            is_liked = True
-            message = '点赞成功'
-        
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'message': message,
-            'data': {
-                'likes_count': comment.likes_count,
-                'is_liked': is_liked
-            }
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"评论点赞操作失败: {e}", exc_info=True)
-        return jsonify({'success': False, 'message': '操作失败，请稍后重试'})
+    data, error = comment_service.toggle_comment_like(current_user_id, comment)
+    if error:
+        return jsonify({'success': False, 'message': error})
+
+    message = data.pop('message')
+    return jsonify({'success': True, 'message': message, 'data': data})
 
 @api_bp.route('/comments/<int:comment_id>/replies', methods=['GET'])
 @jwt_required(optional=True)
@@ -453,62 +318,16 @@ def get_comment_replies(comment_id):
     """获取评论的回复列表"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    
+
     comment = Comment.query.get_or_404(comment_id)
     if comment.status != 'active':
         return jsonify({'success': False, 'message': '评论不存在或已被删除'})
-    
-    # 查询回复
-    query = Comment.query.filter_by(
-        parent_id=comment_id,
-        status='active'
-    ).order_by(Comment.created_at.asc())
-    
-    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-    
-    replies_data = []
-    for reply in pagination.items:
-        user = db.session.get(User, reply.user_id)
-        if not user:
-            continue
-            
-        # 获取当前用户是否点赞
-        current_user_id = get_jwt_identity()
-        is_liked = False
-        if current_user_id:
-            is_liked = CommentLike.query.filter_by(
-                user_id=current_user_id,
-                comment_id=reply.id
-            ).first() is not None
-        
-        replies_data.append({
-            'id': reply.id,
-            'content': reply.content,
-            'comment_type': reply.comment_type,
-            'likes_count': reply.likes_count,
-            'is_liked': is_liked,
-            'created_at': reply.created_at.isoformat(),
-            'user': {
-                'id': user.id,
-                'real_name': user.real_name,
-                'department': user.department
-            }
-        })
-    
-    return jsonify({
-        'success': True,
-        'data': {
-            'replies': replies_data,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': pagination.total,
-                'pages': pagination.pages,
-                'has_prev': pagination.has_prev,
-                'has_next': pagination.has_next
-            }
-        }
-    })
+
+    data = comment_service.list_replies(
+        comment_id, page, per_page,
+        viewer_id=get_jwt_identity()
+    )
+    return jsonify({'success': True, 'data': data})
 
 
 

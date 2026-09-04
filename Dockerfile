@@ -52,15 +52,14 @@ RUN apt-get update && \
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-COPY . .
+RUN useradd --create-home appuser
 
-RUN mkdir -p /app/uploads /app/logs /app/certs /app/案例
+COPY --chown=appuser:appuser . .
 
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
-RUN useradd --create-home appuser && \
-    chown -R appuser:appuser /app /home/appuser
+# 运行时目录不在构建上下文中（见 .dockerignore），需显式创建并授权
+RUN mkdir -p /app/uploads /app/logs /app/certs /app/案例 /app/chroma_data && \
+    chown appuser:appuser /app/uploads /app/logs /app/certs /app/案例 /app/chroma_data && \
+    chmod +x /app/entrypoint.sh
 
 USER appuser
 
