@@ -190,10 +190,10 @@ def users_xlsx_template():
         wb = Workbook()
         ws = wb.active
         ws.title = 'users'
-        headers = ['真实姓名', '科室', '学校', '学号', '邮箱', '手机号', '角色', '状态']
+        headers = ['真实姓名', '科室', '学校', '学号', '邮箱', '手机号', '角色']
         ws.append(headers)
-        ws.append(['张三', '内科', '某某护理学院', '2024001', 'zhangsan@example.com', '13800001111', 'nurse', 'active'])
-        ws.append(['李四', '教学部', '某某卫生学校', '2024002', 'lisi@example.com', '13900002222', 'nurse', 'active'])
+        ws.append(['张三', '内科', '某某护理学院', '2024001', 'zhangsan@example.com', '13800001111', 'nurse'])
+        ws.append(['李四', '教学部', '某某卫生学校', '2024002', 'lisi@example.com', '13900002222', 'nurse'])
         bio = BytesIO()
         wb.save(bio)
         bio.seek(0)
@@ -261,7 +261,8 @@ def users_batch_import_xlsx():
             school = get(row, '学校')
             serial_number = get(row, '学号')
             role = get(row, '角色', 'nurse') or 'nurse'
-            status = get(row, '状态', 'active') or 'active'
+            # 批量新建一律启用；禁用是建号后在用户管理里的管理动作
+            status = 'active'
             if email and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
                 failed += 1
                 continue

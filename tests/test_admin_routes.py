@@ -54,6 +54,31 @@ class TestUserManagement:
                           headers={'Authorization': f'Bearer {admin_token}'})
         assert resp.status_code == 200
 
+    def test_import_creates_active_users_without_status_column(self, client, admin_token):
+        """批量导入不设「状态」列：新建用户一律 active（含旧模板带状态列的文件也应忽略该列）。"""
+        from io import BytesIO
+        from openpyxl import Workbook
+        from models import User
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(['真实姓名', '科室', '学校', '学号', '邮箱', '手机号', '角色'])
+        ws.append(['王五', '外科', '某卫校', '2024003', None, None, 'nurse'])
+        bio = BytesIO()
+        wb.save(bio)
+        bio.seek(0)
+
+        resp = client.post('/admin/users/batch-import-xlsx',
+                           data={'file': (bio, 'users.xlsx')},
+                           headers={'Authorization': f'Bearer {admin_token}'},
+                           content_type='multipart/form-data')
+        data = resp.get_json()
+        assert data['success']
+        assert data['message'].startswith('导入完成：新建 1')
+        user = User.query.filter_by(real_name='王五').first()
+        assert user is not None
+        assert user.status == 'active'
+
 
 class TestCaseManagement:
     def test_list_cases(self, client, admin_token):
