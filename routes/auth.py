@@ -3,7 +3,7 @@ from flask_login import current_user, login_user, logout_user
 from utils.auth import login_or_jwt_required
 from utils.decorators import admin_required
 from flask_jwt_extended import create_access_token
-from models import User, db
+from models import User, db, _utcnow
 from app import limiter
 import re
 
@@ -41,6 +41,14 @@ def login():
     if user and user.check_password(password) and user.is_active():
         login_user(user, remember=True)
         access_token = create_access_token(identity=str(user.id), additional_claims={'v': user.token_version})
+        # 活跃度追踪：登录即视为活跃（字段可空，失败不影响登录）
+        try:
+            user.last_login_at = _utcnow()
+            user.last_seen_at = user.last_login_at
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            current_app.logger.warning(f"记录登录时间失败: user={user.id}", exc_info=True)
 
         if request.is_json:
             return jsonify({

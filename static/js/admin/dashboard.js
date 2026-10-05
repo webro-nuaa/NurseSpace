@@ -10,6 +10,43 @@ function loadDashboard() {
         if (!response.success) return;
         const d = response.data;
         const s = d.statistics;
+        // 活跃度统计独立加载，失败不影响主看板
+        $.get('/admin/statistics/activity', function(res) {
+            let activityCards = '';
+            if (res.success) {
+                const a = res.data;
+                activityCards = `
+                <div class="col-6 col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body py-3">
+                            <div class="fs-2 fw-bold text-success">${a.active_15m}</div>
+                            <div class="text-muted small">最近15分钟活跃</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body py-3">
+                            <div class="fs-2 fw-bold text-info">${a.today_logins}</div>
+                            <div class="text-muted small">今日登录</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body py-3">
+                            <div class="fs-2 fw-bold text-primary">${a.active_today}</div>
+                            <div class="text-muted small">今日活跃</div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+            renderDashboard(d, s, activityCards);
+        }).fail(function() { renderDashboard(d, s, ''); });
+    });
+}
+
+function renderDashboard(d, s, activityCards) {
         const html = `
             <div class="page-header">
                 <div>
@@ -18,6 +55,7 @@ function loadDashboard() {
                 </div>
             </div>
             <div class="row g-3 mb-4">
+                ${activityCards}
                 <div class="col-6 col-md-3">
                     <div class="card text-center">
                         <div class="card-body py-3">
@@ -77,6 +115,5 @@ function loadDashboard() {
             </div>
         `;
         $('#main-content').html(html);
-    });
 }
 

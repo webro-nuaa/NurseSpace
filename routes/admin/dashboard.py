@@ -5,6 +5,9 @@ from utils.auth import login_or_jwt_required
 from utils.decorators import admin_required
 from models import User, Case, CaseCategory, Station, LearningRecord, WrongQuestion, Exam, db
 from sqlalchemy import desc, func
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+from config import Config
 
 
 @admin_bp.route('/dashboard')
@@ -75,6 +78,29 @@ def dashboard():
             'category_data': category_data
         }
     })
+
+
+@admin_bp.route('/statistics/activity')
+@login_or_jwt_required
+@admin_required
+def get_activity_statistics():
+    """活跃度统计：今日登录 / 今日活跃 / 最近15分钟活跃（≈当前在线）。
+
+    库存 naive UTC；"今日"按 Config.TIMEZONE（北京时间）的自然日对齐。
+    """
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    tz = ZoneInfo(Config.TIMEZONE)
+    today_start_utc = datetime.now(tz).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ).astimezone(timezone.utc).replace(tzinfo=None)
+
+    return jsonify({'success': True, 'data': {
+        'today_logins': User.query.filter(User.last_login_at >= today_start_utc).count(),
+        'active_today': User.query.filter(User.last_seen_at >= today_start_utc).count(),
+        'active_15m': User.query.filter(
+            User.last_seen_at >= now_utc - timedelta(minutes=15)).count(),
+        'generated_at': now_utc.isoformat(),
+    }})
 
 
 @admin_bp.route('/statistics/learning-data')

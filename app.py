@@ -46,6 +46,10 @@ def create_app():
     from utils.logging import init_request_id
     init_request_id(app)
 
+    # 用户活跃度追踪 — before_request 节流更新 last_seen_at（异常静默）
+    from utils.activity import init_activity_tracking
+    init_activity_tracking(app)
+
     # 信任 Nginx 反向代理的 X-Forwarded-* 头（HTTPS 终止）
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 

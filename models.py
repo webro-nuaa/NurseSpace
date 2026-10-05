@@ -34,6 +34,9 @@ class User(UserMixin, db.Model):
     knowledge_model = db.Column(db.String(100))
     knowledge_embedding_model = db.Column(db.String(100))
     token_version = db.Column(db.Integer, nullable=False, default=0, server_default='0')
+    # 活跃度追踪：登录时刻 / 最近活跃请求（before_request 节流更新），naive UTC
+    last_login_at = db.Column(db.DateTime)
+    last_seen_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=_utcnow)
     updated_at = db.Column(db.DateTime, default=_utcnow, onupdate=_utcnow)
     

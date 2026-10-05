@@ -1,6 +1,19 @@
 // 管理员端 — 用户管理 · 列表页（列表渲染、新增用户、启用/禁用）
 // currentPage：用户列表当前页，供操作后刷新当前页使用
 let currentPage = 1;
+
+// 库内时间为 naive UTC（isoformat 无时区后缀），前端补 Z 转 epoch 再算相对时间
+function formatLastSeen(iso) {
+    if (!iso) return '<span class="text-muted">从未</span>';
+    const minutes = Math.floor((Date.now() - new Date(iso + 'Z').getTime()) / 60000);
+    if (minutes < 0 || minutes < 1) return '<span class="badge bg-success">刚刚</span>';
+    if (minutes < 15) return `<span class="badge bg-success">${minutes}分钟前</span>`;
+    if (minutes < 60) return `${minutes}分钟前`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}小时前`;
+    const days = Math.floor(minutes / 1440);
+    if (days < 30) return `${days}天前`;
+    return new Date(iso + 'Z').toLocaleDateString('zh-CN');
+}
 // 加载用户管理
 function loadUsers(page = 1, role = 'nurse') {
     setActiveNav('用户管理');
@@ -53,6 +66,7 @@ function loadUsers(page = 1, role = 'nurse') {
                                                 <th class="d-none d-md-table-cell">科室</th>
                                                 <th class="d-none d-lg-table-cell">邮箱</th>
                                                 <th>状态</th>
+                                                <th>最后活跃</th>
                                                 <th>知情同意</th>
                                                 <th class="d-none d-lg-table-cell">学习统计</th>
                                                 <th class="d-none d-md-table-cell">注册时间</th>
@@ -71,6 +85,7 @@ function loadUsers(page = 1, role = 'nurse') {
                                                             ${user.status === 'active' ? '正常' : '禁用'}
                                                         </span>
                                                     </td>
+                                                    <td>${formatLastSeen(user.last_seen_at)}</td>
                                                     <td>
                                                         <span class="badge ${user.consent_accepted ? 'bg-success' : 'bg-warning text-dark'}">
                                                             ${user.consent_accepted ? '已同意' : '未同意'}

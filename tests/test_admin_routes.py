@@ -25,6 +25,23 @@ class TestUserManagement:
         data = resp.get_json()
         assert data['success']
         assert 'users' in data['data']
+        # 活跃度追踪字段随列表返回（空库时列表可为空；字段可为 None）
+        for user in data['data']['users']:
+            assert 'last_seen_at' in user
+            assert 'last_login_at' in user
+
+    def test_activity_statistics(self, client, admin_token):
+        """活跃度统计端点：今日登录 / 今日活跃 / 最近15分钟活跃。"""
+        resp = client.get('/admin/statistics/activity',
+                          headers={'Authorization': f'Bearer {admin_token}'})
+        data = resp.get_json()
+        assert data['success']
+        assert set(data['data'].keys()) >= {'today_logins', 'active_today', 'active_15m'}
+
+    def test_activity_statistics_requires_admin(self, client, nurse_token):
+        resp = client.get('/admin/statistics/activity',
+                          headers={'Authorization': f'Bearer {nurse_token}'})
+        assert resp.status_code == 403
 
     def test_get_user_detail(self, client, admin_token, nurse_user):
         resp = client.get(f'/admin/users/{nurse_user.id}',

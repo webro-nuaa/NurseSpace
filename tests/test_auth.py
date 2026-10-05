@@ -17,6 +17,20 @@ class TestLogin:
         assert 'access_token' in data
         assert data['user']['role'] == 'nurse'
 
+    def test_login_records_activity(self, client, nurse_user, app):
+        """登录成功后记录 last_login_at / last_seen_at（活跃度追踪）。"""
+        from models import User, db
+        with app.app_context():
+            assert db.session.get(User, nurse_user.id).last_login_at is None
+        resp = client.post('/auth/login', json={
+            'username': 'testnurse', 'password': 'nursepass123'
+        })
+        assert resp.get_json()['success']
+        with app.app_context():
+            user = db.session.get(User, nurse_user.id)
+            assert user.last_login_at is not None
+            assert user.last_seen_at is not None
+
     def test_login_wrong_password(self, client, nurse_user):
         resp = client.post('/auth/login', json={
             'username': 'testnurse', 'password': 'wrong'

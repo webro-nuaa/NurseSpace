@@ -56,6 +56,8 @@ def get_users():
             'points': user.points,
             'consent_accepted': user.consent_accepted,
             'consent_accepted_at': user.consent_accepted_at.isoformat() if user.consent_accepted_at else None,
+            'last_login_at': user.last_login_at.isoformat() if user.last_login_at else None,
+            'last_seen_at': user.last_seen_at.isoformat() if user.last_seen_at else None,
             'learning_count': learning_count,
             'wrong_count': wrong_count,
             'created_at': user.created_at.isoformat()
