@@ -48,6 +48,7 @@ function submitUserXlsxImportPage() {
         success: function(res) {
             if (res.success) {
                 const users = res.users || [];
+                window._lastImportedAccounts = users;
                 let userList = users.map(u => '<tr><td>' + sanitizeHTML(u.username) + '</td><td>' + sanitizeHTML(u.password) + '</td><td>' + sanitizeHTML(u.real_name) + '</td></tr>').join('');
                 showAlert(res.message || '导入成功', 'success', 3000);
                 if (users.length) {
@@ -55,10 +56,13 @@ function submitUserXlsxImportPage() {
                         '<div class="modal-dialog modal-lg"><div class="modal-content">' +
                         '<div class="modal-header"><h6 class="modal-title">导入用户清单</h6>' +
                         '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>' +
-                        '<div class="modal-body"><div class="table-responsive"><table class="table table-sm table-bordered small">' +
+                        '<div class="modal-body"><div class="alert alert-warning small mb-2"><i class="fas fa-exclamation-triangle me-1"></i>初始密码仅此次展示，关闭后无法再查看，请先下载保存！</div>' +
+                        '<div class="table-responsive"><table class="table table-sm table-bordered small">' +
                         '<thead><tr><th>工号</th><th>初始密码</th><th>姓名</th></tr></thead>' +
                         '<tbody>' + userList + '</tbody></table></div></div>' +
-                        '<div class="modal-footer"><button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button></div>' +
+                        '<div class="modal-footer">' +
+                        '<button class="btn btn-success btn-sm" onclick="downloadImportedAccounts()"><i class="fas fa-download me-1"></i>下载账号表（Excel）</button>' +
+                        '<button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button></div>' +
                         '</div></div></div>';
                     $('#modal-container').html(modalHtml);
                     $('#importResultModal').modal('show');
@@ -66,5 +70,30 @@ function submitUserXlsxImportPage() {
                 navToUsers();
             } else { showAlert(res.message || '导入失败', 'error'); }
         }
+    });
+}
+
+// 把本次导入返回的账号清单交给后端生成 Excel 下载（密码仅存于此响应中）
+function downloadImportedAccounts() {
+    const users = window._lastImportedAccounts || [];
+    if (!users.length) { showAlert('没有可下载的账号数据', 'error'); return; }
+    $.ajax({
+        url: '/admin/users/export-accounts-xlsx',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ users: users }),
+        xhrFields: { responseType: 'blob' },
+        success: function(blob, status, xhr) {
+            if (xhr.getResponseHeader('Content-Type').indexOf('json') >= 0) {
+                blob.text().then(t => showAlert(JSON.parse(t).message || '导出失败', 'error'));
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = '新用户账号清单.xlsx';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        },
+        error: function() { showAlert('导出失败，请稍后重试', 'error'); }
     });
 }

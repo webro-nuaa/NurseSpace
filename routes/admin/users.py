@@ -204,6 +204,70 @@ def users_xlsx_template():
         return jsonify({'success': False, 'message': '生成模板失败，请稍后重试'})
 
 
+@admin_bp.route('/users/export-xlsx', methods=['GET'])
+@login_or_jwt_required
+@admin_required
+def users_export_xlsx():
+    """导出全部用户信息（不含密码——密码为哈希存储，不可还原）。"""
+    try:
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'users'
+        headers = ['真实姓名', '工号', '科室', '学校', '学号', '邮箱', '手机号', '角色', '状态', '注册时间']
+        ws.append(headers)
+        for u in User.query.order_by(User.id).all():
+            ws.append([
+                u.real_name, u.username, u.department or '', u.school or '',
+                u.serial_number or '', u.email or '', u.phone or '',
+                u.role, u.status,
+                u.created_at.strftime('%Y-%m-%d %H:%M') if u.created_at else '',
+            ])
+        bio = BytesIO()
+        wb.save(bio)
+        bio.seek(0)
+        return send_file(bio, as_attachment=True, download_name='用户信息导出.xlsx',
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    except Exception as e:
+        current_app.logger.error(f"导出用户信息失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '导出失败，请稍后重试'})
+
+
+@admin_bp.route('/users/export-accounts-xlsx', methods=['POST'])
+@login_or_jwt_required
+@admin_required
+def users_export_accounts_xlsx():
+    """把批量导入返回的账号清单（工号/初始密码/姓名）生成 Excel 供发放。
+
+    初始密码只在导入响应中存在（库中为哈希），此端点是清单落盘的唯一途径，
+    数据来自前端持有的导入响应，服务端不再持久化。
+    """
+    try:
+        data = request.get_json() or {}
+        users = data.get('users') or []
+        if not isinstance(users, list) or not users:
+            return jsonify({'success': False, 'message': '没有可导出的账号数据'})
+        if len(users) > 5000:
+            return jsonify({'success': False, 'message': '账号数量超出导出上限'})
+
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'accounts'
+        ws.append(['真实姓名', '工号', '初始密码'])
+        for u in users:
+            ws.append([str(u.get('real_name') or ''), str(u.get('username') or ''),
+                       str(u.get('password') or '')])
+        bio = BytesIO()
+        wb.save(bio)
+        bio.seek(0)
+        return send_file(bio, as_attachment=True, download_name='新用户账号清单.xlsx',
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    except Exception as e:
+        current_app.logger.error(f"导出账号清单失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': '导出失败，请稍后重试'})
+
+
 @admin_bp.route('/users/batch-import-xlsx', methods=['POST'])
 @login_or_jwt_required
 @admin_required

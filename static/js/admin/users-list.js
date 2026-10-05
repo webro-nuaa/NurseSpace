@@ -22,6 +22,9 @@ function loadUsers(page = 1, role = 'nurse') {
                         <button class="btn btn-outline-success btn-sm" onclick="navToUserImport()">
                             <i class="fas fa-file-excel me-1"></i>批量导入
                         </button>
+                        <a class="btn btn-outline-success btn-sm" href="/admin/users/export-xlsx">
+                            <i class="fas fa-file-export me-1"></i>导出用户
+                        </a>
                         <a class="btn btn-outline-secondary btn-sm" href="/admin/users/xlsx-template">
                             <i class="fas fa-download me-1"></i>下载模板
                         </a>

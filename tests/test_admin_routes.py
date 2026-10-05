@@ -79,6 +79,29 @@ class TestUserManagement:
         assert user is not None
         assert user.status == 'active'
 
+    def test_export_users_xlsx(self, client, admin_token):
+        """全量用户导出：返回 xlsx 文件流。"""
+        resp = client.get('/admin/users/export-xlsx',
+                          headers={'Authorization': f'Bearer {admin_token}'})
+        assert resp.status_code == 200
+        assert 'spreadsheetml' in resp.headers['Content-Type']
+
+    def test_export_accounts_xlsx(self, client, admin_token):
+        """导入账号清单导出：有数据返回 xlsx，空数据返回 JSON 错误。"""
+        resp = client.post('/admin/users/export-accounts-xlsx',
+                           json={'users': [
+                               {'username': 'NS26001', 'password': '26001@ns', 'real_name': '张三'},
+                           ]},
+                           headers={'Authorization': f'Bearer {admin_token}'})
+        assert resp.status_code == 200
+        assert 'spreadsheetml' in resp.headers['Content-Type']
+
+        resp_empty = client.post('/admin/users/export-accounts-xlsx',
+                                 json={'users': []},
+                                 headers={'Authorization': f'Bearer {admin_token}'})
+        assert resp_empty.status_code == 200
+        assert resp_empty.get_json()['success'] is False
+
 
 class TestCaseManagement:
     def test_list_cases(self, client, admin_token):
